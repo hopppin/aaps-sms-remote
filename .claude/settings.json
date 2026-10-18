@@ -23,7 +23,10 @@
       "Bash(git push origin main:*)",
       "Bash(git push origin HEAD:main:*)",
       "Bash(git push * main:*)",
-      "Bash(git push * *:main:*)"
+      "Bash(git push * *:main:*)",
+      "Bash(git push origin HEAD:refs/heads/main:*)",
+      "Bash(git push * refs/heads/main:*)",
+      "Bash(git push * *:refs/heads/main:*)"
     ]
   }
 }
