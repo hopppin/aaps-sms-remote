@@ -30,7 +30,8 @@ Wybór: natywnie w **Kotlinie z Jetpack Compose**. SMS i Keystore to API Android
 | Odbiór SMS | `BroadcastReceiver` na `SMS_RECEIVED` |
 | TOTP | własna implementacja RFC 6238 (HMAC-SHA1, 30 s, 6 cyfr) albo biblioteka `kotlin-onetimepassword` |
 | Skan kodu QR | CameraX + ML Kit Barcode Scanning |
-| Bezpieczne dane | Android Keystore + `EncryptedSharedPreferences` / DataStore z szyfrowaniem || Architektura | MVVM, Kotlin Coroutines + Flow, Hilt (DI) |
+| Bezpieczne dane | Android Keystore + `EncryptedSharedPreferences` / DataStore z szyfrowaniem |
+| Architektura | MVVM, Kotlin Coroutines + Flow, Hilt (DI) |
 | Historia poleceń | Room |
 | Testy | JUnit, Turbine, Compose UI Test |
 
