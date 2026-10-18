@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Lokalna konfiguracja
+local.properties
+
+# Klucze podpisu
+*.jks
+*.keystore
+keystore.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Artefakty
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+output-metadata.json
+
+# Logi i system
+*.log
+.DS_Store
+Thumbs.db
+
+# Claude Code - ustawienia lokalne
+.claude/settings.local.json
