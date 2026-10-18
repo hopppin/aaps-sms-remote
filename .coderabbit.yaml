@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: pl-PL
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "**/sms/**"
+      instructions: |
+        Kod wysyłania i odbioru SMS. Sprawdź szczególnie:
+        - filtrowanie wiadomości po numerze AAPS i ignorowanie SMS-ów sprzed wysłania polecenia,
+        - obsługę SMS-ów wieloczęściowych i błędów SmsManager,
+        - brak treści SMS i numerów telefonu w logach.
+    - path: "**/otp/**"
+      instructions: |
+        Generowanie TOTP. Sprawdź szczególnie:
+        - zgodność z RFC 6238 (HMAC-SHA1, 30 s, 6 cyfr) i testy na wektorach z RFC,
+        - obsługę kodu bliskiego wygaśnięcia,
+        - że sekret i kody nigdy nie są logowane ani wyświetlane.
+    - path: "**/security/**"
+      instructions: |
+        Keystore, szyfrowanie i biometria. Sprawdź szczególnie:
+        - setUserAuthenticationRequired(true) dla klucza chroniącego PIN,
+        - obsługę unieważnienia klucza (KeyPermanentlyInvalidatedException),
+        - brak sekretów, PIN-ów i kluczy w logach, wyjątkach i kodzie.
