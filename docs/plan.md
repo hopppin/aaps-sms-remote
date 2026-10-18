@@ -4,7 +4,7 @@ Wersja z 17.10.2026
 
 ## Cel i zakres
 
-Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie biometrią (zapasowo: ręcznie wpisanym PIN-em AAPS) i nie musi przepisywać kodów z Authenticatora.
+Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie, wpisując PIN AAPS, i nie musi przepisywać kodów z Authenticatora. PIN nie jest nigdzie zapisywany.
 
 **Polecenia w wersji 1 (MVP):**
 
@@ -20,7 +20,7 @@ Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sa
 
 ## Wybór technologii
 
-Wybór: natywnie w **Kotlinie z Jetpack Compose**. SMS, Keystore i biometria to API Androida, więc bez Fluttera odpada warstwa kanałów platformowych i pakietów pośrednich.
+Wybór: natywnie w **Kotlinie z Jetpack Compose**. SMS i Keystore to API Androida, więc bez Fluttera odpada warstwa kanałów platformowych i pakietów pośrednich.
 
 | Obszar | Rozwiązanie |
 | --- | --- |
@@ -30,9 +30,7 @@ Wybór: natywnie w **Kotlinie z Jetpack Compose**. SMS, Keystore i biometria to 
 | Odbiór SMS | `BroadcastReceiver` na `SMS_RECEIVED` |
 | TOTP | własna implementacja RFC 6238 (HMAC-SHA1, 30 s, 6 cyfr) albo biblioteka `kotlin-onetimepassword` |
 | Skan kodu QR | CameraX + ML Kit Barcode Scanning |
-| Bezpieczne dane | Android Keystore + `EncryptedSharedPreferences` / DataStore z szyfrowaniem |
-| Biometria | `androidx.biometric` (`BiometricPrompt`) |
-| Architektura | MVVM, Kotlin Coroutines + Flow, Hilt (DI) |
+| Bezpieczne dane | Android Keystore + `EncryptedSharedPreferences` / DataStore z szyfrowaniem || Architektura | MVVM, Kotlin Coroutines + Flow, Hilt (DI) |
 | Historia poleceń | Room |
 | Testy | JUnit, Turbine, Compose UI Test |
 
@@ -40,7 +38,7 @@ Dystrybucja: plik APK instalowany ręcznie (sideload). Google Play mocno ogranic
 
 ## Przepływ działania
 
-Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: wybiera polecenie. Dla CARBS wybiera polecenie, wpisuje ilość i zatwierdza podsumowanie biometrią lub ręcznie wpisanym PIN-em AAPS. Resztę robi aplikacja.
+Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: wybiera polecenie. Dla CARBS wybiera polecenie, wpisuje ilość, a na podsumowaniu wpisuje PIN AAPS i zatwierdza. Resztę robi aplikacja.
 
 **Polecenie bez potwierdzenia (BG, PUMP):**
 
@@ -52,12 +50,12 @@ Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: w
 
 1. Użytkownik wybiera CARBS i wpisuje ilość, np. 20 g.
 2. Ekran podsumowania: „Wysłać CARBS 20 g do AAPS?” + przycisk Zatwierdź.
-3. Zatwierdzenie biometrią. To odblokowuje klucz w Keystore, a z nim zapisany PIN AAPS. Zapas: użytkownik wpisuje PIN AAPS ręcznie przy każdym poleceniu (aplikacja nie ma własnego PIN-u, bo nie da się nim odblokować klucza Keystore).
+3. Użytkownik wpisuje PIN AAPS i zatwierdza. PIN jest trzymany tylko w pamięci do zakończenia polecenia, potem czyszczony.
 4. Aplikacja wysyła SMS `CARBS 20`.
 5. AAPS odsyła prośbę o kod. Aplikacja sprawdza, czy wiadomość przyszła z numeru AAPS i czy dotyczy dokładnie 20 g.
     - zgadza się → krok 6
     - nie zgadza się albo brak odpowiedzi → stop, komunikat dla użytkownika, nic nie jest odsyłane
-6. Aplikacja liczy bieżący kod TOTP, dokleja PIN AAPS i odsyła odpowiedź.
+6. Aplikacja liczy bieżący kod TOTP, dokleja wpisany PIN AAPS i odsyła odpowiedź.
 7. AAPS potwierdza wykonanie. Aplikacja pokazuje wynik i zapisuje wpis w historii.
 
 Jeśli kod TOTP jest bliski wygaśnięcia (np. mniej niż 5 s ważności), aplikacja czeka na następny, żeby uniknąć odrzucenia.
@@ -74,22 +72,20 @@ Całość to jedna aplikacja z wyraźnie rozdzielonymi warstwami. Logikę potwie
 | `session` | maszyna stanów jednego polecenia: Wysłane → Czeka na prośbę o kod → Kod wysłany → Zakończone / Błąd / Timeout |
 | `parser` | rozpoznawanie odpowiedzi AAPS (prośba o kod, sukces, błąd, odrzucenie) na podstawie wzorców |
 | `otp` | generowanie TOTP z sekretu, kontrola czasu ważności kodu |
-| `security` | Keystore, szyfrowanie sekretu i PIN-u, `BiometricPrompt`, blokada aplikacji |
+| `security` | Keystore, szyfrowanie sekretu TOTP, obsługa PIN-u AAPS w pamięci |
 | `data` | ustawienia (numer AAPS, karta SIM), historia poleceń w Room |
 
 Katalog poleceń jest danymi, a nie kodem rozsianym po ekranach. Dodanie bolusa czy zmiany celu w przyszłości to nowy wpis w katalogu, nowe wzorce w parserze i testy.
 
 ## Bezpieczeństwo
 
-Sekret TOTP i PIN AAPS są szyfrowane kluczem z Android Keystore, który odblokowuje się tylko po biometrii lub PIN-ie urządzenia. Kradzież pliku z danymi aplikacji nic wtedy nie daje.
+Sekret TOTP jest szyfrowany kluczem z Android Keystore, którego nie da się wyciągnąć z telefonu. Klucz działa tylko przy odblokowanym telefonie (`setUnlockedDeviceRequired(true)`). Kradzież pliku z danymi aplikacji nic wtedy nie daje. PIN AAPS zna tylko użytkownik, więc potwierdzenie wymaga dwóch czynników: telefonu z sekretem i PIN-u.
 
 - **Sekret TOTP:** wczytany raz ze zeskanowanego QR (`otpauth://…`), zapisany zaszyfrowany. Nigdy nie jest pokazywany ani logowany.
-- **PIN AAPS:** żeby potwierdzać samą biometrią, PIN musi być zapisany. Szyfruje go klucz z `setUserAuthenticationRequired(true)`, więc bez biometrii nie da się go odczytać.
-- **Tryb zapasowy:** zamiast biometrii użytkownik wpisuje PIN AAPS ręcznie przy każdym poleceniu; zapisany PIN nie jest wtedy odczytywany. Sekret TOTP odblokowuje w tym trybie blokada ekranu telefonu. Aplikacja nie ma własnego PIN-u.
-- **Unieważnienie klucza:** po dodaniu nowego odcisku palca Keystore unieważnia klucz i trzeba ponownie podać PIN. To zamierzone zachowanie.
+- **PIN AAPS:** wpisywany przy każdym poleceniu z potwierdzeniem. Nigdy nie jest zapisywany na dysku ani logowany; po zakończeniu polecenia jest czyszczony z pamięci. Aplikacja nie używa biometrii i nie ma własnego PIN-u.
 - **Brak kopii:** `allowBackup=false`, żeby sekret nie trafiał do kopii zapasowej Google.
 - **Ekran:** `FLAG_SECURE` na ekranach z danymi, czyli brak zrzutów i podglądu w ostatnich aplikacjach.
-- **Świadome ryzyko:** sekret TOTP i aplikacja na jednym telefonie to w praktyce jeden czynnik. Ochroną jest blokada telefonu, biometria i to, że AAPS przyjmuje SMS tylko z dozwolonego numeru.
+- **Świadome ryzyko:** sekret TOTP i aplikacja są na jednym telefonie, więc kto ma odblokowany telefon, ma kod TOTP. Ochroną jest PIN AAPS w głowie użytkownika, blokada telefonu i to, że AAPS przyjmuje SMS tylko z dozwolonego numeru.
 
 ## Parsowanie odpowiedzi i obsługa błędów
 
@@ -118,9 +114,9 @@ Pięć ekranów wystarczy na MVP.
 
 | Ekran | Zawartość |
 | --- | --- |
-| Konfiguracja (pierwsze uruchomienie) | numer telefonu AAPS, wybór karty SIM, skan QR sekretu TOTP, podanie PIN-u AAPS, włączenie biometrii, test połączenia `BG` |
+| Konfiguracja (pierwsze uruchomienie) | numer telefonu AAPS, wybór karty SIM, skan QR sekretu TOTP, test połączenia `BG` |
 | Polecenia (główny) | duże przyciski BG, PUMP, CARBS; ostatnia znana glikemia i czas odpowiedzi |
-| CARBS | pole ilości (klawiatura numeryczna, szybkie wartości 10/20/30 g), ekran podsumowania, przycisk Zatwierdź |
+| CARBS | pole ilości (klawiatura numeryczna, szybkie wartości 10/20/30 g), ekran podsumowania z polem PIN AAPS (maskowane), przycisk Zatwierdź |
 | Przebieg polecenia | kroki na żywo: wysłano → AAPS prosi o kod → kod wysłany → wykonano; treść SMS z AAPS |
 | Historia i ustawienia | lista poleceń z wynikiem i czasem; zmiana numeru, SIM, ponowny skan QR, limit oczekiwania |
 
@@ -144,8 +140,8 @@ Sześć etapów, każdy kończy się czymś, co da się sprawdzić na telefonie.
 **Etap 3. Konfiguracja i bezpieczeństwo**
 
 - [ ] Ekran konfiguracji ze skanem QR
-- [ ] Szyfrowanie sekretu i PIN-u w Keystore
-- [ ] `BiometricPrompt` + tryb zapasowy z ręcznym PIN-em
+- [ ] Szyfrowanie sekretu TOTP w Keystore
+- [ ] Pole PIN AAPS na ekranie podsumowania (PIN tylko w pamięci)
 
 **Etap 4. Polecenia i maszyna stanów**
 
@@ -179,6 +175,6 @@ Wdrożenie: podpisany APK z własnym kluczem, instalacja z pliku, aktualizacje t
 - [ ] Jaka wersja AAPS i w jakim języku są komunikaty SMS?
 - [ ] Przykładowe SMS-y: prośba o kod dla CARBS, sukces, błąd (do etapu 1)
 - [ ] Jak przenieść sekret TOTP: ponowne wygenerowanie QR w AAPS czy eksport z obecnego Authenticatora?
-- [ ] Domyślne potwierdzenie: biometria z zapisanym PIN-em czy ręczny PIN za każdym razem?
+- [x] Domyślne potwierdzenie: biometria z zapisanym PIN-em czy ręczny PIN za każdym razem? → ręczny PIN AAPS za każdym razem, bez biometrii.
 - [ ] Telefon nadawcy: jedna karta SIM czy dual SIM, i czy jego numer jest na liście dozwolonych w AAPS?
 - [ ] Maksymalna ilość CARBS do wpisania w aplikacji (dodatkowy limit poza AAPS)?

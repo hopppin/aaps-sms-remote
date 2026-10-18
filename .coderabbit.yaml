@@ -23,7 +23,7 @@ reviews:
         - że sekret i kody nigdy nie są logowane ani wyświetlane.
     - path: "**/security/**"
       instructions: |
-        Keystore, szyfrowanie i biometria. Sprawdź szczególnie:
-        - setUserAuthenticationRequired(true) dla klucza chroniącego PIN,
-        - obsługę unieważnienia klucza (KeyPermanentlyInvalidatedException),
+        Keystore i szyfrowanie sekretu TOTP. Aplikacja nie używa biometrii. Sprawdź szczególnie:
+        - setUnlockedDeviceRequired(true) dla klucza szyfrującego sekret TOTP,
+        - że PIN AAPS nigdy nie jest zapisywany, tylko trzymany w pamięci i czyszczony po poleceniu,
         - brak sekretów, PIN-ów i kluczy w logach, wyjątkach i kodzie.

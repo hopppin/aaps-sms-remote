@@ -4,14 +4,14 @@ Wspólne zasady dla wszystkich agentów (Claude, Codex) i ludzi pracujących w t
 
 ## Projekt
 
-Aplikacja na Androida, która wysyła polecenia SMS do telefonu z AndroidAPS (AAPS) i sama odpowiada kodem potwierdzającym (TOTP + PIN) po zatwierdzeniu biometrią. MVP: `BG`, `PUMP`, `CARBS <g>`.
+Aplikacja na Androida, która wysyła polecenia SMS do telefonu z AndroidAPS (AAPS) i sama odpowiada kodem potwierdzającym (TOTP + PIN) po zatwierdzeniu przez użytkownika, który za każdym razem wpisuje PIN AAPS. Bez biometrii. MVP: `BG`, `PUMP`, `CARBS <g>`.
 
 ## Stos technologiczny
 
 - Kotlin, Jetpack Compose, Material 3
 - minSdk 28, compileSdk/targetSdk 37, JDK 17
 - Hilt (DI), Kotlin Coroutines + Flow, MVVM
-- Room (historia), Android Keystore + szyfrowane DataStore/SharedPreferences, `androidx.biometric`
+- Room (historia), Android Keystore + szyfrowane DataStore/SharedPreferences (bez biometrii)
 - Testy: JUnit 5, MockK, Turbine, `kotlinx-coroutines-test`
 - Wersje zależności: `gradle/libs.versions.toml`
 - Pakiet bazowy: `pl.twojanazwa.aapsremote`
@@ -37,7 +37,7 @@ Jedna aplikacja, warstwy rozdzielone pakietami w `pl.twojanazwa.aapsremote`:
 | `session` | maszyna stanów polecenia: Wysłane → Czeka na prośbę o kod → Kod wysłany → Zakończone / Błąd / Timeout |
 | `parser` | rozpoznawanie odpowiedzi AAPS na podstawie wzorców |
 | `otp` | TOTP wg RFC 6238 (HMAC-SHA1, 30 s, 6 cyfr), kontrola czasu ważności |
-| `security` | Keystore, szyfrowanie sekretu i PIN-u, `BiometricPrompt` |
+| `security` | Keystore, szyfrowanie sekretu TOTP, obsługa PIN-u AAPS w pamięci |
 | `data` | ustawienia, historia w Room |
 
 Logika (`commands`, `parser`, `session`, `otp`) nie zależy od Androida, żeby dało się ją testować jednostkowo bez telefonu. Nowe polecenie = nowy wpis w katalogu + wzorce w parserze + testy.
@@ -54,6 +54,7 @@ Logika (`commands`, `parser`, `session`, `otp`) nie zależy od Androida, żeby d
 ## Bezpieczeństwo
 
 - Nigdy nie loguj sekretu TOTP, kodów TOTP ani PIN-u (także w wyjątkach, `toString()` i komunikatach UI).
+- PIN AAPS nigdy nie jest zapisywany (dysk, DataStore, Room, Keystore). Trzymaj go tylko w pamięci do końca polecenia i potem wyczyść.
 - Żadnych prawdziwych sekretów, PIN-ów ani numerów telefonu w repo. W przykładach używaj fikcyjnych danych.
 - W testach TOTP używaj wyłącznie wektorów testowych z RFC 6238.
 - Aplikacja nigdy nie odsyła kodu, jeśli odpowiedź AAPS nie zgadza się z poleceniem (inny numer nadawcy, inna ilość, nierozpoznana treść, odpowiedź sprzed wysłania). W razie wątpliwości: stop i komunikat dla użytkownika.
