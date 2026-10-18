@@ -4,7 +4,7 @@ Wersja z 17.10.2026
 
 ## Cel i zakres
 
-Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie biometrią albo PIN-em i nie musi przepisywać kodów z Authenticatora.
+Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie biometrią (zapasowo: ręcznie wpisanym PIN-em AAPS) i nie musi przepisywać kodów z Authenticatora.
 
 **Polecenia w wersji 1 (MVP):**
 
@@ -40,7 +40,7 @@ Dystrybucja: plik APK instalowany ręcznie (sideload). Google Play mocno ogranic
 
 ## Przepływ działania
 
-Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: wybiera polecenie. Dla CARBS wybiera polecenie, wpisuje ilość i zatwierdza podsumowanie biometrią lub PIN-em. Resztę robi aplikacja.
+Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: wybiera polecenie. Dla CARBS wybiera polecenie, wpisuje ilość i zatwierdza podsumowanie biometrią lub ręcznie wpisanym PIN-em AAPS. Resztę robi aplikacja.
 
 **Polecenie bez potwierdzenia (BG, PUMP):**
 
@@ -52,7 +52,7 @@ Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: w
 
 1. Użytkownik wybiera CARBS i wpisuje ilość, np. 20 g.
 2. Ekran podsumowania: „Wysłać CARBS 20 g do AAPS?” + przycisk Zatwierdź.
-3. Zatwierdzenie biometrią (albo PIN-em aplikacji jako zapas). To odblokowuje klucz w Keystore.
+3. Zatwierdzenie biometrią. To odblokowuje klucz w Keystore, a z nim zapisany PIN AAPS. Zapas: użytkownik wpisuje PIN AAPS ręcznie przy każdym poleceniu (aplikacja nie ma własnego PIN-u, bo nie da się nim odblokować klucza Keystore).
 4. Aplikacja wysyła SMS `CARBS 20`.
 5. AAPS odsyła prośbę o kod. Aplikacja sprawdza, czy wiadomość przyszła z numeru AAPS i czy dotyczy dokładnie 20 g.
     - zgadza się → krok 6
@@ -85,7 +85,7 @@ Sekret TOTP i PIN AAPS są szyfrowane kluczem z Android Keystore, który odbloko
 
 - **Sekret TOTP:** wczytany raz ze zeskanowanego QR (`otpauth://…`), zapisany zaszyfrowany. Nigdy nie jest pokazywany ani logowany.
 - **PIN AAPS:** żeby potwierdzać samą biometrią, PIN musi być zapisany. Szyfruje go klucz z `setUserAuthenticationRequired(true)`, więc bez biometrii nie da się go odczytać.
-- **Tryb zapasowy:** zamiast biometrii użytkownik wpisuje PIN AAPS ręcznie. Wtedy PIN nie musi być przechowywany wcale.
+- **Tryb zapasowy:** zamiast biometrii użytkownik wpisuje PIN AAPS ręcznie przy każdym poleceniu; zapisany PIN nie jest wtedy odczytywany. Sekret TOTP odblokowuje w tym trybie blokada ekranu telefonu. Aplikacja nie ma własnego PIN-u.
 - **Unieważnienie klucza:** po dodaniu nowego odcisku palca Keystore unieważnia klucz i trzeba ponownie podać PIN. To zamierzone zachowanie.
 - **Brak kopii:** `allowBackup=false`, żeby sekret nie trafiał do kopii zapasowej Google.
 - **Ekran:** `FLAG_SECURE` na ekranach z danymi, czyli brak zrzutów i podglądu w ostatnich aplikacjach.
