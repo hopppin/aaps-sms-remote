@@ -40,7 +40,7 @@ Dystrybucja: plik APK instalowany ręcznie (sideload). Google Play mocno ogranic
 
 ## Przepływ działania
 
-Użytkownik dotyka ekranu tylko dwa razy: wybiera polecenie i zatwierdza je biometrią lub PIN-em. Resztę robi aplikacja.
+Dla poleceń bez potwierdzenia (BG, PUMP) użytkownik dotyka ekranu tylko raz: wybiera polecenie. Dla CARBS wybiera polecenie, wpisuje ilość i zatwierdza podsumowanie biometrią lub PIN-em. Resztę robi aplikacja.
 
 **Polecenie bez potwierdzenia (BG, PUMP):**
 
