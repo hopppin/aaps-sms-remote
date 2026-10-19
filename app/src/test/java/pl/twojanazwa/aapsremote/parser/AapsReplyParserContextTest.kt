@@ -36,6 +36,42 @@ class AapsReplyParserContextTest {
     }
 
     @Test
+    fun `PARSER-01 bg txt i pump txt w kontekscie CARBS 1 sa nierozpoznane`() {
+        for (body in listOf(AapsSamples.bg, AapsSamples.pump)) {
+            assertEquals(AapsReply.Unrecognized(body), AapsReplyParser.parse(body, ExpectedCommand.Carbs(1)))
+        }
+    }
+
+    @Test
+    fun `PARSER-01 pusta tresc w kontekscie CARBS 1 jest nierozpoznana bez wyjatku`() {
+        assertEquals(AapsReply.Unrecognized(""), AapsReplyParser.parse("", ExpectedCommand.Carbs(1)))
+    }
+
+    @Test
+    fun `PARSER-01 macierz kontekstow - kazdy plik w kazdym kontekscie daje tylko oczekiwany wynik`() {
+        val bg = AapsSamples.bg
+        val pump = AapsSamples.pump
+        val request = AapsSamples.carbsCodeRequest
+        val done = AapsSamples.carbsDone
+        val wrong = AapsSamples.wrongCode
+        val contexts = listOf(ExpectedCommand.Bg, ExpectedCommand.Pump, ExpectedCommand.Carbs(1))
+        // Jedyne dozwolone wyniki inne niz Unrecognized: plik x wlasciwy kontekst.
+        val allowed = mapOf<Pair<String, ExpectedCommand>, AapsReply>(
+            (bg to ExpectedCommand.Bg) to AapsReply.BgReport(210, bg),
+            (pump to ExpectedCommand.Pump) to AapsReply.PumpStatus(pump),
+            (request to ExpectedCommand.Carbs(1)) to AapsReply.CodeRequest(1, request),
+            (done to ExpectedCommand.Carbs(1)) to AapsReply.CarbsDone(1, done),
+            (wrong to ExpectedCommand.Carbs(1)) to AapsReply.WrongCode,
+        )
+        for (body in listOf(bg, pump, request, done, wrong)) {
+            for (context in contexts) {
+                val expected = allowed[body to context] ?: AapsReply.Unrecognized(body)
+                assertEquals(expected, AapsReplyParser.parse(body, context))
+            }
+        }
+    }
+
+    @Test
     fun `PARSER-01 kontekst CARBS z iloscia 0 lub -5 rzuca IllegalArgumentException`() {
         assertThrows(IllegalArgumentException::class.java) { ExpectedCommand.Carbs(0) }
         assertThrows(IllegalArgumentException::class.java) { ExpectedCommand.Carbs(-5) }
