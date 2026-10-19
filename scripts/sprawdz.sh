@@ -21,7 +21,9 @@ if [ ! -f local.properties ]; then
   if [ -z "$sdk" ] && [ -d "$HOME/Library/Android/sdk" ]; then sdk="$HOME/Library/Android/sdk"; fi
   if [ -z "$sdk" ] && [ -d "$HOME/Android/Sdk" ]; then sdk="$HOME/Android/Sdk"; fi
   if [ -n "$sdk" ]; then
-    printf 'sdk.dir=%s\n' "$(printf '%s' "$sdk" | sed 's/:/\\:/')" > local.properties
+    # local.properties to plik Properties: "\" jest znakiem ucieczki, a ":" separatorem –
+    # zamieniamy ukośniki odwrotne na zwykłe i escapujemy dwukropek.
+    printf 'sdk.dir=%s\n' "$(printf '%s' "$sdk" | sed -e 's#\\#/#g' -e 's/:/\\:/g')" > local.properties
     echo "Utworzono local.properties (sdk.dir=$sdk)"
   fi
 fi
@@ -35,7 +37,7 @@ fi
 ./gradlew "$@" --console=plain
 
 results=app/build/test-results/testDebugUnitTest
-if [ -d "$results" ]; then
+if compgen -G "$results/*.xml" >/dev/null; then
   cat "$results"/*.xml | grep -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
     | awk -F'"' '{t+=$2; s+=$4; f+=$6; e+=$8} END {printf "Testy: %d, pominięte: %d, porażki: %d, błędy: %d\n", t, s, f, e}'
 fi
