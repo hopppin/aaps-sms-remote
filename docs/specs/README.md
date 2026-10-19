@@ -51,3 +51,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | --- | --- | --- | --- |
 | 001 | [Generator TOTP](001-totp/spec.md) | `TOTP` | zatwierdzona |
 | 002 | [Parser odpowiedzi SMS z AAPS](002-parser-odpowiedzi/spec.md) | `PARSER` | zatwierdzona |
+| 003 | [Katalog poleceń](003-katalog-polecen/spec.md) | `CMD` | szkic |
