@@ -48,6 +48,14 @@ class ParserRedactionTest {
     }
 
     @Test
+    fun `PARSER-10 toString potwierdzenia wykonania CARBS nie zawiera tresci`() {
+        val body = AapsSamples.carbsDone
+        val reply = AapsReplyParser.parse(body, ExpectedCommand.Carbs(1))
+        assertTrue(reply is AapsReply.CarbsDone)
+        assertRedacted(reply.toString(), body)
+    }
+
+    @Test
     fun `PARSER-10 toString kontekstu CARBS nie zawiera ilosci`() {
         assertFalse(ExpectedCommand.Carbs(37).toString().contains("37"))
     }

@@ -10,8 +10,21 @@ class CarbsAmountMismatchTest {
     private fun request(grams: Int) =
         "Aby wprowadzic ${grams}g o 14:50 odeslij w SMS kod z aplikacji Authenticator dla: Jan, z doklejonym PIN-em"
 
-    private fun mismatch(expected: Int, received: Int, body: String) =
-        AapsReply.CarbsAmountMismatch(expected, received, CarbsStage.CODE_REQUEST, body)
+    private fun mismatch(
+        expected: Int,
+        received: Int,
+        body: String,
+        stage: CarbsStage = CarbsStage.CODE_REQUEST,
+    ) = AapsReply.CarbsAmountMismatch(expected, received, stage, body)
+
+    @Test
+    fun `PARSER-06 carbs-sukces 1 g przy CARBS 2 to niezgodna ilosc na etapie potwierdzenia`() {
+        val body = AapsSamples.carbsDone
+        assertEquals(
+            mismatch(2, 1, body, CarbsStage.CONFIRMATION),
+            AapsReplyParser.parse(body, ExpectedCommand.Carbs(2)),
+        )
+    }
 
     @Test
     fun `PARSER-06 plik prosby 1 g przy CARBS 10 to niezgodna ilosc`() {

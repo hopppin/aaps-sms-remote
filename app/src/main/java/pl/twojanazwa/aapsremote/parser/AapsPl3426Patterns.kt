@@ -16,5 +16,7 @@ internal object AapsPl3426Patterns {
         """Aby wprowadzic ${G}g o $H odeslij w SMS kod z aplikacji Authenticator dla: [^\n]+, z doklejonym PIN-em""",
     )
 
+    val CARBS_DONE_FIRST_LINE = Regex("""Pomyslnie wprowadzono $G g weglowodanow""")
+
     val WRONG_CODE = Regex("""Zly kod\. Polecenie anulowano\.""")
 }

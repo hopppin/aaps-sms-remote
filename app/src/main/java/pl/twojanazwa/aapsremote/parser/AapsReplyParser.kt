@@ -19,20 +19,27 @@ object AapsReplyParser {
                     null
                 }
 
-            // Potwierdzenie wykonania CARBS dojdzie w #15.
-            is ExpectedCommand.Carbs -> parseCarbs(n, body, expected.grams)
+            is ExpectedCommand.Carbs -> parseCarbs(n, firstLine, body, expected.grams)
         }
         return result ?: AapsReply.Unrecognized(body)
     }
 
-    private fun parseCarbs(n: String, body: String, expectedGrams: Int): AapsReply? {
+    private fun parseCarbs(n: String, firstLine: String, body: String, expectedGrams: Int): AapsReply? {
         if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
-        val received = AapsPl3426Patterns.CODE_REQUEST.matchEntire(n)?.groupValues?.get(1)?.toInt()
-            ?: return null
-        return if (received == expectedGrams) {
-            AapsReply.CodeRequest(received, body)
+        val requested = AapsPl3426Patterns.CODE_REQUEST.matchEntire(n)?.groupValues?.get(1)?.toInt()
+        if (requested != null) {
+            return if (requested == expectedGrams) {
+                AapsReply.CodeRequest(requested, body)
+            } else {
+                AapsReply.CarbsAmountMismatch(expectedGrams, requested, CarbsStage.CODE_REQUEST, body)
+            }
+        }
+        val done = AapsPl3426Patterns.CARBS_DONE_FIRST_LINE.matchEntire(firstLine)
+            ?.groupValues?.get(1)?.toInt() ?: return null
+        return if (done == expectedGrams) {
+            AapsReply.CarbsDone(done, body)
         } else {
-            AapsReply.CarbsAmountMismatch(expectedGrams, received, CarbsStage.CODE_REQUEST, body)
+            AapsReply.CarbsAmountMismatch(expectedGrams, done, CarbsStage.CONFIRMATION, body)
         }
     }
 }
