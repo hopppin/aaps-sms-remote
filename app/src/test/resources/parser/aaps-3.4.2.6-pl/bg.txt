@@ -1,0 +1,1 @@
+BG: 210, Delta: 10.0 MGDL, IOB: 0,99U (Bolus: 1,33U Baza: -0,34U), COB: 2g

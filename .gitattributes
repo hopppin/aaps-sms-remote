@@ -3,3 +3,4 @@ gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
 docs/specs/**/dane/*.txt text eol=lf
+app/src/test/resources/parser/**/*.txt text eol=lf
