@@ -2,6 +2,8 @@
 
 Wspólne zasady dla wszystkich agentów (Claude, Codex) i ludzi pracujących w tym repo. Pełny plan: [docs/plan.md](docs/plan.md).
 
+**Na początku sesji przeczytaj [docs/stan-prac.md](docs/stan-prac.md)** – co jest zrobione, co w toku, ustalenia z użytkownikiem i otwarte pytania. Na końcu sesji go zaktualizuj.
+
 ## Projekt
 
 Aplikacja na Androida, która wysyła polecenia SMS do telefonu z AndroidAPS (AAPS) i sama odpowiada kodem potwierdzającym (TOTP + PIN) po zatwierdzeniu przez użytkownika, który za każdym razem wpisuje PIN AAPS. Bez biometrii. MVP: `BG`, `PUMP`, `CARBS <g>`.
@@ -24,6 +26,19 @@ Aplikacja na Androida, która wysyła polecenia SMS do telefonu z AndroidAPS (AA
 ./gradlew lintDebug              # lint
 ./gradlew testDebugUnitTest lintDebug assembleDebug   # to samo co CI
 ```
+
+Skrypty (Git Bash / Linux / macOS):
+
+- `scripts/sprawdz.sh` – testy + lint; sam ustawia `JAVA_HOME` (JDK z Android Studio) i `local.properties`, gdy ich brak (np. w nowym worktree). `--pelne` dodaje `assembleDebug`.
+- `scripts/sprzataj-worktree.sh` – usuwa worktree agentów z `.claude/worktrees/` i ich gałęzie; pomija te z niewypchniętą pracą.
+
+CI uruchamia się tylko na PR. Po scaleniu kilku PR sprawdź połączony `main` lokalnie (`scripts/sprawdz.sh --pelne`).
+
+## Narzędzia dla Claude Code
+
+- Skille w `.claude/skills/`: `/nowa-funkcja` (cały przepływ spec → issues → kod), `/obsluga-pr <nr>` (CI, CodeRabbit, scalenie), `/aktualizuj-stan` (odświeża `docs/stan-prac.md`).
+- Agenci `specyfikator`, `planista`, `wykonawca`, `recenzent` są globalni (`~/.claude/agents/`), nie w repo.
+- PR scala się (squash) dopiero za wyraźną zgodą użytkownika.
 
 ## Architektura
 
