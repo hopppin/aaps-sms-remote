@@ -1,6 +1,6 @@
 # Spec 003: Katalog poleceń
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `CMD`
 - **Pakiety:** `commands`
 - **Powiązane:** [docs/plan.md](../../plan.md#cel-i-zakres) (tabela poleceń MVP), [docs/plan.md](../../plan.md#przepływ-działania), [docs/plan.md](../../plan.md#ekrany-aplikacji) (ekran CARBS, szybkie wartości), [docs/plan.md](../../plan.md#otwarte-kwestie) (maksymalna ilość CARBS); [Spec 002: Parser odpowiedzi SMS z AAPS](../002-parser-odpowiedzi/spec.md) (kontekst `ExpectedCommand`, PARSER-01, PARSER-10); przyszłe specyfikacje `session` (maszyna stanów, PIN, odesłanie kodu), `sms` (wysyłanie), `ui` (ekrany i komunikaty)
@@ -218,4 +218,4 @@ Fikcyjne ilości i teksty z kryteriów akceptacji (CMD-03 – CMD-09). Brak plik
 
 ## Otwarte pytania
 
-- [ ] Czy `toString()` polecenia `CARBS` i wyników walidacji ma ukrywać ilość (jak `ExpectedCommand.Carbs` w PARSER-10), czy można ją pokazywać (ilość nie jest sekretem, a ułatwia diagnostykę)? Specyfikacja przyjmuje na razie redakcję – spójnie z parserem (CMD-09).
+- [x] Czy `toString()` polecenia `CARBS` i wyników walidacji ma ukrywać ilość (jak `ExpectedCommand.Carbs` w PARSER-10), czy można ją pokazywać (ilość nie jest sekretem, a ułatwia diagnostykę)? Rozstrzygnięte: ukrywa ilość, spójnie z parserem (CMD-09).
