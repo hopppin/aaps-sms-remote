@@ -89,6 +89,15 @@ class UsableTotpProviderTest {
     }
 
     @Test
+    fun `TOTP-02 ta sama instancja nie pamieta kodu miedzy wywolaniami`() = runTest {
+        var now = 31000L // krok T = 1, pozostało 29000 ms
+        val provider = UsableTotpProvider(EpochClock { now })
+        assertEquals("287082", provider.awaitUsableCode(secret).value)
+        now = 1111111111000
+        assertEquals("050471", provider.awaitUsableCode(secret).value)
+    }
+
+    @Test
     fun `TOTP-04 wynik zalezy tylko od wstrzyknietego zrodla czasu`() = runTest {
         val code = UsableTotpProvider(EpochClock { 1111111111000 }).awaitUsableCode(secret)
         assertEquals("050471", code.value)
