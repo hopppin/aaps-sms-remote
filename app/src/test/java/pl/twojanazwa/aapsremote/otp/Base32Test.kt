@@ -39,7 +39,7 @@ class Base32Test {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["GEZD GNBV", "GEZ1", "GE=ZD", "G", "GEZ0", "GEZ8", "GEZ9", "GE-ZD", "ĄBCDEFGH", "=ABCDEFG"])
+    @ValueSource(strings = ["GEZD GNBV", "GEZD GNB", "GEZDGNB ", "GEZ1", "GE=ZD", "G", "GEZ0", "GEZ8", "GEZ9", "GE-ZD", "ĄBCDEFGH", "=ABCDEFG"])
     fun `TOTP-05 nieprawidlowy znak lub polozenie dopelnienia jest bledem`(text: String) {
         assertEquals(Base32Result.Invalid, Base32.decode(text))
     }
