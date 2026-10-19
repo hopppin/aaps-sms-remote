@@ -12,7 +12,7 @@ Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sa
 | --- | --- | --- | --- |
 | Glikemia | `BG` | nie | brak |
 | Stan pompy | `PUMP` | nie | brak |
-| Węglowodany | `CARBS 20` | tak | ilość w gramach (np. 1–100) |
+| Węglowodany | `CARBS 20` | tak | ilość w gramach (1–50) |
 
 **Poza zakresem MVP:** bolus, zmiana celu, LOOP STOP/RESUME, profile. Struktura aplikacji ma pozwalać dodać je później jako kolejne wpisy w katalogu poleceń.
 
@@ -178,4 +178,4 @@ Wdrożenie: podpisany APK z własnym kluczem, instalacja z pliku, aktualizacje t
 - [ ] Jak przenieść sekret TOTP: ponowne wygenerowanie QR w AAPS czy eksport z obecnego Authenticatora?
 - [x] Domyślne potwierdzenie: biometria z zapisanym PIN-em czy ręczny PIN za każdym razem? → ręczny PIN AAPS za każdym razem, bez biometrii.
 - [ ] Telefon nadawcy: jedna karta SIM czy dual SIM, i czy jego numer jest na liście dozwolonych w AAPS?
-- [ ] Maksymalna ilość CARBS do wpisania w aplikacji (dodatkowy limit poza AAPS)?
+- [x] Maksymalna ilość CARBS do wpisania w aplikacji (dodatkowy limit poza AAPS)? → 1–50 g, powyżej 40 g dodatkowe potwierdzenie (spec 003).

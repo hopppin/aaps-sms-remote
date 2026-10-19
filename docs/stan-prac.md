@@ -23,13 +23,14 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Spec `commands` (katalog poleceń BG, PUMP, CARBS, walidacja ilości) – nie zależy od niczego.
+1. Spec `commands` (003, katalog poleceń BG, PUMP, CARBS, walidacja ilości) – zatwierdzona (PR #21); następnie issues i kod.
 2. Spec `session` (maszyna stanów polecenia, timeouty) – po `commands` (parser gotowy). Musi uwzględnić ustalenia poniżej.
 3. Potem: `sms` (SmsManager, odbiór, filtr numeru), `security` (Keystore dla sekretu TOTP), `ui`, `data`.
 
 ## Ustalenia z użytkownikiem (decyzje)
 
 - **Bez biometrii.** PIN AAPS wpisywany przy każdym poleceniu z potwierdzeniem, nigdy niezapisywany (plan, AGENTS.md).
+- **CARBS w aplikacji:** liczba całkowita 1–50 g; powyżej 40 g dodatkowe pytanie „Na pewno X g?” przed PIN-em; szybkie wartości 10/20/30 g; SMS zawsze `CARBS <g>` bez godziny. BG i PUMP wysyłane jednym dotknięciem, bez potwierdzenia (spec 003).
 - **Sekret TOTP:** każdy niepusty sekret jest przyjmowany; nieznane parametry `otpauth://` są ignorowane. QR z AAPS: `otpauth://totp/AAPS?secret=…&issuer=AAPS&algorithm=SHA1&digits=6&period=30`.
 - **SMS z AAPS 3.4.2.6, po polsku, bez znaków diakrytycznych.** Każda odpowiedź to jeden SMS. Odpowiedź na kod: `<6 cyfr><PIN>` bez spacji.
 - **Brak odpowiedzi AAPS:** na nieznane polecenie, z numeru spoza listy dozwolonych i po upływie czasu na kod AAPS nic nie wysyła.
@@ -39,5 +40,4 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 - Czas na odesłanie kodu w AAPS – w SMS Communicator nie ma ustawienia; ustalić podczas opracowywania specyfikacji `session` (dokumentacja / kod AAPS).
 - Odpowiedź AAPS na CARBS powyżej limitu – nieznana; oba możliwe warianty parser obsługuje bezpiecznie.
-- Własny limit CARBS w aplikacji (otwarte pytanie z planu).
 - Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo – jeszcze niezrobione.
