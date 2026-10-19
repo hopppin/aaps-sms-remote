@@ -76,4 +76,54 @@ class OtpRedactionTest {
         assertFalse(text.contains("GEZDGNBV"))
         assertFalse(text.contains("12345678901234567890"))
     }
+
+    private val rfcSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+    private val p = "otpauth://totp/Przyklad:test?"
+
+    private val badUris = listOf(
+        "https://example.com/?secret=GEZDGNBV",
+        "otpauth://hotp/Przyklad:test?secret=$rfcSecret&counter=0",
+        "${p}issuer=Przyklad",
+        "${p}secret=$rfcSecret&secret=$rfcSecret",
+        "${p}secret=$rfcSecret&digits=6&digits=6",
+        "${p}secret=GEZ1",
+        "${p}secret=%ZZ",
+        "${p}secret",
+        "${p}secret=$rfcSecret&algorithm=SHA256",
+        "${p}secret=$rfcSecret&algorithm=",
+        "${p}secret=$rfcSecret&digits=8",
+        "${p}secret=$rfcSecret&digits=06",
+        "${p}secret=$rfcSecret&period=60",
+        "${p}secret=$rfcSecret&period=-30",
+        "${p}secret=====",
+    )
+
+    @Test
+    fun `TOTP-09 toString bledu parsera nie zawiera sekretu ani wejscia`() {
+        for (uri in badUris) {
+            val result = OtpauthParser.parse(uri)
+            assertTrue(result is OtpauthResult.Failure, "oczekiwano Failure")
+            val text = result.toString()
+            assertFalse(text.contains(rfcSecret), "sekret w toString")
+            assertFalse(text.contains("GEZDGNBV"), "fragment sekretu w toString")
+            assertFalse(text.contains(uri), "wejscie w toString")
+            assertFalse(text.contains("Przyklad"), "etykieta w toString")
+        }
+    }
+
+    @Test
+    fun `TOTP-09 toString Success parsera nie ujawnia sekretu`() {
+        val result = OtpauthParser.parse("${p}secret=$rfcSecret")
+        assertTrue(result is OtpauthResult.Success)
+        assertEquals("OtpauthResult.Success(***)", result.toString())
+        assertEquals("TotpSecret(***)", (result as OtpauthResult.Success).secret.toString())
+    }
+
+    @Test
+    fun `TOTP-09 parser nie rzuca wyjatkow dla zlych danych`() {
+        val inputs = badUris + listOf("", "otpauth://", "otpauth://totp", "${p}secret=%", "${p}x=%C3%28&secret=$rfcSecret")
+        for (uri in inputs) {
+            OtpauthParser.parse(uri)
+        }
+    }
 }
