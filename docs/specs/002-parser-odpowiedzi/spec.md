@@ -1,6 +1,6 @@
 # Spec 002: Parser odpowiedzi SMS z AAPS
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `PARSER`
 - **Pakiety:** `parser`
 - **Powiązane:** [docs/plan.md](../../plan.md#parsowanie-odpowiedzi-i-obsługa-błędów), [docs/plan.md](../../plan.md#przepływ-działania) (krok 5), [docs/plan.md](../../plan.md#bezpieczeństwo); [Spec 001: Generator TOTP](../001-totp/spec.md) (kod odsyłany po prośbie o kod); przyszłe specyfikacje `commands` (katalog poleceń), `sms` (odbiór i filtr numeru), `session` (maszyna stanów, timeouty, składanie odpowiedzi z kodem)
@@ -196,7 +196,7 @@ Każda treść, która w danym kontekście nie spełnia dokładnie jednego z wzo
 
 Treść SMS z AAPS to dane medyczne (glikemia, insulina, węglowodany), a nierozpoznana wiadomość może zawierać cokolwiek. Dlatego:
 
-- `toString()` każdego wyniku i kontekstu zawiera tylko nazwę rodzaju wyniku i nie zawiera treści wejściowej ani żadnej wartości z niej wyciągniętej (glikemii, ilości, nazwy, godziny). Ilość z kontekstu też nie jest wypisywana.
+- `toString()` każdego wyniku i kontekstu zawiera tylko nazwę rodzaju wyniku (dla „niezgodna ilość” także etap: prośba o kod albo potwierdzenie – bez wartości) i nie zawiera treści wejściowej ani żadnej wartości z niej wyciągniętej (glikemii, ilości, nazwy, godziny). Ilość z kontekstu też nie jest wypisywana.
 - Pakiet `parser` nie wywołuje żadnego API logowania (`android.util.Log`, `println`, `System.out`/`err`, loggerów).
 - Parser nie rzuca wyjątków zawierających treść wejściową (PARSER-01: dla treści nie rzuca żadnych).
 
@@ -230,7 +230,7 @@ Teksty w cudzysłowach to nazwy rodzajów wyniku, nie komunikaty UI. Reakcję na
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej funkcji:
 
 - **Nie odsyłamy kodu, jeśli odpowiedź nie zgadza się z poleceniem.** Parser dostarcza `session` jednoznaczną podstawę: jedynym wynikiem, po którym wolno odesłać kod, jest „prośba o kod”, a powstaje on tylko przy dokładnym dopasowaniu całej treści (PARSER-05, PARSER-09), w kontekście `CARBS` (PARSER-01) i przy ilości równej wysłanej (PARSER-06). Inna ilość → „niezgodna ilość”; nierozpoznana treść → „nierozpoznana”. Pozostałe warunki z AGENTS.md należą do innych pakietów: inny numer nadawcy – `sms`; odpowiedź sprzed wysłania i wynik niepasujący do stanu sesji – `session`.
-- **Powiadomienia AAPS bez pytania.** AAPS wysyła SMS-y o poleceniach wykonanych z innych dozwolonych numerów; ich treści nie znamy (pytanie 4). Ścisłe, kotwiczone wzorce (PARSER-09) sprawiają, że takie powiadomienie nie zostanie uznane za prośbę o kod, chyba że byłoby znak w znak identyczne z prośbą o kod – co jest mało prawdopodobne, bo prośba o kod trafia tylko do numeru, który wysłał polecenie. Gdyby powiadomienie było identyczne z potwierdzeniem wykonania (PARSER-07), parser go nie odróżni; `session` musi wtedy przyjmować „wykonano CARBS” tylko po odesłaniu kodu.
+- **Powiadomienia AAPS bez pytania.** AAPS wysyła SMS-y o poleceniach wykonanych z innych dozwolonych numerów. Użytkownik potwierdził (pytanie 4), że po `CARBS` z innego numeru dostaje tekst **identyczny** z własnym potwierdzeniem (`dane/carbs-sukces.txt`). Parser tego nie odróżni i nie próbuje: „wykonano CARBS” (PARSER-07) mówi tylko, że treść pasuje do wzorca, a nie, czyje polecenie wykonano. Wymóg dla `session` (do jej specyfikacji): wynik „wykonano CARBS” przyjmować wyłącznie w stanie „kod wysłany”; w każdym innym stanie (np. czekanie na prośbę o kod) traktować go jako nieoczekiwaną wiadomość – stop i komunikat, bez odsyłania kodu. Ryzyko szczątkowe: `CARBS` z tą samą ilością z innego numeru w oknie po odesłaniu naszego kodu zostanie wzięte za nasze potwierdzenie – do opisania w spec `session`. Prośba o kod trafia tylko do numeru, który wysłał polecenie, a ścisłe wzorce (PARSER-09) sprawiają, że powiadomienie nie zostanie uznane za prośbę o kod, chyba że byłoby z nią identyczne znak w znak.
 - **Nie logujemy PIN-u ani kodów.** Parser nie przyjmuje PIN-u ani kodu TOTP; wiadomości AAPS z danych nie zawierają kodu. Treść SMS nie jest logowana ani wypisywana w `toString()` (PARSER-10).
 - **Żadnych prawdziwych danych w repo.** Imię w prośbie o kod zastąpione fikcyjnym `Jan`; pliki w `dane/` nie zawierają numerów, PIN-ów ani kodów. Wartości medyczne w danych (glikemia 210, IOB) to jednorazowy odczyt potrzebny jako wzorzec, bez danych identyfikujących.
 - **Bez automatycznego ponawiania i omijania limitów.** Parser niczego nie wysyła; „niezgodna ilość” (np. po obcięciu przez limit AAPS) nie prowadzi do korekty ani ponownej próby.
@@ -251,7 +251,7 @@ Warianty oznaczone w kryteriach jako „syntetyczne” to modyfikacje tych wiado
 
 ## Otwarte pytania
 
-- [ ] **1. Przekroczenie czasu na kod.** Czy AAPS wysyła SMS, gdy kod nie przyjdzie w wyznaczonym czasie, i jaka jest jego treść? Do czasu odpowiedzi taki SMS daje „nierozpoznana” (PARSER-09).
-- [ ] **2. CARBS powyżej limitu AAPS.** Jaka jest odpowiedź AAPS na `CARBS` z ilością powyżej limitu (np. maks. węglowodanów w ustawieniach): osobny komunikat odmowy czy prośba o kod z obciętą ilością? Obcięta ilość daje „niezgodna ilość” (PARSER-06), osobny komunikat – „nierozpoznana”. Jeśli to osobny komunikat, warto dodać rozpoznawany wynik „odrzucono przez limit”.
-- [ ] **3. Czas na odesłanie kodu.** Dokładna wartość z ustawień SMS Communicator (użytkownik podaje „ok. 5 minut”, niepotwierdzone). Nie wpływa na parser, ale jest potrzebna `session`; wpisana tu, żeby nie zginęła.
-- [ ] **4. Powiadomienie o poleceniu z innego numeru.** Jaka jest treść SMS, który AAPS wysyła, gdy inny dozwolony numer wykona istotne polecenie (np. bolus, CARBS)? Szczególnie: czy po `CARBS` z innego numeru użytkownik dostaje tekst identyczny z `dane/carbs-sukces.txt`? Jeśli tak, parser nie odróżni go od własnego potwierdzenia (patrz Bezpieczeństwo).
+- [x] **1. Przekroczenie czasu na kod.** Rozstrzygnięte: AAPS nic nie wysyła. Upływ czasu obsługuje `session` (timeout), parser nie ma tu nic do rozpoznania.
+- [x] **2. CARBS powyżej limitu AAPS.** Rozstrzygnięte bez znajomości treści (użytkownik nie może tego sprawdzić): oba możliwe warianty kończą się bezpiecznie – prośba o kod z obciętą ilością daje „niezgodna ilość” (PARSER-06), osobny komunikat odmowy daje „nierozpoznana” (PARSER-09); w obu przypadkach kod nie jest odsyłany, a użytkownik widzi treść SMS. Osobny wynik „odrzucono przez limit” poza MVP; do dodania, gdy poznamy treść.
+- [x] **3. Czas na odesłanie kodu.** Nie dotyczy parsera. W SMS Communicator nie ma takiego ustawienia (wg użytkownika); wartość trzeba ustalić w spec `session` (np. z dokumentacji lub kodu AAPS).
+- [x] **4. Powiadomienie o poleceniu z innego numeru.** Rozstrzygnięte: po `CARBS` z innego numeru treść jest identyczna z własnym potwierdzeniem. Skutki i wymóg dla `session` – sekcja Bezpieczeństwo. Treści powiadomień o innych poleceniach (np. bolus) nie znamy; dają „nierozpoznana”.

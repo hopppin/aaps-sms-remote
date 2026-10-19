@@ -15,6 +15,6 @@
 
 Uwagi techniczne:
 
-- Pliki mają linie rozdzielone LF i nie mają końcowego znaku nowej linii. Przy `core.autocrlf=true` (Windows) git może je wypakować z CRLF – parser i tak normalizuje końce linii (PARSER-02), więc wynik testu nie zależy od tego. Testy, które sprawdzają konkretny rodzaj końca linii (LF, CRLF), budują tekst w kodzie, a nie czytają go z pliku.
+- Pliki mają linie rozdzielone LF i nie mają końcowego znaku nowej linii. `.gitattributes` wymusza dla nich LF także przy `core.autocrlf=true` (Windows); parser i tak normalizuje końce linii (PARSER-02). Testy, które sprawdzają konkretny rodzaj końca linii (LF, CRLF), budują tekst w kodzie, a nie czytają go z pliku.
 - Pliki są źródłem prawdy dla testów parsera. Wykonawca kopiuje je bez zmian do zasobów testowych (patrz [design.md](../design.md#mapowanie-wymagań-na-testy)).
 - Nowa wersja lub język AAPS = nowy katalog/zestaw plików z adnotacją wersji, bez nadpisywania tych.
