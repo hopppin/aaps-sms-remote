@@ -39,6 +39,21 @@ class CommandRedactionTest {
     }
 
     @Test
+    fun `CMD-09 toString polecenia CARBS 37 nie zawiera ilosci po dodaniu rozszerzen`() {
+        val command = (Command.Carbs.of(37) as CarbsValidation.Valid).command
+        command.definition
+        command.smsText()
+        command.toExpectedCommand()
+        assertFalse(command.toString().contains("37"))
+    }
+
+    @Test
+    fun `CMD-09 toString wyniku toExpectedCommand dla CARBS 37 nie zawiera ilosci`() {
+        val command = (Command.Carbs.of(37) as CarbsValidation.Valid).command
+        assertFalse(command.toExpectedCommand().toString().contains("37"))
+    }
+
+    @Test
     fun `CMD-09 Invalid przechowuje tylko rodzaj bledu`() {
         val fields = CarbsValidation.Invalid::class.java.declaredFields.filter { !it.isSynthetic && !java.lang.reflect.Modifier.isStatic(it.modifiers) }
         assertEquals(listOf("error"), fields.map { it.name })
