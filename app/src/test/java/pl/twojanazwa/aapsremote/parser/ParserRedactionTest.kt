@@ -39,6 +39,15 @@ class ParserRedactionTest {
     }
 
     @Test
+    fun `PARSER-10 toString prosby o kod i zlego kodu nie zawiera tresci`() {
+        for (body in listOf(AapsSamples.carbsCodeRequest, AapsSamples.wrongCode)) {
+            val reply = AapsReplyParser.parse(body, ExpectedCommand.Carbs(1))
+            assertTrue(reply is AapsReply.CodeRequest || reply is AapsReply.WrongCode)
+            assertRedacted(reply.toString(), body)
+        }
+    }
+
+    @Test
     fun `PARSER-10 toString kontekstu CARBS nie zawiera ilosci`() {
         assertFalse(ExpectedCommand.Carbs(37).toString().contains("37"))
     }
