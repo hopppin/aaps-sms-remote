@@ -78,6 +78,8 @@ Logika `otp` nie odczytuje zegara systemowego bezpośrednio. Czas pochodzi z wst
 
 - **Zakładając** źródło czasu zwracające stałą 1111111111000 ms (inną niż czas systemowy maszyny testowej), **gdy** dostawca z TOTP-02 liczy kod, **wtedy** zwraca `050471` – wynik zależy wyłącznie od wstrzykniętego źródła.
 - **Zakładając** chwilę −1 ms, **gdy** generator liczy kod lub okno, **wtedy** rzuca `IllegalArgumentException`, którego komunikat nie zawiera sekretu ani żadnego kodu.
+- **Zakładając** chwilę `Long.MAX_VALUE - 30_000` ms (największa dozwolona), **gdy** generator liczy kod i okno, **wtedy** nie rzuca wyjątku, a koniec okna jest dodatni i większy od jego początku.
+- **Zakładając** chwilę `Long.MAX_VALUE - 29_999` ms (pierwsza niedozwolona), **gdy** generator liczy kod lub okno, **wtedy** rzuca `IllegalArgumentException`, którego komunikat nie zawiera sekretu ani żadnego kodu.
 - **Zakładając** chwilę `Long.MAX_VALUE` ms, **gdy** generator liczy kod lub okno, **wtedy** rzuca `IllegalArgumentException`, którego komunikat nie zawiera sekretu ani żadnego kodu.
 
 ### TOTP-05: Dekodowanie sekretu Base32
@@ -150,6 +152,7 @@ Każdy niepusty sekret (co najmniej 1 bajt po dekodowaniu Base32) jest przyjmowa
 - **Zakładając** URI z `secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ` (20 bajtów), **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
 - **Zakładając** URI z sekretem 16 bajtów (`secret=GEZDGNBVGY3TQOJQGEZDGNBVGY======`, czyli pierwsze 16 bajtów sekretu z RFC: ASCII `1234567890123456`), **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
 - **Zakładając** URI z `secret=MZXW6` (3 bajty), **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `foo`.
+- **Zakładając** URI z `secret=MY` (1 bajt, ASCII `f` – najmniejszy niepusty sekret), **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `f`.
 - **Zakładając** URI z `secret=====`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „pusty sekret”.
 
 ### TOTP-09: Brak ujawniania sekretu i kodów
