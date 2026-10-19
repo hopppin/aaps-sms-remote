@@ -61,18 +61,17 @@ object TotpGenerator {
     const val PERIOD_MILLIS: Long = 30_000
     const val DIGITS: Int = 6
 
-    /** TOTP-03. Rzuca IllegalArgumentException dla epochMillis < 0. */
+    /** TOTP-03. Rzuca IllegalArgumentException dla epochMillis < 0 lub > Long.MAX_VALUE - PERIOD_MILLIS. */
     fun window(epochMillis: Long): TotpWindow
 
-    /** TOTP-01. Rzuca IllegalArgumentException dla epochMillis < 0. */
+    /** TOTP-01. Rzuca IllegalArgumentException dla epochMillis < 0 lub > Long.MAX_VALUE - PERIOD_MILLIS. */
     fun generate(secret: TotpSecret, epochMillis: Long): TotpCode
 }
 
 class UsableTotpProvider(
     private val clock: EpochClock,
-    private val minRemainingMillis: Long = MIN_REMAINING_MILLIS,
 ) {
-    /** TOTP-02. Zwraca kod z co najmniej [minRemainingMillis] ważności wg [clock]. Anulowalne. */
+    /** TOTP-02. Zwraca kod z co najmniej [MIN_REMAINING_MILLIS] ważności wg [clock]. Anulowalne. */
     suspend fun awaitUsableCode(secret: TotpSecret): TotpCode
 
     companion object {
@@ -125,7 +124,7 @@ Sygnatury są wiążące dla nazw i typów publicznych; ciała i prywatne pomocn
 
 Algorytm `TotpGenerator.generate` (TOTP-01):
 
-1. `require(epochMillis >= 0)` z komunikatem bez danych, np. `"epochMillis must be >= 0"`.
+1. `require(epochMillis in 0..(Long.MAX_VALUE - 30_000))` z komunikatem bez danych, np. `"epochMillis out of range"`.
 2. `counter = epochMillis / 30_000` (dzielenie całkowite na `Long`, dla `t >= 0` równe `floor`).
 3. `msg = 8 bajtów big-endian(counter)`.
 4. `hmac = HmacSHA1(key, msg)` (20 bajtów); `offset = hmac[19] and 0x0F`.
@@ -151,7 +150,7 @@ Kod zwracany jest zawsze z chwili odczytanej w tym samym przebiegu pętli, więc
 1. `trim()` białych znaków ASCII.
 2. Prefiks `otpauth://` bez względu na wielkość liter → inaczej `NOT_OTPAUTH_URI`.
 3. Typ = tekst do pierwszego `/` lub `?`; `totp` bez względu na wielkość liter → inaczej `UNSUPPORTED_TYPE`.
-4. Zapytanie po pierwszym `?`; podział na `&`; każdy element dzielony na pierwszym `=` (wartości Base32 z `=` dopełnienia pozostają nienaruszone). Dekodowanie `%XX` (UTF-8) nazw i wartości; błąd dekodowania → `MALFORMED_URI`. `+` nie jest zamieniany na spację.
+4. Zapytanie po pierwszym `?`; podział na `&`; element bez `=` → `MALFORMED_URI`; każdy element dzielony na pierwszym `=` (wartości Base32 z `=` dopełnienia pozostają nienaruszone). Dekodowanie `%XX` (UTF-8) nazw i wartości; błąd dekodowania → `MALFORMED_URI`. `+` nie jest zamieniany na spację.
 5. Duplikat `secret`/`algorithm`/`digits`/`period` → `DUPLICATE_PARAMETER`.
 6. Brak `secret` → `MISSING_SECRET`.
 7. `algorithm` (jeśli jest) ≠ `SHA1` bez względu na wielkość liter → `UNSUPPORTED_ALGORITHM`.

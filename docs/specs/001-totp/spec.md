@@ -48,7 +48,7 @@ RFC 6238 w Dodatku B podaje kody 8-cyfrowe (`mod 10^8`). Ponieważ 10^6 dzieli 1
 
 ### TOTP-02: Kod bliski wygaśnięcia czeka na następny
 
-Dostawca kodu do wysłania odczytuje czas z wstrzykniętego zegara. Jeśli bieżącemu kodowi zostało mniej niż 5000 ms ważności (TOTP-03), czeka do początku następnego kroku, ponownie odczytuje zegar i zwraca kod dla nowej chwili. Zwrócony kod ma w chwili zwrócenia (wg zegara) co najmniej 5000 ms ważności. Gdy zostało dokładnie 5000 ms lub więcej, kod jest zwracany bez czekania.
+Dostawca kodu do wysłania odczytuje czas z wstrzykniętego zegara. Jeśli bieżącemu kodowi zostało mniej niż 5000 ms ważności (TOTP-03), czeka do początku następnego kroku, ponownie odczytuje zegar i zwraca kod dla nowej chwili. Zwrócony kod ma co najmniej 5000 ms ważności względem chwili odczytanej z zegara w tym samym przebiegu, z której został policzony. Próg jest stały i nie da się go zmienić przez API. Gdy zostało dokładnie 5000 ms lub więcej, kod jest zwracany bez czekania.
 
 **Kryteria akceptacji** (sekret jak w TOTP-01, zegar i opóźnienia w czasie wirtualnym testu):
 
@@ -72,12 +72,13 @@ Dla chwili `t` (ms) generator podaje: początek ważności `floor(t / 30000) * 3
 
 ### TOTP-04: Wstrzykiwane źródło czasu
 
-Logika `otp` nie odczytuje zegara systemowego bezpośrednio. Czas pochodzi z wstrzykniętego źródła zwracającego milisekundy od epoki Unix. Chwila ujemna jest błędem.
+Logika `otp` nie odczytuje zegara systemowego bezpośrednio. Czas pochodzi z wstrzykniętego źródła zwracającego milisekundy od epoki Unix. Chwila ujemna jest błędem. Chwila większa niż `Long.MAX_VALUE - 30_000` ms też jest błędem, bo koniec jej okna (TOTP-03) nie mieści się w `Long`.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** źródło czasu zwracające stałą 1111111111000 ms (inną niż czas systemowy maszyny testowej), **gdy** dostawca z TOTP-02 liczy kod, **wtedy** zwraca `050471` – wynik zależy wyłącznie od wstrzykniętego źródła.
 - **Zakładając** chwilę −1 ms, **gdy** generator liczy kod lub okno, **wtedy** rzuca `IllegalArgumentException`, którego komunikat nie zawiera sekretu ani żadnego kodu.
+- **Zakładając** chwilę `Long.MAX_VALUE` ms, **gdy** generator liczy kod lub okno, **wtedy** rzuca `IllegalArgumentException`, którego komunikat nie zawiera sekretu ani żadnego kodu.
 
 ### TOTP-05: Dekodowanie sekretu Base32
 
@@ -106,6 +107,7 @@ Parser przyjmuje tekst (wynik skanu QR) i zwraca sekret albo jawny błąd. Zasad
 - Inny schemat albo brak `://` → błąd „to nie jest URI otpauth”.
 - Typ `hotp` lub dowolny inny niż `totp` → błąd „nieobsługiwany typ”.
 - Parametry zapytania (po pierwszym `?`, rozdzielone `&`, postać `nazwa=wartość`) są dekodowane z kodowania procentowego (`%XX`). Nazwy parametrów porównywane są dokładnie (małe litery).
+- Element zapytania bez znaku `=` (np. `?secret`) → błąd „nieprawidłowy URI otpauth”.
 - Parametr `secret` jest wymagany; jego wartość dekodowana jest wg TOTP-05.
 - Parametr `secret`, `algorithm`, `digits` lub `period` podany więcej niż raz → błąd „zduplikowany parametr”.
 - Nieprawidłowe kodowanie procentowe → błąd „nieprawidłowy URI otpauth”.
@@ -122,6 +124,7 @@ Parser przyjmuje tekst (wynik skanu QR) i zwraca sekret albo jawny błąd. Zasad
 - **Zakładając** tekst z dwoma parametrami `secret`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „zduplikowany parametr”.
 - **Zakładając** tekst z `secret=GEZ1`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieprawidłowy Base32”.
 - **Zakładając** tekst z `secret=%ZZ`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieprawidłowy URI otpauth”.
+- **Zakładając** tekst `otpauth://totp/Przyklad:test?secret`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieprawidłowy URI otpauth”.
 - **Zakładając** tekst `otpauth://totp/Przyklad:test?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&image=https%3A%2F%2Fexample.com%2Flogo.png&nieznany=1`, **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `12345678901234567890` (nieznane parametry pominięte, bez błędu).
 
 ### TOTP-07: Walidacja parametrów algorytmu
@@ -169,7 +172,7 @@ Sekret i kody nie trafiają do logów, wyjątków, `toString()` ani wyników bł
 
 | Sytuacja | Oczekiwane zachowanie | Wymaganie |
 | --- | --- | --- |
-| Chwila ujemna | `IllegalArgumentException` bez sekretu i kodu w komunikacie | TOTP-04 |
+| Chwila ujemna lub większa niż `Long.MAX_VALUE - 30_000` | `IllegalArgumentException` bez sekretu i kodu w komunikacie | TOTP-04 |
 | Zegar po czekaniu nadal w końcówce kroku | dalsze czekanie, nigdy zwrot kodu z < 5000 ms ważności | TOTP-02 |
 | Anulowanie podczas czekania | `CancellationException`, brak kodu | TOTP-02 |
 | Tekst nie jest URI `otpauth://` | błąd „to nie jest URI otpauth” | TOTP-06 |
