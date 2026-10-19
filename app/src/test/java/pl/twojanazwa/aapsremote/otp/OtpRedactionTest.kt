@@ -68,4 +68,12 @@ class OtpRedactionTest {
         val e = assertThrows(IllegalArgumentException::class.java) { TotpSecret.fromBytes(ByteArray(0)) }
         assertFalse(e.message.orEmpty().contains("GEZD"))
     }
+
+    @Test
+    fun `TOTP-09 toString wyniku Base32 Success nie zawiera sekretu ani bajtow`() {
+        val text = Base32.decode("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ").toString()
+        assertEquals("Base32Result.Success(***)", text)
+        assertFalse(text.contains("GEZDGNBV"))
+        assertFalse(text.contains("12345678901234567890"))
+    }
 }
