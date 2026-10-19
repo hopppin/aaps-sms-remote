@@ -55,7 +55,7 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 ## Konwencje pracy
 
 - Jedno issue = jedna gałąź `feature/<nr>-<krotki-opis>` = jeden PR. Specyfikacje: gałąź `spec/<NNN>-<krotki-opis>`.
-- PR do `main`, w opisie `Closes #<nr>`. Tytuł i opis PR po polsku.
+- PR do `main`, w opisie `Closes #<nr>` (wyjątek: PR `Spec: ...`, bo issues powstają dopiero po zatwierdzeniu spec). Tytuł i opis PR po polsku.
 - Małe PR-y: ok. 200–400 linii zmian.
 - Nie pushujemy bezpośrednio na `main` i nie używamy `git push --force`.
 - Commity często, małymi krokami, z opisowymi wiadomościami.

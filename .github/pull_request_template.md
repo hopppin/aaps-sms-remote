@@ -2,6 +2,7 @@
 
 <!-- Co i dlaczego. Po polsku. -->
 
+<!-- PR realizujący issue: "Closes #<nr>". PR "Spec: ...": issue jeszcze nie istnieje, wpisz "Issue: nie dotyczy". -->
 Closes #
 
 ## Specyfikacja
