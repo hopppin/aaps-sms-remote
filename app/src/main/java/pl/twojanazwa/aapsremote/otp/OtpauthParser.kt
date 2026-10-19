@@ -61,6 +61,14 @@ object OtpauthParser {
 
     private fun fail(error: OtpauthError): OtpauthResult = OtpauthResult.Failure(error)
 
+    /** Wartość cyfry szesnastkowej tylko z ASCII (`0-9`, `A-F`, `a-f`), inaczej -1. `Character.digit` przyjmuje też cyfry spoza ASCII. */
+    private fun asciiHexDigit(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'A'..'F' -> c - 'A' + 10
+        in 'a'..'f' -> c - 'a' + 10
+        else -> -1
+    }
+
     /** Dekoduje `%XX` jako UTF-8; `+` zostaje bez zmian. Zwraca null przy błędzie (bez wyjątków z wejściem). */
     private fun percentDecode(s: String): String? {
         if (s.indexOf('%') < 0) return s
@@ -70,8 +78,8 @@ object OtpauthParser {
             val c = s[i]
             if (c == '%') {
                 if (i + 2 >= s.length) return null
-                val hi = Character.digit(s[i + 1], 16)
-                val lo = Character.digit(s[i + 2], 16)
+                val hi = asciiHexDigit(s[i + 1])
+                val lo = asciiHexDigit(s[i + 2])
                 if (hi < 0 || lo < 0) return null
                 out.write(hi * 16 + lo)
                 i += 3

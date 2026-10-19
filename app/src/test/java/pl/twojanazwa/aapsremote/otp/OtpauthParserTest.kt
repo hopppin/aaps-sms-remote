@@ -75,7 +75,7 @@ class OtpauthParserTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["secret=%ZZ", "secret", "secret=GEZDGNBV&x=%C3", "secret=GEZDGNBV&x=%4"])
+    @ValueSource(strings = ["secret=%ZZ", "secret", "secret=GEZDGNBV&x=%C3", "secret=GEZDGNBV&x=%4", "secret=M%５AXW6", "secret=M%5ＡXW6"])
     fun `TOTP-06 zle kodowanie lub parametr bez rownosci to MALFORMED_URI`(query: String) {
         assertError(OtpauthError.MALFORMED_URI, base + query)
     }
