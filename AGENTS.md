@@ -42,9 +42,19 @@ Jedna aplikacja, warstwy rozdzielone pakietami w `pl.twojanazwa.aapsremote`:
 
 Logika (`commands`, `parser`, `session`, `otp`) nie zależy od Androida, żeby dało się ją testować jednostkowo bez telefonu. Nowe polecenie = nowy wpis w katalogu + wzorce w parserze + testy.
 
+## Specyfikacje (spec-driven)
+
+Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/specs/README.md](docs/specs/README.md).
+
+- Każda funkcja ma `docs/specs/NNN-nazwa/spec.md` (co) i `design.md` (jak). Wymagania mają identyfikatory, np. `TOTP-01`.
+- Specyfikacja trafia do repo osobnym PR `Spec: <nazwa>`, bez kodu aplikacji. Scalenie = zatwierdzenie.
+- Issues zakłada się tylko z zatwierdzonych specyfikacji; każde issue wskazuje plik spec i identyfikatory wymagań.
+- Kod nie robi nic, czego nie opisuje specyfikacja. Każde realizowane wymaganie ma test z identyfikatorem w nazwie.
+- Gdy spec jest błędna lub niepełna: stop, osobny PR ze zmianą spec, dopiero potem kod. Nie zgaduj.
+
 ## Konwencje pracy
 
-- Jedno issue = jedna gałąź `feature/<nr>-<krotki-opis>` = jeden PR.
+- Jedno issue = jedna gałąź `feature/<nr>-<krotki-opis>` = jeden PR. Specyfikacje: gałąź `spec/<NNN>-<krotki-opis>`.
 - PR do `main`, w opisie `Closes #<nr>`. Tytuł i opis PR po polsku.
 - Małe PR-y: ok. 200–400 linii zmian.
 - Nie pushujemy bezpośrednio na `main` i nie używamy `git push --force`.
