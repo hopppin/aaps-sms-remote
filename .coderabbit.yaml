@@ -9,6 +9,19 @@ reviews:
     enabled: true
     drafts: false
   path_instructions:
+    - path: "docs/specs/**"
+      instructions: |
+        Specyfikacja (spec-driven development, zasady w docs/specs/README.md). Sprawdź szczególnie:
+        - czy każde wymaganie ma identyfikator <PREFIKS>-<NN> i kryteria akceptacji w formie "Zakładając / gdy / wtedy",
+        - czy wymagania są testowalne: bez sformułowań typu "szybko", "zwykle", "odpowiednio", z konkretnymi liczbami i warunkami,
+        - sprzeczności z AGENTS.md (zwłaszcza sekcją Bezpieczeństwo) i z docs/plan.md,
+        - brakujące przypadki błędów i brzegowe (timeout, zła ilość, inny nadawca, nierozpoznana odpowiedź),
+        - czy status "zatwierdzona" nie ma otwartych pytań,
+        - prawdziwe sekrety, PIN-y lub numery telefonu w danych testowych.
+    - path: "app/src/test/**"
+      instructions: |
+        Testy jednostkowe. Sprawdź, czy nazwy testów zawierają identyfikatory wymagań ze specyfikacji
+        (np. TOTP-02) i czy każde wymaganie wymienione w opisie PR ma test. Testy TOTP używają tylko wektorów z RFC 6238.
     - path: "**/sms/**"
       instructions: |
         Kod wysyłania i odbioru SMS. Sprawdź szczególnie:
