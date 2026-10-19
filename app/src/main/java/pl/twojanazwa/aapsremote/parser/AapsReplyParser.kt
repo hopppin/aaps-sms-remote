@@ -19,9 +19,20 @@ object AapsReplyParser {
                     null
                 }
 
-            // Logika CARBS: kolejne zadania (#14, #15).
-            is ExpectedCommand.Carbs -> null
+            // Potwierdzenie wykonania CARBS dojdzie w #15.
+            is ExpectedCommand.Carbs -> parseCarbs(n, body, expected.grams)
         }
         return result ?: AapsReply.Unrecognized(body)
+    }
+
+    private fun parseCarbs(n: String, body: String, expectedGrams: Int): AapsReply? {
+        if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
+        val received = AapsPl3426Patterns.CODE_REQUEST.matchEntire(n)?.groupValues?.get(1)?.toInt()
+            ?: return null
+        return if (received == expectedGrams) {
+            AapsReply.CodeRequest(received, body)
+        } else {
+            AapsReply.CarbsAmountMismatch(expectedGrams, received, CarbsStage.CODE_REQUEST, body)
+        }
     }
 }
