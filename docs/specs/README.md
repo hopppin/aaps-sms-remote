@@ -49,4 +49,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 
 | Nr | Specyfikacja | Prefiks | Status |
 | --- | --- | --- | --- |
-| – | brak | – | – |
+| 001 | [Generator TOTP](001-totp/spec.md) | `TOTP` | szkic |
