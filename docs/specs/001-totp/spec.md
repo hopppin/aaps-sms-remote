@@ -137,15 +137,16 @@ Aplikacja obsługuje tylko HMAC-SHA1, 6 cyfr i krok 30 s. Brakujący parametr pr
 - **Zakładając** URI z `digits=8`, `digits=06`, `digits=` albo `digits=abc`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieobsługiwana liczba cyfr”.
 - **Zakładając** URI z `period=60`, `period=030`, `period=` albo `period=-30`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieobsługiwany okres”.
 
-### TOTP-08: Minimalna długość sekretu
+### TOTP-08: Brak minimalnej długości sekretu
 
-Sekret krótszy niż 16 bajtów (128 bitów, RFC 4226 wymóg R6) jest odrzucany błędem „za krótki sekret”. **Wymaganie czeka na odpowiedź na otwarte pytanie nr 1** – wartość 16 bajtów to propozycja.
+Każdy niepusty sekret (co najmniej 1 bajt po dekodowaniu Base32) jest przyjmowany. Aplikacja nie narzuca minimalnej długości, żeby nie zablokować sekretu wygenerowanego przez AAPS. Pusty sekret odrzuca TOTP-05.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** URI z `secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ` (20 bajtów), **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
 - **Zakładając** URI z sekretem 16 bajtów (`secret=GEZDGNBVGY3TQOJQGEZDGNBVGY======`, czyli pierwsze 16 bajtów sekretu z RFC: ASCII `1234567890123456`), **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
-- **Zakładając** URI z `secret=MZXW6` (3 bajty), **gdy** jest parsowany, **wtedy** wynikiem jest błąd „za krótki sekret”.
+- **Zakładając** URI z `secret=MZXW6` (3 bajty), **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `foo`.
+- **Zakładając** URI z `secret=====`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „pusty sekret”.
 
 ### TOTP-09: Brak ujawniania sekretu i kodów
 
@@ -181,7 +182,6 @@ Sekret i kody nie trafiają do logów, wyjątków, `toString()` ani wyników bł
 | `algorithm` ≠ SHA1 | błąd „nieobsługiwany algorytm” | TOTP-07 |
 | `digits` ≠ 6 | błąd „nieobsługiwana liczba cyfr” | TOTP-07 |
 | `period` ≠ 30 | błąd „nieobsługiwany okres” | TOTP-07 |
-| Sekret < 16 bajtów | błąd „za krótki sekret” (do potwierdzenia) | TOTP-08 |
 
 Teksty w cudzysłowach to nazwy rodzajów błędu, nie gotowe komunikaty UI. Komunikaty dla użytkownika określi specyfikacja konfiguracji.
 
@@ -221,6 +221,6 @@ Dane są na tyle krótkie, że leżą w tej specyfikacji; katalog `dane/` nie je
 
 ## Otwarte pytania
 
-- [ ] **1. Minimalna długość sekretu (TOTP-08).** Czy odrzucać sekrety krótsze niż 16 bajtów (RFC 4226 R6)? Nie wiemy, jakiej długości sekret generuje AAPS – jeśli krótszy, takie wymaganie zablokowałoby konfigurację. Proszę o potwierdzenie długości sekretu z AAPS (sama liczba znaków Base32, bez sekretu) albo decyzję: 16 bajtów / inna wartość / tylko niepusty.
+- [x] **1. Minimalna długość sekretu (TOTP-08).** Rozstrzygnięte: brak minimum, wystarczy niepusty sekret.
 - [x] **2. Nieznane parametry URI (TOTP-06).** Rozstrzygnięte: nieznane nazwy parametrów są ignorowane; jawny błąd tylko dla nieobsługiwanych wartości `algorithm`, `digits`, `period` (TOTP-07).
 - [ ] **3. Format QR z AAPS.** Czy URI z QR AAPS ma postać `otpauth://totp/...?...secret=...` i czy zawiera `algorithm`/`digits`/`period`? Wystarczy struktura z zamazanym sekretem – pozwoli potwierdzić, że TOTP-06 i TOTP-07 przyjmą prawdziwy QR.

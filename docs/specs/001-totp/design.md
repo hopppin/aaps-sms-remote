@@ -29,9 +29,6 @@ fun interface EpochClock {
 
 /** Sekret TOTP. Kopiuje bajty, nie ujawnia ich w toString(). */
 class TotpSecret private constructor(private val key: ByteArray) {
-    /** Liczba bajtów sekretu (potrzebna do TOTP-08; nie ujawnia treści). */
-    val sizeBytes: Int get() = key.size
-
     /** Dostęp do kopii bajtów dla `security` przy zapisie; wywołujący zeruje kopię po użyciu. */
     fun copyBytes(): ByteArray = key.copyOf()
 
@@ -119,7 +116,6 @@ enum class OtpauthError {
     UNSUPPORTED_ALGORITHM,  // „nieobsługiwany algorytm”
     UNSUPPORTED_DIGITS,     // „nieobsługiwana liczba cyfr”
     UNSUPPORTED_PERIOD,     // „nieobsługiwany okres”
-    SECRET_TOO_SHORT,       // „za krótki sekret” (TOTP-08, do potwierdzenia)
 }
 ```
 
@@ -162,7 +158,7 @@ Kod zwracany jest zawsze z chwili odczytanej w tym samym przebiegu pętli, więc
 8. `digits` (jeśli jest) ≠ dokładnie `"6"` → `UNSUPPORTED_DIGITS`.
 9. `period` (jeśli jest) ≠ dokładnie `"30"` → `UNSUPPORTED_PERIOD`.
 10. `Base32.decode(secret)`: `Empty` → `EMPTY_SECRET`, `Invalid` → `INVALID_BASE32`.
-11. Długość < 16 bajtów → `SECRET_TOO_SHORT` (TOTP-08, po rozstrzygnięciu pytania 1).
+11. Brak sprawdzania minimalnej długości – każdy niepusty sekret jest przyjmowany (TOTP-08).
 12. `TotpSecret.fromBytes(bytes)`, potem `bytes.fill(0)`; `Success`.
 
 Etykieta, `issuer` i parametry o nieznanych nazwach są pomijane bez błędu (TOTP-06).
@@ -195,7 +191,7 @@ Wszystkie testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremot
 | TOTP-05 | `Base32Test` – jednostkowy, wektory RFC 4648 i przypadki błędne |
 | TOTP-06 | `OtpauthParserTest` – jednostkowy |
 | TOTP-07 | `OtpauthParserTest` – jednostkowy, parametryzowany wartościami z spec |
-| TOTP-08 | `OtpauthParserTest` – jednostkowy (po rozstrzygnięciu pytania 1) |
+| TOTP-08 | `OtpauthParserTest` – jednostkowy |
 | TOTP-09 | `OtpRedactionTest` – jednostkowy: `toString()` sekretu, kodu, wyników parsera i dekodera; komunikat wyjątku dla chwili −1; zerowanie tablicy wejściowej nie zmienia kodu |
 
 Brak wywołań API logowania w `otp` (TOTP-09) sprawdza recenzja kodu; test nie jest wymagany.
@@ -206,4 +202,4 @@ Kolejność wynika z zależności. Każde zadanie to jeden PR, ok. 200–400 lin
 
 1. **Generator TOTP** – `EpochClock`, `TotpSecret`, `TotpCode`, `TotpWindow`, `TotpGenerator` + `TotpGeneratorTest` i część `OtpRedactionTest` (sekret, kod, wyjątek). Wymagania: TOTP-01, TOTP-03, TOTP-04 (część generatora), TOTP-09 (część).
 2. **Kod z zapasem ważności** – `UsableTotpProvider` + `UsableTotpProviderTest`. Wymagania: TOTP-02, TOTP-04 (część dostawcy).
-3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część). Zadanie zależy od odpowiedzi na otwarte pytania 1 i 3.
+3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część). Zadanie zależy od odpowiedzi na otwarte pytanie 3.
