@@ -14,6 +14,8 @@ _Ostatnia aktualizacja: 2026-10-19_
 | Pakiet `otp` | generator RFC 6238, okno ważności, `UsableTotpProvider` (≥ 5 s zapasu), dekoder Base32, parser `otpauth://` | `app/src/main/java/pl/twojanazwa/aapsremote/otp/` |
 | Spec 002 parser | zatwierdzona, w całości zaimplementowana; prawdziwe SMS-y AAPS 3.4.2.6 jako dane testowe | PR #12; kod: PR #16, #18, #19; dane: `docs/specs/002-parser-odpowiedzi/dane/` |
 | Pakiet `parser` | `AapsReplyParser`: BG, PUMP, CARBS (prośba o kod, niezgodna ilość, potwierdzenie, zły kod); normalizacja, redakcja `toString()`, macierz plik × kontekst | `app/src/main/java/pl/twojanazwa/aapsremote/parser/` |
+| Spec 003 katalog | zatwierdzona, w całości zaimplementowana | PR #21; kod: PR #24, #25 |
+| Pakiet `commands` | `CommandCatalog` (BG, PUMP, CARBS), `Command` (`Carbs` tylko przez `of`/`parse`, 1–50 g, dodatkowe potwierdzenie > 40 g), `smsText()`, `toExpectedCommand()`, redakcja ilości w `toString()` | `app/src/main/java/pl/twojanazwa/aapsremote/commands/` |
 
 ## W toku
 
@@ -23,9 +25,8 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Spec `commands` (003, katalog poleceń BG, PUMP, CARBS, walidacja ilości) – zatwierdzona (PR #21); następnie issues i kod.
-2. Spec `session` (maszyna stanów polecenia, timeouty) – po `commands` (parser gotowy). Musi uwzględnić ustalenia poniżej.
-3. Potem: `sms` (SmsManager, odbiór, filtr numeru), `security` (Keystore dla sekretu TOTP), `ui`, `data`.
+1. Spec `session` (004, maszyna stanów polecenia, timeouty) – `commands` i `parser` gotowe. `session` dostaje `Command`, wysyła `command.smsText()` i parsuje odpowiedzi z `command.toExpectedCommand()`. Musi uwzględnić ustalenia poniżej.
+2. Potem: `sms` (SmsManager, odbiór, filtr numeru), `security` (Keystore dla sekretu TOTP), `ui`, `data`.
 
 ## Ustalenia z użytkownikiem (decyzje)
 
