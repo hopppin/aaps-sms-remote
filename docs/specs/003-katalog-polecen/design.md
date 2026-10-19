@@ -162,7 +162,7 @@ Algorytm `Command.Carbs.of(grams)` (CMD-03): `grams < MIN_GRAMS` → `Invalid(BE
 | Katalog bez etykiet UI („Glikemia”, „Stan pompy”, „Węglowodany”) | nazwy po polsku w `CommandDefinition` | Teksty UI należą do zasobów Androida (`strings.xml`), a `commands` ma nie zależeć od Androida. `ui` mapuje `CommandId` na zasób. |
 | Zakres, próg i szybkie wartości jako stałe w `CarbsLimits` | ustawienia użytkownika | Ustalenie z użytkownikiem dla MVP; zmiana wartości = zmiana spec. |
 | `requiresExtraConfirmation` na `Command`, a nie tylko próg w danych | `ui` sam porównuje z progiem | Jedno miejsce reguły (> 40), testowane jednostkowo; `ui` tylko czyta flagę. |
-| Redakcja ilości w `toString()` | pokazywanie ilości | Spójność z PARSER-10. Otwarte pytanie w spec – do potwierdzenia przez użytkownika. |
+| Redakcja ilości w `toString()` | pokazywanie ilości | Spójność z PARSER-10. Potwierdzone przez użytkownika (pytanie w spec rozstrzygnięte). |
 
 ## Mapowanie wymagań na testy
 
