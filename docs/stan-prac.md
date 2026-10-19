@@ -12,23 +12,20 @@ _Ostatnia aktualizacja: 2026-10-19_
 | Proces | spec-driven: szablony `docs/specs/_szablon/`, zasady w `docs/specs/README.md` | PR #2 |
 | Spec 001 TOTP | zatwierdzona, w całości zaimplementowana | PR #3; kod: PR #8, #9, #10, #11 |
 | Pakiet `otp` | generator RFC 6238, okno ważności, `UsableTotpProvider` (≥ 5 s zapasu), dekoder Base32, parser `otpauth://` | `app/src/main/java/pl/twojanazwa/aapsremote/otp/` |
-| Spec 002 parser | zatwierdzona; prawdziwe SMS-y AAPS 3.4.2.6 jako dane testowe; zaimplementowane: typy wyniku, normalizacja, BG, PUMP (#13) | PR #12, #16; dane: `docs/specs/002-parser-odpowiedzi/dane/` |
+| Spec 002 parser | zatwierdzona, w całości zaimplementowana; prawdziwe SMS-y AAPS 3.4.2.6 jako dane testowe | PR #12; kod: PR #16, #18, #19; dane: `docs/specs/002-parser-odpowiedzi/dane/` |
+| Pakiet `parser` | `AapsReplyParser`: BG, PUMP, CARBS (prośba o kod, niezgodna ilość, potwierdzenie, zły kod); normalizacja, redakcja `toString()`, macierz plik × kontekst | `app/src/main/java/pl/twojanazwa/aapsremote/parser/` |
 
 ## W toku
 
-| Issue | Temat | Zależy od |
-| --- | --- | --- |
-| #14 | parser: CARBS – prośba o kod, niezgodna ilość, zły kod | – (#13 scalone w PR #16) |
-| #15 | parser: CARBS – potwierdzenie, macierz kontekstów | #14 |
+Brak otwartych issues i PR-ów.
 
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Dokończyć parser (#14 → #15, po kolei).
-2. Spec `commands` (katalog poleceń BG, PUMP, CARBS, walidacja ilości) – nie zależy od niczego.
-3. Spec `session` (maszyna stanów polecenia, timeouty) – po parserze i `commands`. Musi uwzględnić ustalenia poniżej.
-4. Potem: `sms` (SmsManager, odbiór, filtr numeru), `security` (Keystore dla sekretu TOTP), `ui`, `data`.
+1. Spec `commands` (katalog poleceń BG, PUMP, CARBS, walidacja ilości) – nie zależy od niczego.
+2. Spec `session` (maszyna stanów polecenia, timeouty) – po `commands` (parser gotowy). Musi uwzględnić ustalenia poniżej.
+3. Potem: `sms` (SmsManager, odbiór, filtr numeru), `security` (Keystore dla sekretu TOTP), `ui`, `data`.
 
 ## Ustalenia z użytkownikiem (decyzje)
 
