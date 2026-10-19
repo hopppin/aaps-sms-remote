@@ -165,7 +165,7 @@ Kod zwracany jest zawsze z chwili odczytanej w tym samym przebiegu pętli, więc
 11. Długość < 16 bajtów → `SECRET_TOO_SHORT` (TOTP-08, po rozstrzygnięciu pytania 1).
 12. `TotpSecret.fromBytes(bytes)`, potem `bytes.fill(0)`; `Success`.
 
-Etykieta, `issuer` i inne parametry są pomijane (zachowanie dla nieznanych nazw – otwarte pytanie 2 w spec).
+Etykieta, `issuer` i parametry o nieznanych nazwach są pomijane bez błędu (TOTP-06).
 
 ## Decyzje
 
@@ -206,4 +206,4 @@ Kolejność wynika z zależności. Każde zadanie to jeden PR, ok. 200–400 lin
 
 1. **Generator TOTP** – `EpochClock`, `TotpSecret`, `TotpCode`, `TotpWindow`, `TotpGenerator` + `TotpGeneratorTest` i część `OtpRedactionTest` (sekret, kod, wyjątek). Wymagania: TOTP-01, TOTP-03, TOTP-04 (część generatora), TOTP-09 (część).
 2. **Kod z zapasem ważności** – `UsableTotpProvider` + `UsableTotpProviderTest`. Wymagania: TOTP-02, TOTP-04 (część dostawcy).
-3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część). Zadanie zależy od odpowiedzi na otwarte pytania 1–3.
+3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część). Zadanie zależy od odpowiedzi na otwarte pytania 1 i 3.

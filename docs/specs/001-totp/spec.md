@@ -109,7 +109,7 @@ Parser przyjmuje tekst (wynik skanu QR) i zwraca sekret albo jawny błąd. Zasad
 - Parametr `secret` jest wymagany; jego wartość dekodowana jest wg TOTP-05.
 - Parametr `secret`, `algorithm`, `digits` lub `period` podany więcej niż raz → błąd „zduplikowany parametr”.
 - Nieprawidłowe kodowanie procentowe → błąd „nieprawidłowy URI otpauth”.
-- Postępowanie z nieznanymi nazwami parametrów – patrz „Otwarte pytania”.
+- Parametry o nieznanych nazwach (np. `image`, `counter` przy `totp`, pola niestandardowe) są ignorowane. Jawny błąd dotyczy tylko nieobsługiwanych wartości `algorithm`, `digits`, `period` (TOTP-07).
 
 **Kryteria akceptacji:**
 
@@ -122,6 +122,7 @@ Parser przyjmuje tekst (wynik skanu QR) i zwraca sekret albo jawny błąd. Zasad
 - **Zakładając** tekst z dwoma parametrami `secret`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „zduplikowany parametr”.
 - **Zakładając** tekst z `secret=GEZ1`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieprawidłowy Base32”.
 - **Zakładając** tekst z `secret=%ZZ`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieprawidłowy URI otpauth”.
+- **Zakładając** tekst `otpauth://totp/Przyklad:test?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&image=https%3A%2F%2Fexample.com%2Flogo.png&nieznany=1`, **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `12345678901234567890` (nieznane parametry pominięte, bez błędu).
 
 ### TOTP-07: Walidacja parametrów algorytmu
 
@@ -221,5 +222,5 @@ Dane są na tyle krótkie, że leżą w tej specyfikacji; katalog `dane/` nie je
 ## Otwarte pytania
 
 - [ ] **1. Minimalna długość sekretu (TOTP-08).** Czy odrzucać sekrety krótsze niż 16 bajtów (RFC 4226 R6)? Nie wiemy, jakiej długości sekret generuje AAPS – jeśli krótszy, takie wymaganie zablokowałoby konfigurację. Proszę o potwierdzenie długości sekretu z AAPS (sama liczba znaków Base32, bez sekretu) albo decyzję: 16 bajtów / inna wartość / tylko niepusty.
-- [ ] **2. Nieznane parametry URI (TOTP-06).** Czy parametry o nieznanych nazwach (np. `image`, `counter` przy `totp`, inne niestandardowe) mają być ignorowane, czy odrzucane błędem „nieobsługiwany parametr”? Propozycja: ignorować nieznane nazwy, a jawny błąd zwracać tylko dla nieobsługiwanych wartości `algorithm`, `digits`, `period` (TOTP-07). Odrzucanie nieznanych nazw jest bezpieczniejsze, ale może zablokować QR z AAPS, jeśli zawiera dodatkowe pola.
+- [x] **2. Nieznane parametry URI (TOTP-06).** Rozstrzygnięte: nieznane nazwy parametrów są ignorowane; jawny błąd tylko dla nieobsługiwanych wartości `algorithm`, `digits`, `period` (TOTP-07).
 - [ ] **3. Format QR z AAPS.** Czy URI z QR AAPS ma postać `otpauth://totp/...?...secret=...` i czy zawiera `algorithm`/`digits`/`period`? Wystarczy struktura z zamazanym sekretem – pozwoli potwierdzić, że TOTP-06 i TOTP-07 przyjmą prawdziwy QR.
