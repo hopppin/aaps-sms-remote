@@ -34,10 +34,16 @@ elif [ "$1" = "--pelne" ]; then
   set -- testDebugUnitTest lintDebug assembleDebug
 fi
 
+testy_w_wywolaniu=0
+for zadanie in "$@"; do
+  case "$zadanie" in *testDebugUnitTest) testy_w_wywolaniu=1 ;; esac
+done
+
 ./gradlew "$@" --console=plain
 
+# Podsumowanie tylko, gdy to wywołanie uruchamiało testy – inaczej XML-e są z poprzedniego razu.
 results=app/build/test-results/testDebugUnitTest
-if compgen -G "$results/*.xml" >/dev/null; then
+if [ "$testy_w_wywolaniu" -eq 1 ] && compgen -G "$results/*.xml" >/dev/null; then
   cat "$results"/*.xml | grep -o 'tests="[0-9]*" skipped="[0-9]*" failures="[0-9]*" errors="[0-9]*"' \
     | awk -F'"' '{t+=$2; s+=$4; f+=$6; e+=$8} END {printf "Testy: %d, pominięte: %d, porażki: %d, błędy: %d\n", t, s, f, e}'
 fi

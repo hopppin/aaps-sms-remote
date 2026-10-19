@@ -16,14 +16,25 @@ sila=0; [ "${1:-}" = "--sila" ] && sila=1
 git fetch -q --prune origin || true
 ./gradlew --stop -q >/dev/null 2>&1 || true
 
+gh_ok=1
+if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+  gh_ok=0
+  echo "UWAGA: gh niedostępne lub niezalogowane – nie sprawdzę stanu PR; worktree ze scalonym (squash) PR zostaną pominięte."
+fi
+
 pr_state() { # stan PR dla gałęzi: OPEN / MERGED / CLOSED / pusty
-  command -v gh >/dev/null 2>&1 || return 0
+  [ "$gh_ok" -eq 1 ] || return 0
   gh pr list --head "$1" --state all --json state --jq '.[0].state // ""' 2>/dev/null || true
 }
 
 for w in .claude/worktrees/*/; do
   w=${w%/}
-  [ -e "$w/.git" ] || { rm -rf "$w"; continue; }
+  [ -d "$w" ] || continue
+  if [ ! -e "$w/.git" ]; then
+    if [ "$sila" -eq 1 ]; then rm -rf "$w"; echo "Usunięto $w (bez .git)"
+    else echo "POMINIĘTO $w: brak .git – sprawdź ręcznie (albo --sila)"; fi
+    continue
+  fi
   branch=$(git -C "$w" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
   if [ "$sila" -eq 0 ]; then
     if [ -n "$(git -C "$w" status --porcelain --untracked-files=normal)" ]; then
@@ -41,7 +52,9 @@ for w in .claude/worktrees/*/; do
   echo "Usunięto $w"
   git worktree prune
   if [ -n "$branch" ] && [ "$branch" != "HEAD" ] && [ "$branch" != "main" ]; then
-    git branch -D "$branch" >/dev/null 2>&1 && echo "  i gałąź $branch" || true
+    tip=$(git rev-parse --short "$branch" 2>/dev/null || echo "?")
+    git branch -D "$branch" >/dev/null 2>&1 \
+      && echo "  i gałąź $branch (była na $tip; odzyskasz: git branch $branch $tip)" || true
   fi
 done
 git worktree prune

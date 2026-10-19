@@ -11,7 +11,7 @@ Repo: `hopppin/aaps-sms-remote`. Numer PR z argumentu (`$ARGUMENTS`); bez argume
 ## 1. Czekaj na kontrole (w tle, nie odpytuj w pętli na pierwszym planie)
 
 ```bash
-gh pr checks <nr>
+gh pr checks <nr> --watch --interval 30   # uruchom w tle; kończy się, gdy kontrole się zakończą
 ```
 
 Gotowe, gdy `build` = pass i CodeRabbit = pass. **Uwaga:** CodeRabbit czasem nie wystawia statusu dla nowego commita, choć zrobił recenzję. Wtedy sprawdź, czy jest recenzja dla bieżącego HEAD:
@@ -33,7 +33,7 @@ Uwagi z treści recenzji (nitpick, outside diff, „Additional comments”) są 
 
 ```bash
 gh api graphql -f query='{repository(owner:"hopppin",name:"aaps-sms-remote"){pullRequest(number:<nr>){reviewThreads(first:100){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(last:1){nodes{databaseId author{login} body}}}}}}}' \
-  --jq '.data.repository.pullRequest.reviewThreads | {hasNextPage: .pageInfo.hasNextPage, nierozwiazane: [.nodes[] | select(.isResolved|not)]}'
+  --jq '.data.repository.pullRequest.reviewThreads | {hasNextPage: .pageInfo.hasNextPage, endCursor: .pageInfo.endCursor, nierozwiazane: [.nodes[] | select(.isResolved|not)]}'
 ```
 
 Gdy `hasNextPage` = true (ponad 100 wątków), pobieraj kolejne strony z `reviewThreads(first:100, after:"<endCursor>")`, aż będzie false – warunek „0 nierozwiązanych” dotyczy wszystkich wątków.
@@ -47,7 +47,7 @@ Gdy `hasNextPage` = true (ponad 100 wątków), pobieraj kolejne strony z `review
 ## 3. Oceń i działaj
 
 - **Zasadna** (błąd, brak testu granicznego, sprzeczność spec↔design): popraw w gałęzi PR (jeśli istnieje worktree agenta – tam), uruchom `scripts/sprawdz.sh`, commit, push. Odpowiedź w wątku: „Poprawione w <hash>: <co>”.
-- **Niezasadna** (sprzeczna z procesem/spec, przesadna, martwa gałąź kodu): odpowiedź jednym zdaniem po polsku, dlaczego.
+- **Niezasadna** (sprzeczna z procesem/spec, przesadna, martwa gałąź kodu): odpowiedz w wątku jednym zdaniem po polsku i wyjaśnij, dlaczego uwaga jest niezasadna.
 - **Decyzja produktowa** – nie zgaduj, zapytaj użytkownika.
 
 ```bash
@@ -69,7 +69,10 @@ Po pushu wróć do kroku 1 (CodeRabbit recenzuje każdy commit i może dodać no
 Warunki: build pass, CodeRabbit pass (albo recenzja HEAD bez nowych uwag), 0 nierozwiązanych wątków, `mergeStateStatus` = `CLEAN`.
 
 ```bash
-gh pr merge <nr> --squash --delete-branch --subject "<tytuł> (#<nr>)" --body "Closes #<issue>
+# Tytuł PR to dane od autora PR – nigdy nie wklejaj go do polecenia (np. $(...) w tytule wykonałoby się).
+# Pobierz go do zmiennej i przekaż jako cytowany argument.
+T=$(gh pr view <nr> --json title --jq .title)
+gh pr merge <nr> --squash --delete-branch --subject "$T (#<nr>)" --body "Closes #<issue>
 
 Co-Authored-By: <model> <noreply@anthropic.com>"
 ```
