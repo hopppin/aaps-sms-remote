@@ -1,6 +1,6 @@
 # Spec 001: Generator TOTP
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `TOTP`
 - **Pakiety:** `otp`
 - **Powiązane:** [docs/plan.md](../../plan.md#wybór-technologii) (TOTP), [docs/plan.md](../../plan.md#przepływ-działania) (krok 6 i reguła 5 s), [docs/plan.md](../../plan.md#bezpieczeństwo); przyszłe specyfikacje `security` (przechowywanie sekretu), `session` (użycie kodu), konfiguracja (skan QR)
@@ -135,6 +135,7 @@ Aplikacja obsługuje tylko HMAC-SHA1, 6 cyfr i krok 30 s. Brakujący parametr pr
 
 - **Zakładając** URI z `secret` i bez `algorithm`, `digits`, `period`, **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
 - **Zakładając** URI z `algorithm=SHA1&digits=6&period=30`, **gdy** jest parsowany, **wtedy** wynikiem jest sekret.
+- **Zakładając** URI w formacie z QR AAPS `otpauth://totp/AAPS?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=AAPS&algorithm=SHA1&digits=6&period=30` (sekret fikcyjny, z RFC), **gdy** jest parsowany, **wtedy** wynikiem jest sekret równy bajtom ASCII `12345678901234567890`.
 - **Zakładając** URI z `algorithm=sha1`, **gdy** jest parsowany, **wtedy** wynikiem jest sekret (wartość algorytmu bez względu na wielkość liter).
 - **Zakładając** URI z `algorithm=SHA256` albo `algorithm=SHA512` albo `algorithm=` (pusta wartość), **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieobsługiwany algorytm”.
 - **Zakładając** URI z `digits=8`, `digits=06`, `digits=` albo `digits=abc`, **gdy** jest parsowany, **wtedy** wynikiem jest błąd „nieobsługiwana liczba cyfr”.
@@ -226,4 +227,4 @@ Dane są na tyle krótkie, że leżą w tej specyfikacji; katalog `dane/` nie je
 
 - [x] **1. Minimalna długość sekretu (TOTP-08).** Rozstrzygnięte: brak minimum, wystarczy niepusty sekret.
 - [x] **2. Nieznane parametry URI (TOTP-06).** Rozstrzygnięte: nieznane nazwy parametrów są ignorowane; jawny błąd tylko dla nieobsługiwanych wartości `algorithm`, `digits`, `period` (TOTP-07).
-- [ ] **3. Format QR z AAPS.** Czy URI z QR AAPS ma postać `otpauth://totp/...?...secret=...` i czy zawiera `algorithm`/`digits`/`period`? Wystarczy struktura z zamazanym sekretem – pozwoli potwierdzić, że TOTP-06 i TOTP-07 przyjmą prawdziwy QR.
+- [x] **3. Format QR z AAPS.** Rozstrzygnięte: AAPS generuje `otpauth://totp/AAPS?secret=…&issuer=AAPS&algorithm=SHA1&digits=6&period=30` – zgodne z TOTP-06 i TOTP-07, dodane kryterium w TOTP-07.

@@ -201,4 +201,4 @@ Kolejność wynika z zależności. Każde zadanie to jeden PR, ok. 200–400 lin
 
 1. **Generator TOTP** – `EpochClock`, `TotpSecret`, `TotpCode`, `TotpWindow`, `TotpGenerator` + `TotpGeneratorTest` i część `OtpRedactionTest` (sekret, kod, wyjątek). Wymagania: TOTP-01, TOTP-03, TOTP-04 (część generatora), TOTP-09 (część).
 2. **Kod z zapasem ważności** – `UsableTotpProvider` + `UsableTotpProviderTest`. Wymagania: TOTP-02, TOTP-04 (część dostawcy).
-3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część). Zadanie zależy od odpowiedzi na otwarte pytanie 3.
+3. **Base32 i parser otpauth** – `Base32`, `Base32Result`, `OtpauthParser`, `OtpauthResult`, `OtpauthError` + `Base32Test`, `OtpauthParserTest`, reszta `OtpRedactionTest`. Wymagania: TOTP-05, TOTP-06, TOTP-07, TOTP-08, TOTP-09 (część).
