@@ -13,8 +13,11 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.definition
 import pl.twojanazwa.aapsremote.commands.smsText
+import pl.twojanazwa.aapsremote.commands.toExpectedCommand
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
+import pl.twojanazwa.aapsremote.parser.AapsReply
+import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
@@ -54,6 +57,7 @@ class CommandSession(
     private var lastClockReading: Long? = null
     private var startedAt: Long? = null
     private var commandSentAt: Long? = null
+    private val pendingMessages = mutableListOf<IncomingSms>()
 
     /** Wywoływany po opublikowaniu FINISHED, przed uzupełnieniem wyniku (używa koordynator). */
     internal var onFinished: () -> Unit = {}
@@ -77,7 +81,7 @@ class CommandSession(
             coroutineScope {
                 startedAt = readClock()
                 _state.value = _state.value.copy(phase = SessionPhase.SENDING_COMMAND)
-                // Subskrypcja aktywna, zanim wyjdzie SMS (SESSION-03). Wiadomości obsłuży kolejne zadanie.
+                // Subskrypcja aktywna, zanim wyjdzie SMS (SESSION-03). Wiadomości trafiają do pętli zdarzeń.
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
                         incoming.messages().collect { events.trySend(Event.Message(it)) }
@@ -115,7 +119,13 @@ class CommandSession(
     private suspend fun eventLoop(): SessionResult {
         for (event in events) {
             when (event) {
-                is Event.Message -> Unit // zadanie „przetwarzanie wiadomości"
+                is Event.Message -> {
+                    if (_state.value.phase == SessionPhase.SENDING_COMMAND) {
+                        pendingMessages += event.sms
+                    } else {
+                        processMessage(event.sms)?.let { return it }
+                    }
+                }
                 is Event.CommandSendResult -> {
                     if (_state.value.phase != SessionPhase.SENDING_COMMAND) continue
                     when (event.result) {
@@ -128,6 +138,10 @@ class CommandSession(
                                     SessionPhase.AWAITING_REPLY
                                 },
                             )
+                            // Wiadomości odłożone w trakcie wysyłania – w kolejności odbioru.
+                            val pending = pendingMessages.toList()
+                            pendingMessages.clear()
+                            for (sms in pending) processMessage(sms)?.let { return it }
                         }
                         SendResult.Failed ->
                             return finish(SessionOutcome.Failed(FailureReason.SEND_FAILED, null))
@@ -136,6 +150,24 @@ class CommandSession(
             }
         }
         error("event channel closed")
+    }
+
+    /**
+     * Wiadomość po wysłaniu polecenia. Zwraca wynik, gdy sesja się kończy, inaczej null.
+     * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W fazie AWAITING_CODE_REQUEST
+     * i pozostałych stan się nie zmienia (obsługa w zadaniach CARBS).
+     */
+    private fun processMessage(sms: IncomingSms): SessionResult? {
+        val sentAt = commandSentAt ?: return null
+        if (sms.receivedAtEpochMillis < sentAt) return null
+        if (_state.value.phase != SessionPhase.AWAITING_REPLY) return null
+        val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+        return finish(
+            when (reply) {
+                is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
+                else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
+            },
+        )
     }
 
     /** Nieblokujące, bezpieczne z dowolnego wątku. Pełna obsługa – zadanie „anulowanie". */

@@ -12,11 +12,15 @@ class FakeIncomingSmsSource : IncomingSmsSource {
     /** Jeśli ustawione, strumień kończy się tym wyjątkiem po subskrypcji. */
     var failure: Throwable? = null
 
+    /** Jeśli true, strumień kończy się normalnie (bez wyjątku) tuż po subskrypcji. */
+    var completeImmediately: Boolean = false
+
     val subscriptionCount get() = shared.subscriptionCount
 
     suspend fun emit(sms: IncomingSms) = shared.emit(sms)
 
     override fun messages(): Flow<IncomingSms> {
+        if (completeImmediately) return flow { }
         val error = failure ?: return shared
         return merge(shared, flow { throw error })
     }
