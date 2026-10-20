@@ -57,12 +57,13 @@ class KeystoreTotpSecretStoreConcurrencyTest {
             storage.writeGate = gate
             val saving = async(Dispatchers.Default) { s.save(secret(s1Bytes)) }
             assertTrue(storage.writeEntered.await(10, java.util.concurrent.TimeUnit.SECONDS))
-            val loading = async(Dispatchers.Default) { s.load() }
-            val decryptsWhileBlocked = fakeCipher.decryptCount
+            // UNDISPATCHED: load wykonuje się synchronicznie do pierwszego zawieszenia (czekanie na Mutex trzymany przez save).
+            val loading = async(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) { s.load() }
+            assertFalse(loading.isCompleted)
+            assertEquals(0, fakeCipher.decryptCount)
             gate.countDown()
             assertEquals(SaveResult.Saved, saving.await())
             val loaded = loading.await() as LoadResult.Loaded
-            assertEquals(0, decryptsWhileBlocked)
             assertArrayEquals(s1Bytes, loaded.secret.copyBytes())
             assertEquals(1, fakeCipher.decryptCount)
         }
