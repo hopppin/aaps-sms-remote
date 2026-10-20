@@ -310,13 +310,15 @@ try {
     if (r is Failure && r.reason == KEY_INVALIDATED) { wipe(); r = cipher.encrypt(plain) }
     when (r) {
         is Success -> {
-            // rekord sprzed zapisu: Known(record | null) albo Unknown, gdy odczyt rzucił (wtedy bez wycofania)
+            // Rekord sprzed zapisu (po ewentualnym wipe() – wtedy brak): Known(record | null) albo Unknown,
+            // gdy odczyt rzucił (wtedy bez wycofania). Rekord, którego SealedSecretFormat.decode() nie przyjmuje,
+            // jest traktowany jak brak (Known(null)) – wycofanie nigdy nie przywraca rekordu nieprawidłowego.
             val previous = readForRollback()
             if (safeWrite(SealedSecretFormat.encode(r.sealed))) { _state.value = PRESENT; Saved }
             else {
                 // commit() == false mógł już zmienić stan w pamięci SharedPreferences – jedna próba wycofania (SECRET-05)
                 if (previous is Known) { if (previous.record != null) safeWrite(previous.record) else safeClear() }
-                updateStateFromStorage()   // jak refreshState(), bez ponownego brania blokady
+                updateStateFromStorage()   // reguły refreshState() (pusty + INVALIDATED → INVALIDATED), bez ponownego brania blokady
                 Failed(STORAGE)
             }
         }
