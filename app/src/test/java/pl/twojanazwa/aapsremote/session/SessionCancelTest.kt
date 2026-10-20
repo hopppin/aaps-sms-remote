@@ -130,6 +130,48 @@ class SessionCancelTest {
         }
 
     @Test
+    fun `SESSION-17 SESSION-20 anulowanie w SENDING_COMMAND - zawieszone send nie konczy sie po FINISHED`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var sentAfterGate = 0
+        val gatedSender = SmsSender {
+            gate.await()
+            sentAfterGate++
+            SendResult.Sent
+        }
+        val session = testSession(Command.Bg, gatedSender, source)
+        val run = async { session.run() }
+        runCurrent()
+        assertEquals(SessionPhase.SENDING_COMMAND, session.state.value.phase)
+        session.cancel()
+        runCurrent()
+        assertEquals(SessionOutcome.Cancelled, run.await().outcome)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(0, sentAfterGate)
+        assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+    }
+
+    @Test
+    fun `SESSION-07 SESSION-20 limit w SENDING_COMMAND - zawieszone send nie konczy sie po FINISHED`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        var sentAfterGate = 0
+        val gatedSender = SmsSender {
+            gate.await()
+            sentAfterGate++
+            SendResult.Sent
+        }
+        val session = testSession(Command.Bg, gatedSender, source)
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(180_000)
+        runCurrent()
+        assertEquals(SessionOutcome.TimedOut(SessionPhase.SENDING_COMMAND), run.await().outcome)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(0, sentAfterGate)
+    }
+
+    @Test
     fun `SESSION-17 po Completed anulowanie nie zmienia wyniku`() = runTest {
         val session = testSession(Command.Bg, sender, source)
         val run = async { session.run() }

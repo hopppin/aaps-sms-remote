@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -139,15 +140,15 @@ class CommandSession(
     private suspend fun eventLoop(): SessionResult {
         for (event in events) {
             // Pierwszeństwo limitu: przy równej chwili limit wygrywa z każdym zdarzeniem (nie jest ono obsługiwane).
-            if (deadline?.hasPassedNow() == true) return finish(timeoutOutcome())
+            if (deadline?.hasPassedNow() == true) return endWith(timeoutOutcome())
             when (event) {
                 Event.ReplyDeadline -> Unit // wybudzenie; termin sprawdzony wyżej
-                Event.Cancel -> return finish(SessionOutcome.Cancelled) // tylko fazy przed kodem
+                Event.Cancel -> return endWith(SessionOutcome.Cancelled) // tylko fazy przed kodem
                 is Event.Message -> {
                     if (_state.value.phase == SessionPhase.SENDING_COMMAND) {
                         pendingMessages += event.sms
                     } else {
-                        processMessage(event.sms)?.let { return it }
+                        processMessage(event.sms)?.let { return endWith(it) }
                     }
                 }
                 is Event.CommandSendResult -> {
@@ -165,10 +166,10 @@ class CommandSession(
                             // Wiadomości odłożone w trakcie wysyłania – w kolejności odbioru.
                             val pending = pendingMessages.toList()
                             pendingMessages.clear()
-                            for (sms in pending) processMessage(sms)?.let { return it }
+                            for (sms in pending) processMessage(sms)?.let { return endWith(it) }
                         }
                         SendResult.Failed ->
-                            return finish(SessionOutcome.Failed(FailureReason.SEND_FAILED, null))
+                            return endWith(SessionOutcome.Failed(FailureReason.SEND_FAILED, null))
                     }
                 }
             }
@@ -181,17 +182,24 @@ class CommandSession(
      * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W fazie AWAITING_CODE_REQUEST
      * i pozostałych stan się nie zmienia (obsługa w zadaniach CARBS).
      */
-    private fun processMessage(sms: IncomingSms): SessionResult? {
+    private fun processMessage(sms: IncomingSms): SessionOutcome? {
         val sentAt = commandSentAt ?: return null
         if (sms.receivedAtEpochMillis < sentAt) return null
         if (_state.value.phase != SessionPhase.AWAITING_REPLY) return null
         val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
-        return finish(
-            when (reply) {
-                is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
-                else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
-            },
-        )
+        return when (reply) {
+            is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
+            else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
+        }
+    }
+
+    /**
+     * Każde zakończenie z pętli: najpierw anulowanie korutyn potomnych (zawieszone send nie dokończy się
+     * po FINISHED na wielowątkowym dispatcherze), potem finish().
+     */
+    private suspend fun endWith(outcome: SessionOutcome): SessionResult {
+        currentCoroutineContext().job.cancelChildren()
+        return finish(outcome)
     }
 
     /**
