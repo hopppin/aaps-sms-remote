@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
@@ -20,6 +21,7 @@ import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
@@ -36,15 +38,19 @@ class CommandSession(
     private val incoming: IncomingSmsSource,
     private val clock: EpochClock,
     @Suppress("unused") private val totp: UsableTotpProvider,
-    @Suppress("unused") private val timeouts: SessionTimeouts = SessionTimeouts(),
+    private val timeouts: SessionTimeouts = SessionTimeouts(),
     /** Czas korutyn dla terminów limitów; w testach testScheduler.timeSource. */
-    @Suppress("unused") private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+    private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
-    private enum class Lifecycle { NOT_STARTED, RUNNING }
+    private enum class Lifecycle { NOT_STARTED, RUNNING, CANCELLED_BEFORE_START, RESULT_TAKEN }
 
     private sealed interface Event {
         class Message(val sms: IncomingSms) : Event
         class CommandSendResult(val result: SendResult) : Event
+
+        /** Tylko wybudzenie pętli; o limicie decyduje znacznik [deadline]. */
+        data object ReplyDeadline : Event
+        data object Cancel : Event
     }
 
     private val _state = MutableStateFlow(SessionState(SessionPhase.NOT_STARTED, emptyList(), null))
@@ -58,6 +64,9 @@ class CommandSession(
     private var startedAt: Long? = null
     private var commandSentAt: Long? = null
     private val pendingMessages = mutableListOf<IncomingSms>()
+
+    /** Termin limitu bieżącej fazy (czas korutyn). Zadania CARBS ustawiają go przy zmianie fazy. */
+    private var deadline: TimeMark? = null
 
     /** Wywoływany po opublikowaniu FINISHED, przed uzupełnieniem wyniku (używa koordynator). */
     internal var onFinished: () -> Unit = {}
@@ -76,11 +85,22 @@ class CommandSession(
      * Nie rzuca dla błędów sesji (SESSION-19).
      */
     suspend fun run(): SessionResult {
-        check(lifecycle.compareAndSet(Lifecycle.NOT_STARTED, Lifecycle.RUNNING)) { "session already started" }
+        if (!lifecycle.compareAndSet(Lifecycle.NOT_STARTED, Lifecycle.RUNNING)) {
+            // Anulowana przed startem: wynik dopiero po pełnym zakończeniu (PIN wyczyszczony, FINISHED opublikowany).
+            check(lifecycle.compareAndSet(Lifecycle.CANCELLED_BEFORE_START, Lifecycle.RESULT_TAKEN)) {
+                "session already started"
+            }
+            return finishedResult.await()
+        }
         return try {
             coroutineScope {
                 startedAt = readClock()
                 _state.value = _state.value.copy(phase = SessionPhase.SENDING_COMMAND)
+                deadline = timeSource.markNow() + timeouts.reply
+                launch {
+                    delay(timeouts.reply)
+                    events.trySend(Event.ReplyDeadline)
+                }
                 // Subskrypcja aktywna, zanim wyjdzie SMS (SESSION-03). Wiadomości trafiają do pętli zdarzeń.
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
@@ -109,7 +129,8 @@ class CommandSession(
                 result
             }
         } catch (e: CancellationException) {
-            // Anulowanie z zewnątrz: obsługa w zadaniu „limit odpowiedzi i anulowanie".
+            // Anulowanie z zewnątrz (SESSION-17). Fazy po kodzie (Unknown(CANCELLED_AFTER_CODE)) dopisze zadanie CARBS.
+            if (_state.value.phase != SessionPhase.FINISHED) finish(SessionOutcome.Cancelled)
             throw e
         } catch (e: Exception) {
             finish(SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null))
@@ -118,7 +139,11 @@ class CommandSession(
 
     private suspend fun eventLoop(): SessionResult {
         for (event in events) {
+            // Pierwszeństwo limitu: przy równej chwili limit wygrywa z każdym zdarzeniem (nie jest ono obsługiwane).
+            if (deadline?.hasPassedNow() == true) return finish(timeoutOutcome())
             when (event) {
+                Event.ReplyDeadline -> Unit // wybudzenie; termin sprawdzony wyżej
+                Event.Cancel -> return finish(SessionOutcome.Cancelled) // tylko fazy przed kodem
                 is Event.Message -> {
                     if (_state.value.phase == SessionPhase.SENDING_COMMAND) {
                         pendingMessages += event.sms
@@ -170,8 +195,16 @@ class CommandSession(
         )
     }
 
-    /** Nieblokujące, bezpieczne z dowolnego wątku. Pełna obsługa – zadanie „anulowanie". */
+    /** Wynik limitu bieżącej fazy. Fazy z kodu (PREPARING_CODE, po kodzie) dopisują zadania CARBS. */
+    private fun timeoutOutcome(): SessionOutcome = SessionOutcome.TimedOut(_state.value.phase)
+
+    /** Nieblokujące, bezpieczne z dowolnego wątku. Bez efektu po FINISHED. */
     fun cancel() {
+        if (lifecycle.compareAndSet(Lifecycle.NOT_STARTED, Lifecycle.CANCELLED_BEFORE_START)) {
+            finish(SessionOutcome.Cancelled)
+        } else if (lifecycle.get() == Lifecycle.RUNNING) {
+            events.trySend(Event.Cancel)
+        }
     }
 
     /** Kolejność wg design.md: PIN → jeden odczyt zegara → FINISHED → onFinished → wynik. Nie rzuca. */

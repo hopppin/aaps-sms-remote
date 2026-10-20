@@ -66,4 +66,16 @@ class SessionStateFlowTest {
         runCurrent()
         assertEquals(SessionTestFixtures.T0 + 2000, run.await().commandSentAtEpochMillis)
     }
+
+    @Test
+    fun `SESSION-21 BG zakonczone TimedOut ma pusta chwile wysylki kodu`() = runTest {
+        val session = session(Command.Bg)
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(180_000)
+        runCurrent()
+        val result = run.await()
+        assertEquals(SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY), result.outcome)
+        assertEquals(null, result.codeSentAtEpochMillis)
+    }
 }
