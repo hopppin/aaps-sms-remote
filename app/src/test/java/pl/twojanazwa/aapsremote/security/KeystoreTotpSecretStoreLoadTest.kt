@@ -59,4 +59,18 @@ class KeystoreTotpSecretStoreLoadTest {
         s.load()
         assertEquals(SecretState.PRESENT, s.state.value)
     }
+
+    @Test
+    fun `SECRET-06 load ustawia stan PRESENT w nowej instancji magazynu`() = runTest {
+        val writer = store(fakeCipher)
+        writer.save(TotpSecret.fromBytes(s1Bytes.copyOf()))
+
+        val reader = store(fakeCipher)
+        assertEquals(SecretState.UNKNOWN, reader.state.value)
+
+        val loaded = reader.load()
+        assertTrue(loaded is LoadResult.Loaded)
+        assertEquals("287082", code((loaded as LoadResult.Loaded).secret))
+        assertEquals(SecretState.PRESENT, reader.state.value)
+    }
 }
