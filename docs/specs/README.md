@@ -55,3 +55,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 004 | [Sesja polecenia](004-sesja-polecenia/spec.md) | `SESSION` | zatwierdzona |
 | 005 | [SMS (wysyłanie i odbiór)](005-sms/spec.md) | `SMS` | zatwierdzona |
 | 006 | [Przechowywanie sekretu TOTP (Keystore)](006-sekret-totp/spec.md) | `SECRET` | zatwierdzona |
+| 007 | [Dane – ustawienia i historia poleceń](007-dane/spec.md) | `DATA` | zatwierdzona |
