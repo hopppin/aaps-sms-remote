@@ -16,9 +16,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * Magazyn jednego sekretu TOTP (spec 006). Pola: tylko zależności, [Mutex] i stan (SECRET-14).
  * Każda operacja: `mutex.withLock { withContext(dispatcher) { ... } }`, a stan jest aktualizowany
  * wewnątrz `withContext` zaraz po wywołaniu portu, które go przesądza (SECRET-13).
- *
- * Stan prac (łańcuch #70-#74):
- * - TODO(#73): `delete` (SECRET-11) i `refreshState` (SECRET-12) to zaślepki bez I/O.
  */
 @Singleton
 class KeystoreTotpSecretStore @Inject constructor(
@@ -102,11 +99,29 @@ class KeystoreTotpSecretStore @Inject constructor(
         }
     }
 
-    /** TODO(#73): SECRET-11. Zaślepka: nic nie usuwa. */
-    override suspend fun delete(): DeleteResult = DeleteResult.Failed
+    /** SECRET-11: usuwa rekord, potem klucz (wynik ignorowany). Nieudane usunięcie rekordu: klucz zostaje. */
+    override suspend fun delete(): DeleteResult = mutex.withLock {
+        withContext(dispatcher) {
+            if (!safeClear()) {
+                DeleteResult.Failed
+            } else {
+                _state.value = SecretState.ABSENT
+                try {
+                    cipher.deleteKey()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // wynik ignorowany
+                }
+                DeleteResult.Deleted
+            }
+        }
+    }
 
-    /** TODO(#73): SECRET-12. Zaślepka: bez I/O, zwraca bieżący stan. */
-    override suspend fun refreshState(): SecretState = _state.value
+    /** SECRET-12: tylko obecność rekordu, bez dekodowania i odszyfrowania. */
+    override suspend fun refreshState(): SecretState = mutex.withLock {
+        withContext(dispatcher) { updateStateFromStorage() }
+    }
 
     /**
      * SECRET-08: usuwa rekord, potem klucz (wyniki i wyjątki ignorowane poza anulowaniem), stan INVALIDATED.
@@ -168,7 +183,7 @@ class KeystoreTotpSecretStore @Inject constructor(
 
     /**
      * Reguły `refreshState()` (SECRET-12), bez brania blokady: rekord jest -> PRESENT; brak -> ABSENT,
-     * chyba że INVALIDATED; błąd odczytu -> bez zmiany. Użyje go też #71 (wycofanie) i #73.
+     * chyba że INVALIDATED; błąd odczytu -> bez zmiany. Używają go: wycofanie w `save` i `refreshState`.
      */
     private fun updateStateFromStorage(): SecretState {
         val record = try {
