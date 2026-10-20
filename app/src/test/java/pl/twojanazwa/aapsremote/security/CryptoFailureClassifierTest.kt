@@ -93,6 +93,22 @@ class CryptoFailureClassifierTest {
     }
 
     @Test
+    fun `SECRET-07 AEADBadTagException jako 8 element lancucha daje CORRUPTED`() {
+        val env = FakeKeystoreEnvironment()
+        var error: Throwable = AEADBadTagException()
+        repeat(7) { error = Exception("test", error) }
+        assertEquals(CORRUPTED, CryptoFailureClassifier.classify(error, env))
+    }
+
+    @Test
+    fun `SECRET-07 AEADBadTagException jako 9 element lancucha daje UNAVAILABLE`() {
+        val env = FakeKeystoreEnvironment()
+        var error: Throwable = AEADBadTagException()
+        repeat(8) { error = Exception("test", error) }
+        assertEquals(UNAVAILABLE, CryptoFailureClassifier.classify(error, env))
+    }
+
+    @Test
     fun `SECRET-07 brak klucza odblokowany to KEY_INVALIDATED a zablokowany LOCKED`() {
         assertEquals(KEY_INVALIDATED, CryptoFailureClassifier.classifyMissingKey(FakeKeystoreEnvironment(locked = false)))
         assertEquals(LOCKED, CryptoFailureClassifier.classifyMissingKey(FakeKeystoreEnvironment(locked = true)))
