@@ -63,11 +63,12 @@ class IncomingSmsHubFilterTest {
     fun `SMS-04 po nieudanej rejestracji osierocony kanal nie blokuje wyrejestrowania`() = runTest {
         val f = HubFixture()
         f.registrar.registerException = SecurityException("odmowa")
+        val failedReceived = mutableListOf<IncomingSms>()
         val failed = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            runCatching { f.hub.messages().collect { } }
+            runCatching { f.hub.messages().collect { failedReceived.add(it) } }
         }
         runCurrent()
-        assertTrue(failed.isCompleted)
+        assertTrue(failed.isActive) // SMS-08: wyjątek rejestracji jest połykany, kolektor czeka
 
         f.registrar.registerException = null
         val received = mutableListOf<IncomingSms>()
@@ -75,8 +76,10 @@ class IncomingSmsHubFilterTest {
         f.registrar.deliver(RawSmsPart(aaps, AapsSamples.bg, 1L))
         runCurrent()
         assertEquals(listOf(AapsSamples.bg), received.map { it.body })
+        assertEquals(listOf(AapsSamples.bg), failedReceived.map { it.body })
 
         second.cancel()
+        failed.cancel()
         runCurrent()
         assertEquals(1, f.registrar.unregisterCount)
     }

@@ -20,8 +20,12 @@ class FakeSmsBroadcastRegistrar : SmsBroadcastRegistrar {
         isRegistered = true
     }
 
+    /** Jeśli ustawiony, [unregister] rzuca ten wyjątek (po zliczeniu wywołania). */
+    var unregisterException: Exception? = null
+
     override fun unregister() {
         unregisterCount++
+        unregisterException?.let { throw it }
         handler = null
         isRegistered = false
     }
