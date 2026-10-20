@@ -281,7 +281,7 @@ Rekord jest zapisywany w osobnym pliku `SharedPreferences` o nazwie `totp_secret
 | Brak StrongBox | jedna próba bez StrongBox (TEE) | SECRET-02 |
 | Generacja klucza nieudana (inny powód) | `Failed(KEY_GENERATION)`, bez obniżania parametrów | SECRET-02, SECRET-04 |
 | Telefon zablokowany przy zapisie | `Locked`, nic nie zmienione | SECRET-04 |
-| Zapis rekordu `false` / wyjątek (poza `CancellationException`) | `Failed(STORAGE)`; gdy odczyt przed zapisem się udał: jedna próba wycofania, potem poprzedni rekord bez zmian albo nowy, nigdy o nieprawidłowym formacie; gdy odczyt rzucił: bez wycofania, bez tej gwarancji | SECRET-04, SECRET-05 |
+| Zapis rekordu `false` / wyjątek (poza `CancellationException`) | `Failed(STORAGE)`; gdy odczyt przed zapisem się udał: jedna próba wycofania, potem poprzedni rekord bez zmian albo nowy (albo pusty magazyn); gwarancja „nigdy o nieprawidłowym formacie” tylko, gdy poprzedni rekord był poprawny albo go nie było (gdy był nieprawidłowy, a usunięcie się nie udało, może zostać i da `Invalidated` jak bez zapisu); gdy odczyt rzucił: bez wycofania, bez tej gwarancji | SECRET-04, SECRET-05 |
 | Proces zabity w trakcie zapisu | stary albo nowy sekret (W9) | SECRET-05 |
 | Brak rekordu | `Absent` | SECRET-06 |
 | Rekord nieprawidłowy (Base64, długość, wersja) | wyczyszczenie, `Invalidated` | SECRET-03, SECRET-08 |
