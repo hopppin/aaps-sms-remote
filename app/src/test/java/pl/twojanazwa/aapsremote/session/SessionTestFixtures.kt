@@ -32,6 +32,7 @@ fun TestScope.testSession(
     credentials: CodeCredentials? = null,
     timeouts: SessionTimeouts = SessionTimeouts(),
     clock: EpochClock = virtualClock(),
+    timeSource: kotlin.time.TimeSource.WithComparableMarks = testScheduler.timeSource,
 ): CommandSession = CommandSession(
     command = command,
     credentials = credentials,
@@ -40,8 +41,18 @@ fun TestScope.testSession(
     clock = clock,
     totp = UsableTotpProvider(clock),
     timeouts = timeouts,
-    timeSource = testScheduler.timeSource,
+    timeSource = timeSource,
 )
+
+/**
+ * Źródło czasu spóźnione o 1 ms po starcie (odczyt = czas wirtualny - 1 ms dla czasu > 0): delay potrafi
+ * wybudzić korutynę, zanim znacznik uzna termin za minięty.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+fun TestScope.laggingTimeSource(): kotlin.time.TimeSource.WithComparableMarks =
+    object : kotlin.time.AbstractLongTimeSource(kotlin.time.DurationUnit.MILLISECONDS) {
+        override fun read(): Long = testScheduler.currentTime.let { if (it > 0) it - 1 else 0 }
+    }
 
 /** Zegar na czasie wirtualnym: T0 + upłynięty czas testu. */
 @OptIn(ExperimentalCoroutinesApi::class)

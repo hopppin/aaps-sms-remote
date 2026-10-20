@@ -1,6 +1,7 @@
 package pl.twojanazwa.aapsremote.session
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.ensureActive
@@ -96,11 +97,9 @@ class CommandSession(
             coroutineScope {
                 startedAt = readClock()
                 _state.value = _state.value.copy(phase = SessionPhase.SENDING_COMMAND)
-                deadline = timeSource.markNow() + timeouts.reply
-                launch {
-                    delay(timeouts.reply)
-                    events.trySend(Event.ReplyDeadline)
-                }
+                val replyDeadline = timeSource.markNow() + timeouts.reply
+                deadline = replyDeadline
+                launchDeadlineTimer(replyDeadline, Event.ReplyDeadline)
                 // Subskrypcja aktywna, zanim wyjdzie SMS (SESSION-03). Wiadomości trafiają do pętli zdarzeń.
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
@@ -193,6 +192,20 @@ class CommandSession(
                 else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
             },
         )
+    }
+
+    /**
+     * Wspólny licznik terminów (ReplyDeadline, PreparationDeadline, ConfirmationDeadline): czeka na ten sam
+     * znacznik, którego pętla używa w hasPassedNow(), więc nie wybudzi pętli przed terminem, nawet gdy
+     * dispatcher wznowi delay odrobinę wcześniej niż źródło czasu. Zdarzenie służy tylko do wybudzenia.
+     */
+    private fun CoroutineScope.launchDeadlineTimer(mark: TimeMark, event: Event) {
+        launch {
+            while (!mark.hasPassedNow()) {
+                delay(maxOf(1L, (-mark.elapsedNow()).inWholeMilliseconds))
+            }
+            events.trySend(event)
+        }
     }
 
     /** Wynik limitu bieżącej fazy. Fazy z kodu (PREPARING_CODE, po kodzie) dopisują zadania CARBS. */

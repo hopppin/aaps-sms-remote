@@ -36,7 +36,22 @@ class CommandSessionReplyTimeoutTest {
     }
 
     @Test
-    fun `SESSION-07 BG bg txt w chwili 179999 konczy sie Completed`() = runTest {
+    fun `SESSION-07 delay budzi sie przed terminem wedlug znacznika - licznik czeka i sesja konczy sie TimedOut`() =
+        runTest {
+            val session = testSession(Command.Bg, sender, source, timeSource = laggingTimeSource())
+            val run = async { session.run() }
+            runCurrent()
+            advanceTimeBy(180_000)
+            runCurrent()
+            // Znacznik jeszcze nie uznaje terminu za minięty (spóźnione źródło), więc sesja czeka.
+            assertEquals(SessionPhase.AWAITING_REPLY, session.state.value.phase)
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY), run.await().outcome)
+        }
+
+    @Test
+    fun `SESSION-07 BG bg txt w chwili 179999konczy sie Completed`() = runTest {
         val session = testSession(Command.Bg, sender, source)
         val run = async { session.run() }
         runCurrent()
