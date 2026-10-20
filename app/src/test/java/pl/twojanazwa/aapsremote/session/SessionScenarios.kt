@@ -54,7 +54,7 @@ private val carbsRequest2g: String get() = AapsSamples.carbsCodeRequest.replace(
 @OptIn(ExperimentalCoroutinesApi::class)
 private suspend fun TestScope.play(
     command: Command = carbsCommand(1),
-    withCredentials: Boolean = command != Command.Bg,
+    withCredentials: Boolean = command != Command.Bg && command != Command.Pump,
     totp: UsableTotpProvider? = null,
     clock: EpochClock = virtualClock(),
     sender: FakeSmsSender = FakeSmsSender(),
@@ -120,6 +120,9 @@ val sessionScenarios: List<SessionScenario> = listOf(
     },
     SessionScenario("SESSION-06 BG dostaje odpowiedz", "Completed") {
         play(Command.Bg) { _, source, _ -> deliverAt(source, 5_000, AapsSamples.bg) }
+    },
+    SessionScenario("SESSION-06 PUMP dostaje odpowiedz", "Completed") {
+        play(Command.Pump) { _, source, _ -> deliverAt(source, 5_000, AapsSamples.pump) }
     },
     SessionScenario("SESSION-06 BG dostaje nierozpoznana tresc", "Failed.UNRECOGNIZED_REPLY") {
         play(Command.Bg) { _, source, _ -> deliverAt(source, 5_000, "Czesc, kupisz chleb?") }
