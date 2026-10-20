@@ -42,6 +42,20 @@ class SecretRedactionTest {
     }
 
     @Test
+    fun `SECRET-15 AesGcmSecretCipher i wyniki szyfratora nie ujawniaja sekretu ani rekordu`() {
+        val cipher = AesGcmSecretCipher(FakeSecretKeySource(), FakeKeystoreEnvironment())
+        val encrypted = cipher.encrypt(s1) as EncryptResult.Success
+        val record = SealedSecretFormat.encode(encrypted.sealed)
+        assertEquals("AesGcmSecretCipher(***)", cipher.toString())
+        assertEquals("Success(***)", encrypted.toString())
+        assertRedacted(cipher.toString(), record)
+        assertRedacted(encrypted.toString(), record)
+        val decrypted = cipher.decrypt(encrypted.sealed) as DecryptResult.Success
+        assertEquals("Success(***)", decrypted.toString())
+        assertRedacted(decrypted.toString(), record)
+    }
+
+    @Test
     fun `SECRET-15 komunikaty wyjatkow konstruktora SealedSecret sa stalymi tekstami`() {
         val badIv = assertThrows(IllegalArgumentException::class.java) {
             SealedSecret(SealedSecretFormat.VERSION_1, ByteArray(11) { 0x31 }, s1)
