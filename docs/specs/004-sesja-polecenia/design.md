@@ -48,6 +48,7 @@ package pl.twojanazwa.aapsremote.session
 
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeSource
 
 /** SESSION-01. require(reply.isPositive() && confirmation.isPositive()) ze stałym komunikatem. */
 data class SessionTimeouts(
@@ -70,7 +71,8 @@ object SessionLimits {
 
 /**
  * Wiadomość od numeru AAPS, już po filtrze numeru i sklejeniu części.
- * receivedAtEpochMillis: odczyt tego samego EpochClock co sesja w chwili odbioru (nie znacznik centrum SMS).
+ * receivedAtEpochMillis: odczyt tego samego EpochClock co sesja w chwili odbioru (nie znacznik centrum SMS) – K1.
+ * Każda wiadomość dostarczana najwyżej raz (deduplikacja) – K2; kontrakt portów w spec.md.
  */
 data class IncomingSms(val body: String, val receivedAtEpochMillis: Long) {
     override fun toString(): String = "IncomingSms(***, receivedAtEpochMillis=$receivedAtEpochMillis)"
@@ -136,10 +138,12 @@ data class SessionState(
 
 data class SessionResult(
     val command: Command,
-    val startedAtEpochMillis: Long,
+    /** null tylko, gdy zegar nie zwrócił w sesji żadnej poprawnej wartości (SESSION-19). */
+    val startedAtEpochMillis: Long?,
     val commandSentAtEpochMillis: Long?,
     val codeSentAtEpochMillis: Long?,
-    val finishedAtEpochMillis: Long,
+    /** Odczyt przy zakończeniu albo ostatni poprawny odczyt, gdy zegar rzucił; null jak wyżej (SESSION-19). */
+    val finishedAtEpochMillis: Long?,
     val outcome: SessionOutcome,
     val unexpectedMessages: List<IncomingSms>,
 ) {
@@ -197,13 +201,18 @@ class CommandSession(
     clock: EpochClock,
     totp: UsableTotpProvider,
     timeouts: SessionTimeouts = SessionTimeouts(),
+    /** Czas korutyn dla terminów limitów; w testach testScheduler.timeSource. */
+    timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
     val state: StateFlow<SessionState>
 
-    /** Raz. Drugie wywołanie: IllegalStateException("session already started"). Nie rzuca dla błędów sesji (SESSION-19). */
+    /**
+     * Raz. Po cancel() w NOT_STARTED zwraca od razu Cancelled (bez subskrypcji, limitu i wysyłki).
+     * Kolejne wywołanie: IllegalStateException("session already started"). Nie rzuca dla błędów sesji (SESSION-19).
+     */
     suspend fun run(): SessionResult
 
-    /** Nieblokujące, bezpieczne z dowolnego wątku; bez efektu w FINISHED (SESSION-17). */
+    /** Nieblokujące, bezpieczne z dowolnego wątku; w NOT_STARTED kończy sesję od razu; bez efektu w FINISHED (SESSION-17). */
     fun cancel()
 
     override fun toString(): String // "CommandSession(phase=…)"
@@ -217,13 +226,15 @@ class SessionCoordinator(
     incoming: IncomingSmsSource,
     clock: EpochClock,
     totp: UsableTotpProvider,
+    timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
 ) {
     /** null, gdy brak aktywnej sesji (SESSION-22). */
     val activeSession: StateFlow<CommandSession?>
 
     /**
-     * Atomowo: tworzy sesję i uruchamia run() w [scope] albo zwraca Busy (czyści credentials?.pin).
-     * IllegalArgumentException z konstruktora sesji przechodzi do wywołującego (PIN już wyczyszczony).
+     * Najpierw atomowa rezerwacja miejsca; zajęte → Busy bez walidacji danych (czyści credentials?.pin).
+     * Po rezerwacji tworzy sesję i uruchamia run() w [scope]. IllegalArgumentException z konstruktora
+     * zwalnia rezerwację, czyści PIN i przechodzi do wywołującego.
      */
     fun start(
         scope: CoroutineScope,
@@ -259,6 +270,8 @@ Sygnatury są wiążące dla nazw i typów publicznych; ciała i prywatne pomocn
 | `Cancel` | `cancel()` przez `trySend` |
 | `InternalError` | wyjątek (nie `CancellationException`) w pętli lub w korutynie potomnej poza obsłużonymi przypadkami (SESSION-19) |
 
+**Pierwszeństwo limitu.** Przy wejściu w fazę z limitem pętla zapisuje termin jako znacznik `deadline = timeSource.markNow() + limit` (`ReplyDeadline`: przy wejściu w `SENDING_COMMAND`; `PreparationDeadline`: w `PREPARING_CODE`; `ConfirmationDeadline`: przy rozpoczęciu wysyłania kodu). Przed obsługą każdego zdarzenia innego niż zdarzenie limitu (`Message`, `CommandSendResult`, `CodeReady`, `CodeSendResult`, `Cancel`) pętla sprawdza `timeSource.markNow() >= deadline` bieżącej fazy; jeśli tak, kończy sesję wynikiem limitu i zdarzenia nie obsługuje. Dzięki temu wynik nie zależy od kolejności, w jakiej korutyny potomne wstawiły zdarzenia do kanału w tej samej chwili. Korutyny `delay(...)` dla limitów służą tylko do wybudzenia pętli, gdy nie przychodzą inne zdarzenia. W testach `timeSource = testScheduler.timeSource`, więc termin i `delay` liczą ten sam czas wirtualny.
+
 Liczniki czasu i wysyłanie działają w korutynach potomnych, żeby pętla mogła w tym czasie przetwarzać `Cancel` i wiadomości. Po przejściu do `FINISHED` pętla kończy się, a `coroutineScope` anuluje potomków (kolektor, liczniki, zawieszone `send`) – SESSION-20.
 
 Wiadomości w fazach `SENDING_COMMAND` i `SENDING_CODE` są odkładane do listy i przetwarzane po zdarzeniu wyniku wysyłania, w kolejności odbioru (SESSION-05, SESSION-12, SESSION-13). Przy `Failed` dla kodu lista jest porzucana (SESSION-16).
@@ -267,9 +280,18 @@ Wiadomość przetwarzana: `if (sms.receivedAtEpochMillis < commandSentAt) ignore
 
 ### Zakończenie
 
-Jedna funkcja `finish(outcome)`: (1) `credentials?.pin?.clear()`, (2) odczyt zegara jako `finishedAt`, (3) zbudowanie `SessionResult`, (4) wywołanie wewnętrznego `onFinished` (koordynator zwalnia `activeSession`), (5) publikacja `SessionState(FINISHED, …, result)`. Kolejność gwarantuje, że obserwator `FINISHED` widzi wyczyszczony PIN i pustą `activeSession` (SESSION-19, SESSION-22).
+Każdy odczyt zegara przechodzi przez pomocnika, który zapamiętuje ostatnią poprawną wartość (`lastClockReading: Long?`). Jedna funkcja `finish(outcome)` (niezawieszająca): (1) `credentials?.pin?.clear()`, (2) jeden odczyt zegara jako `finishedAt` w `try`; wyjątek → `finishedAt = lastClockReading` (może być `null`), bez ponownego odczytu i bez zmiany `outcome`, (3) zbudowanie `SessionResult`, (4) wywołanie wewnętrznego `onFinished` (koordynator zwalnia `activeSession`), (5) publikacja `SessionState(FINISHED, …, result)`. Kolejność gwarantuje, że obserwator `FINISHED` widzi wyczyszczony PIN i pustą `activeSession` (SESSION-19, SESSION-22).
 
-Anulowanie z zewnątrz: `catch (e: CancellationException)` wokół pętli → `finish(Cancelled)` albo `finish(Unknown(CANCELLED_AFTER_CODE))` wg fazy → `throw e` (SESSION-17). Inny wyjątek → `finish(Failed(INTERNAL_ERROR))` albo `finish(Unknown(INTERNAL_ERROR))` wg fazy, `run()` zwraca wynik (SESSION-19).
+Anulowanie z zewnątrz: `catch (e: CancellationException)` wokół pętli → `finish(Cancelled)` albo `finish(Unknown(CANCELLED_AFTER_CODE))` wg fazy → `throw e` (SESSION-17). Inny wyjątek (także z odczytu zegara w pętli, np. `startedAt`, `commandSentAt`, wiek prośby) → `finish(Failed(INTERNAL_ERROR))` albo `finish(Unknown(INTERNAL_ERROR))` wg fazy, `run()` zwraca wynik (SESSION-19). Ponieważ `finish()` sam nie rzuca przy błędzie zegara, ta ścieżka zawsze kończy się `FINISHED`.
+
+### Start i anulowanie przed startem
+
+`AtomicReference<Lifecycle>` z wartościami `NOT_STARTED`, `RUNNING`, `CANCELLED_BEFORE_START`, `RESULT_TAKEN`:
+
+- `cancel()`: `compareAndSet(NOT_STARTED, CANCELLED_BEFORE_START)` → od razu `finish(Cancelled)` w wątku wywołującego (pętla jeszcze nie istnieje, więc nie ma wyścigu). W przeciwnym razie `events.trySend(Cancel)`.
+- `run()`: `compareAndSet(NOT_STARTED, RUNNING)` → dopiero wtedy odczyt `startedAt`, start kolektora, termin limitu i wysyłka. Gdy CAS się nie uda: `compareAndSet(CANCELLED_BEFORE_START, RESULT_TAKEN)` → zwrot wyniku `Cancelled` bez subskrypcji, limitu i wysyłki; inaczej `IllegalStateException`.
+
+Jeden atomowy przełącznik rozstrzyga wyścig `cancel()` / `run()`: albo anulowanie przed startem (zero SMS-ów), albo zdarzenie `Cancel` w kanale obsłużone w `SENDING_COMMAND` (SESSION-17).
 
 ### Tabela przejść
 
@@ -277,8 +299,9 @@ Fazy „przed kodem” = `NOT_STARTED` … `PREPARING_CODE`; „po kodzie” = `
 
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
-| `NOT_STARTED` | `run()` | `SENDING_COMMAND` | `startedAt = clock`; start kolektora; start `ReplyDeadline`; `send(CommandText(smsText()))` | SESSION-03, SESSION-07 |
-| `NOT_STARTED` | `Cancel` (przed `run()`) | `FINISHED` | `run()` zwraca `Cancelled` bez wysyłania | SESSION-17 |
+| `NOT_STARTED` | `run()` (CAS `NOT_STARTED` → `RUNNING`) | `SENDING_COMMAND` | `startedAt = clock`; start kolektora; termin i start `ReplyDeadline`; `send(CommandText(smsText()))` | SESSION-03, SESSION-07 |
+| `NOT_STARTED` | `cancel()` (CAS `NOT_STARTED` → `CANCELLED_BEFORE_START`) | `FINISHED` | `finish(Cancelled)` od razu; pierwszy `run()` zwraca ten wynik bez subskrypcji, limitu i wysyłania | SESSION-17 |
+| fazy z limitem | dowolne zdarzenie przy `markNow() >= deadline` | `FINISHED` | wynik limitu bieżącej fazy; zdarzenie nieobsłużone | SESSION-07, SESSION-10, SESSION-15 |
 | `SENDING_COMMAND` | `Message` | – | odłóż | SESSION-05 |
 | `SENDING_COMMAND` | `CommandSendResult(Sent)` | `AWAITING_REPLY` / `AWAITING_CODE_REQUEST` | `commandSentAt = clock`; przetwórz odłożone | SESSION-03, SESSION-05 |
 | `SENDING_COMMAND` | `CommandSendResult(Failed)` | `FINISHED` | `Failed(SEND_FAILED)` | SESSION-04 |
@@ -314,7 +337,14 @@ Składanie kodu: `CharArray(6 + pin.length)`; `code.value` (6 cyfr ASCII ze Spec
 
 ### Koordynator
 
-`MutableStateFlow<CommandSession?>(null)`. `start`: (1) utworzenie `CommandSession` (wyjątek → przechodzi dalej; PIN wyczyszczony przez konstruktor), (2) `active.compareAndSet(null, session)`; porażka → `credentials?.pin?.clear()`, `Busy`, (3) `scope.launch { session.run() }` i `job.invokeOnCompletion { credentials?.pin?.clear(); active.compareAndSet(session, null) }` – zwalnia miejsce także, gdy zakres był już anulowany i `run()` nie wystartował, (4) `onFinished` sesji też robi `compareAndSet(session, null)` przed publikacją `FINISHED`.
+Stan: `AtomicBoolean reserved` (miejsce zajęte od rezerwacji do zakończenia sesji) i `MutableStateFlow<CommandSession?>(null)` dla `ui`. `start`:
+
+1. `reserved.compareAndSet(false, true)`; porażka → `credentials?.pin?.clear()`, `Busy` – bez tworzenia sesji i bez walidacji danych (brak wyjątku dla niepoprawnego zestawu polecenie/dane).
+2. Utworzenie `CommandSession` w `try`; wyjątek → `credentials?.pin?.clear()` (konstruktor też czyści), `reserved.set(false)`, wyjątek dalej.
+3. `active.value = session`; `job = scope.launch { session.run() }`.
+4. Zwolnienie miejsca w jednej funkcji `release(session)`: jeśli `active.compareAndSet(session, null)` – `reserved.set(false)`. Wywołują ją `onFinished` sesji (przed publikacją `FINISHED`) i `job.invokeOnCompletion { credentials?.pin?.clear(); release(session) }` – ta druga zwalnia miejsce także, gdy zakres był już anulowany i `run()` nie wystartował.
+
+Rezerwacja przed utworzeniem sesji sprawia, że przy zajętym miejscu wynik zawsze brzmi „zajęte”, niezależnie od poprawności danych wejściowych (SESSION-22).
 
 ## Decyzje
 
@@ -327,6 +357,12 @@ Składanie kodu: `CharArray(6 + pin.length)`; `code.value` (6 cyfr ASCII ze Spec
 | **Limit fazy `PREPARING_CODE`: 10 000 ms** | brak limitu; limit odpowiedzi | `awaitUsableCode` przy poprawnym zegarze czeka < 5000 ms, ale przy zatrzymanym zegarze czekałby bez końca (Spec 001, TOTP-02). 2 × 5000 ms to zapas na jedną zmianę okna. Limit odpowiedzi nie obejmuje tej fazy, żeby prośba z ostatniej sekundy limitu nie była porzucana w trakcie przygotowania kodu. |
 | **Limit odpowiedzi liczony od rozpoczęcia wysyłania polecenia** | od wyniku „wysłano” | Obejmuje też zawieszony port wysyłania (`TimedOut(SENDING_COMMAND)`) jednym licznikiem; użytkownik czeka najwyżej 3 min od dotknięcia przycisku. |
 | Limit potwierdzenia od rozpoczęcia wysyłania kodu | od „wysłano” dla kodu | Analogicznie; obejmuje zawieszony port przy kodzie. |
+| **Przy równej chwili wygrywa limit** (sprawdzenie terminu przed obsługą każdego zdarzenia) | kolejność w kanale; wygrywa zdarzenie | Kolejność wstawiania do kanału przez różne korutyny w tej samej chwili nie jest określona, więc bez reguły wynik na granicy byłby niedeterministyczny. Limit wygrywa, bo to bezpieczniejszy kierunek: kod gotowy po 10 000 ms nie wychodzi, odpowiedź na granicy nie zmienia `TimedOut` w sukces. Koszt: zdarzenie dokładnie na granicy przepada (różnica 1 ms). |
+| Termin jako znacznik `TimeSource.WithComparableMarks` wstrzykiwany do sesji | odczyt `EpochClock`; same `delay` | Czas monotoniczny, odporny na zmianę zegara telefonu; w testach `testScheduler.timeSource` daje ten sam czas wirtualny co `delay`. |
+| **Błąd zegara przy zakończeniu: ostatni poprawny odczyt, `null` gdy brak** | ponowny odczyt; stała zastępcza (np. −1); zmiana wyniku na `INTERNAL_ERROR` | Ponowny odczyt wadliwego zegara mógłby znów rzucić i sesja nie doszłaby do `FINISHED`. `null` jest jednoznaczny (−1 to poprawna chwila epoki). Wynik już ustalony (np. `CarbsConfirmed`) jest prawdziwy niezależnie od zegara, więc się nie zmienia. |
+| Anulowanie przed `run()` rozstrzyga jeden atomowy przełącznik cyklu życia | zdarzenie `Cancel` w kanale | Zdarzenie w kanale byłoby odczytane dopiero po starcie pętli, czyli po wysłaniu SMS-a; przełącznik gwarantuje zero SMS-ów, gdy anulowanie było pierwsze. |
+| **Koordynator rezerwuje miejsce przed utworzeniem sesji** | utworzenie sesji, potem CAS | Przy zajętym miejscu wynik „zajęte” nie zależy od danych wejściowych (bez wyjątku z walidacji), a PIN jest czyszczony w jednym miejscu. |
+| Ponownie dostarczona prośba o kod – ograniczenie opisane, a deduplikacja w `sms` (K2) | identyfikator prośby; porównanie godziny z prośby z zegarem | AAPS nie nadaje identyfikatora, a porównanie godziny wymagałoby tolerancji dla dwóch zegarów (decyzja Spec 002). Skutek jest ograniczony do potwierdzenia bieżącego, identycznego polecenia (A6); źródło problemu (powtórne dostarczenie) leży w `sms`. |
 | **Błąd wysyłania kodu → `Unknown(CODE_SEND_FAILED)`**, nie `Failed` | `Failed` | Wynik portu „błąd” nie wyklucza, że SMS z kodem dotarł (np. część wieloczęściowa, błąd po wysłaniu). Wynik „błąd” zachęcałby do ponownego `CARBS`, co grozi podwójnym wprowadzeniem; „sprawdź w AAPS” jest bezpieczniejsze. |
 | `CarbsAmountMismatch` przed kodem zawsze kończy sesję (także etap „potwierdzenie”) | traktować potwierdzenie z inną ilością jak wiadomość nieoczekiwaną | Decyzja użytkownika 5 obejmuje każdą niezgodną ilość. Wynik jest bezpieczny (kod nie wychodzi); koszt: obce potwierdzenie z inną ilością przerywa naszą sesję przed kodem. |
 | Wiadomość wątpliwa w `PREPARING_CODE` przerywa przygotowanie kodu | dokończyć wysłanie kodu | AGENTS.md: w razie wątpliwości stop. Okno trwa ≤ 5000 ms, więc koszt jest mały, a np. druga prośba o kod w tym czasie oznacza, że stan AAPS jest inny, niż zakłada sesja (A6). |
@@ -346,7 +382,7 @@ Testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremote/session/
 
 - `FakeSmsSender` – zapisuje kopie wysłanych treści (dla `CodeReply` także referencję tablicy), konfigurowalny wynik, opóźnienie (`delay`), wyjątek albo zawieszenie bez końca.
 - `FakeIncomingSmsSource` – `MutableSharedFlow<IncomingSms>(replay = 0)`, udostępnia `subscriptionCount`; opcjonalnie strumień kończący się wyjątkiem.
-- Zegar `EpochClock { T0 + testScheduler.currentTime }` i `UsableTotpProvider` na tym zegarze; zegar zatrzymany dla SESSION-10.
+- Zegar `EpochClock { T0 + testScheduler.currentTime }`, `timeSource = testScheduler.timeSource` i `UsableTotpProvider` na tym zegarze; zegar zatrzymany dla SESSION-10; zegar rzucający od wybranej chwili dla SESSION-19.
 - Treści z `app/src/test/resources/parser/aaps-3.4.2.6-pl/` (istniejący pomocnik `AapsSamples`).
 - Przy sprawdzaniu kolejności faz Turbine port wysyłania czeka ≥ 1 ms czasu wirtualnego, żeby `StateFlow` nie zlał faz przejściowych.
 
@@ -358,22 +394,22 @@ Testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremote/session/
 | SESSION-04 | `CommandSessionSendTest` – jednostkowy |
 | SESSION-05 | `CommandSessionIncomingTest` – jednostkowy |
 | SESSION-06 | `CommandSessionReplyTest` – jednostkowy, `bg.txt`, `pump.txt`, `carbs-sukces.txt`, tekst obcy |
-| SESSION-07 | `CommandSessionReplyTimeoutTest` – jednostkowy, granice 179 999 / 180 000 ms |
+| SESSION-07 | `CommandSessionReplyTimeoutTest` – jednostkowy, granice 179 999 / 180 000 ms; równość: `bg.txt`, prośba o kod i wynik portu dokładnie w chwili 180 000 |
 | SESSION-08 | `CarbsSessionCodeTest` – jednostkowy |
 | SESSION-09 | `CarbsSessionCodeTest` – jednostkowy, wektor `1111111111` → `0504714321`, `050471987654`, zerowanie tablicy |
-| SESSION-10 | `CarbsSessionCodeValidityTest` – jednostkowy, wiek 240 000 / 240 001 / −1 ms, zatrzymany zegar |
+| SESSION-10 | `CarbsSessionCodeValidityTest` – jednostkowy, wiek 240 000 / 240 001 / −1 ms, zatrzymany zegar; równość: dostawca TOTP z MockK zwracający kod po 9 999 / 10 000 ms |
 | SESSION-11 | `CarbsSessionBeforeCodeTest` – jednostkowy, parametryzowany tabelą z spec dla obu faz |
 | SESSION-12 | `CarbsSessionConfirmationTest` – jednostkowy |
 | SESSION-13 | `CarbsSessionAfterCodeTest` – jednostkowy, parametryzowany tabelą z spec |
 | SESSION-14 | `SessionUnknownInvariantTest` – jednostkowy: przegląd scenariuszy (lista z pozostałych testów) i asercja „`Unknown` ⇔ port dostał kod” |
-| SESSION-15 | `CarbsSessionConfirmationTimeoutTest` – jednostkowy, granice 419 999 / 420 000 ms |
+| SESSION-15 | `CarbsSessionConfirmationTimeoutTest` – jednostkowy, granice 419 999 / 420 000 ms; równość: `carbs-sukces.txt` i wynik portu kodu dokładnie w chwili 420 000 |
 | SESSION-16 | `CarbsSessionCodeSendFailureTest` – jednostkowy |
-| SESSION-17 | `SessionCancelTest` – jednostkowy, każda faza, anulowanie z zewnątrz |
+| SESSION-17 | `SessionCancelTest` – jednostkowy, każda faza, anulowanie z zewnątrz, anulowanie przed `run()` (zero SMS-ów, `subscriptionCount` = 0); `SessionCancelRaceTest` – 1000 × równoczesne `cancel()`/`run()` na `Dispatchers.Default` |
 | SESSION-18 | `SessionUnexpectedMessagesTest` – jednostkowy |
-| SESSION-19 | `SessionPinClearingTest` – jednostkowy, parametryzowany wynikami; obserwator Turbine sprawdza `pin.isCleared` przy `FINISHED`; dostawca TOTP z MockK rzucający wyjątek |
+| SESSION-19 | `SessionPinClearingTest` – jednostkowy, parametryzowany wynikami; obserwator Turbine sprawdza `pin.isCleared` przy `FINISHED`; dostawca TOTP z MockK rzucający wyjątek; `SessionClockFailureTest` – zegar rzucający od wybranej chwili (przed kodem, od startu, przy zakończeniu po `CarbsConfirmed`) |
 | SESSION-20 | `SessionNoRetryTest` – jednostkowy: liczniki SMS-ów, `subscriptionCount == 0` po `FINISHED` |
 | SESSION-21 | `SessionStateFlowTest` – jednostkowy, Turbine: kolejność faz, pola `SessionResult`, brak `4321`/`050471` w polach tekstowych |
-| SESSION-22 | `SessionCoordinatorTest` – jednostkowy; równoległość: 100 × `start` na `Dispatchers.Default` (bez `runTest` dla tej części) |
+| SESSION-22 | `SessionCoordinatorTest` – jednostkowy: „zajęte” bez wyjątku dla niepoprawnych danych, zwolnienie rezerwacji po `IllegalArgumentException`; równoległość: 100 × `start` na `Dispatchers.Default` (bez `runTest` dla tej części) |
 | SESSION-23 | `SessionRedactionTest` – jednostkowy: `toString()` `AapsPin`, `CodeCredentials`, `OutgoingSms`, `IncomingSms`, `SessionState`, `SessionResult`, wyników; komunikaty wyjątków |
 
 Brak wywołań API logowania i brak importów `android.*` w `session` (SESSION-23, Przegląd) sprawdza recenzja kodu; test nie jest wymagany.
@@ -382,8 +418,9 @@ Brak wywołań API logowania i brak importów `android.*` w `session` (SESSION-2
 
 Kolejność wynika z zależności. Każde zadanie to jeden PR, ok. 200–400 linii z testami.
 
-1. **Typy, porty i PIN** – `AapsPin` (`security`), `SessionTimeouts`, `SessionLimits`, `IncomingSms`, `IncomingSmsSource`, `OutgoingSms`, `SendResult`, `SmsSender`, `CodeCredentials`, `SessionPhase`, `SessionState`, `SessionResult`, `SessionOutcome`, `FailureReason`, `UnknownReason` + `AapsPinTest`, `SessionTimeoutsTest`, część `SessionRedactionTest`; pomocniki testowe `FakeSmsSender`, `FakeIncomingSmsSource`. Wymagania: SESSION-01, SESSION-02 (część `AapsPin`), SESSION-23 (część). Bez zależności.
-2. **Sesja BG i PUMP** – `CommandSession`: walidacja konstruktora, pętla zdarzeń, wysłanie polecenia, filtr chwili wysłania, odpowiedzi `BG`/`PUMP`, limit odpowiedzi, anulowanie przed kodem, `finish()` z czyszczeniem PIN-u, `INTERNAL_ERROR` przed kodem, `StateFlow` + `CommandSessionCreationTest`, `CommandSessionSendTest`, `CommandSessionIncomingTest`, `CommandSessionReplyTest`, `CommandSessionReplyTimeoutTest`, część `SessionCancelTest`, `SessionStateFlowTest` (`BG`), `SessionNoRetryTest` (`BG`). Wymagania: SESSION-02 (część sesji), SESSION-03, SESSION-04, SESSION-05, SESSION-06, SESSION-07, SESSION-17 (część), SESSION-19 (część), SESSION-20 (część), SESSION-21 (część). Zależy od 1.
-3. **CARBS do wysłania kodu** – przyjęcie prośby, `PREPARING_CODE`, `awaitUsableCode`, kontrola wieku, limit 10 000 ms, składanie kodu i czyszczenie PIN-u, wiadomości przed kodem, wiadomości nieoczekiwane, anulowanie w `PREPARING_CODE` + `CarbsSessionCodeTest`, `CarbsSessionCodeValidityTest`, `CarbsSessionBeforeCodeTest`, `SessionUnexpectedMessagesTest`, część `SessionPinClearingTest` i `SessionCancelTest`. Wymagania: SESSION-08, SESSION-09, SESSION-10, SESSION-11, SESSION-18, SESSION-17 (część), SESSION-19 (część). Zależy od 2. Po tym zadaniu sesja dochodzi do `AWAITING_CONFIRMATION` i kończy się tam tylko anulowaniem (testy anulują ją na końcu); obsługę tej fazy dodaje zadanie 4.
-4. **CARBS po wysłaniu kodu** – potwierdzenie, wiadomości po kodzie, limit potwierdzenia, błąd wysyłania kodu, anulowanie po kodzie, `INTERNAL_ERROR` po kodzie + `CarbsSessionConfirmationTest`, `CarbsSessionAfterCodeTest`, `CarbsSessionConfirmationTimeoutTest`, `CarbsSessionCodeSendFailureTest`, `SessionUnknownInvariantTest`, reszta `SessionCancelTest`, `SessionPinClearingTest`, `SessionStateFlowTest`, `SessionNoRetryTest`, `SessionRedactionTest`. Wymagania: SESSION-12, SESSION-13, SESSION-14, SESSION-15, SESSION-16, SESSION-17 (reszta), SESSION-19 (reszta), SESSION-20 (reszta), SESSION-21 (reszta), SESSION-23 (reszta). Zależy od 3.
-5. **Koordynator jednego polecenia** – `SessionCoordinator`, `StartResult`, `onFinished` w sesji + `SessionCoordinatorTest`. Wymagania: SESSION-22. Zależy od 2 (może iść równolegle z 3 i 4).
+1. **Typy, porty i PIN** – `AapsPin` (`security`), `SessionTimeouts`, `SessionLimits`, `IncomingSms`, `IncomingSmsSource`, `OutgoingSms`, `SendResult`, `SmsSender`, `CodeCredentials`, `SessionPhase`, `SessionState`, `SessionResult`, `SessionOutcome`, `FailureReason`, `UnknownReason` + `AapsPinTest`, `SessionTimeoutsTest`, część `SessionRedactionTest`; pomocniki testowe `FakeSmsSender`, `FakeIncomingSmsSource`, zegar i `timeSource` na czasie wirtualnym. Wymagania: SESSION-01, SESSION-02 (część `AapsPin`), SESSION-23 (część). Bez zależności.
+2. **Rdzeń sesji BG i PUMP** – `CommandSession`: walidacja konstruktora, przełącznik cyklu życia (jedno uruchomienie), pętla zdarzeń, wysłanie polecenia, filtr chwili wysłania, odpowiedzi `BG`/`PUMP`, `finish()` z czyszczeniem PIN-u i ostatnim poprawnym odczytem zegara, `StateFlow` + `CommandSessionCreationTest`, `CommandSessionSendTest`, `CommandSessionIncomingTest`, `CommandSessionReplyTest`, część `SessionClockFailureTest`, `SessionStateFlowTest` (`BG`), `SessionNoRetryTest` (`BG`). Wymagania: SESSION-02 (część sesji), SESSION-03, SESSION-04, SESSION-05, SESSION-06, SESSION-19 (część), SESSION-20 (część), SESSION-21 (część). Zależy od 1.
+3. **Limit odpowiedzi i anulowanie przed kodem** – termin limitu na `timeSource` z pierwszeństwem limitu, `TimedOut`, anulowanie w fazach przed kodem (także przed `run()` i równoczesne z `run()`), anulowanie z zewnątrz, `INTERNAL_ERROR` przed kodem + `CommandSessionReplyTimeoutTest`, część `SessionCancelTest`, `SessionCancelRaceTest`, część `SessionClockFailureTest`. Wymagania: SESSION-07, SESSION-17 (część), SESSION-19 (część). Zależy od 2.
+4. **CARBS do wysłania kodu** – przyjęcie prośby, `PREPARING_CODE`, `awaitUsableCode`, kontrola wieku, limit 10 000 ms z pierwszeństwem limitu, składanie kodu i czyszczenie PIN-u, wiadomości przed kodem, wiadomości nieoczekiwane, anulowanie w `PREPARING_CODE` + `CarbsSessionCodeTest`, `CarbsSessionCodeValidityTest`, `CarbsSessionBeforeCodeTest`, `SessionUnexpectedMessagesTest`, część `SessionPinClearingTest` i `SessionCancelTest`. Wymagania: SESSION-08, SESSION-09, SESSION-10, SESSION-11, SESSION-18, SESSION-17 (część), SESSION-19 (część). Zależy od 3. Po tym zadaniu sesja dochodzi do `AWAITING_CONFIRMATION` i kończy się tam tylko anulowaniem (testy anulują ją na końcu); obsługę tej fazy dodaje zadanie 5.
+5. **CARBS po wysłaniu kodu** – potwierdzenie, wiadomości po kodzie, limit potwierdzenia z pierwszeństwem limitu, błąd wysyłania kodu, anulowanie po kodzie, `INTERNAL_ERROR` po kodzie + `CarbsSessionConfirmationTest`, `CarbsSessionAfterCodeTest`, `CarbsSessionConfirmationTimeoutTest`, `CarbsSessionCodeSendFailureTest`, `SessionUnknownInvariantTest`, reszta `SessionCancelTest`, `SessionPinClearingTest`, `SessionClockFailureTest`, `SessionStateFlowTest`, `SessionNoRetryTest`, `SessionRedactionTest`. Wymagania: SESSION-12, SESSION-13, SESSION-14, SESSION-15, SESSION-16, SESSION-17 (reszta), SESSION-19 (reszta), SESSION-20 (reszta), SESSION-21 (reszta), SESSION-23 (reszta). Zależy od 4.
+6. **Koordynator jednego polecenia** – `SessionCoordinator` z rezerwacją miejsca przed utworzeniem sesji, `StartResult`, `onFinished` w sesji + `SessionCoordinatorTest`. Wymagania: SESSION-22. Zależy od 2 (może iść równolegle z 3–5).

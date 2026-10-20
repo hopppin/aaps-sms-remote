@@ -60,6 +60,8 @@ Aplikacja prowadzi jedno polecenie od wysłania SMS-a do wyniku: czeka na odpowi
 - **Wynik parsera** – `AapsReplyParser.parse(treść, command.toExpectedCommand())` (Spec 002).
 - **Wiadomość nieoczekiwana** – wiadomość pokazywana użytkownikowi, która nie zmienia fazy ani wyniku sesji (SESSION-18).
 - **Czas wirtualny** – czas planisty `kotlinx-coroutines-test`; w kryteriach zegar jest powiązany z nim: `zegar = T0 + czas wirtualny`.
+- **Termin limitu** – chwila w czasie korutyn (monotonicznym, w testach: czas wirtualny), w której upływa limit bieżącej fazy: limit odpowiedzi (SESSION-07), limit przygotowania kodu (SESSION-10) albo limit potwierdzenia (SESSION-15).
+- **Pierwszeństwo limitu** – zdarzenie (wiadomość, wynik portu wysyłania, gotowy kod TOTP, anulowanie), którego obsługa przypada w czasie korutyn ≥ terminowi limitu bieżącej fazy, nie jest obsługiwane; sesja kończy się wynikiem tego limitu. Zdarzenie obsługiwane przed terminem (także o 1 ms wcześniej) jest obsługiwane normalnie. Przy równej chwili zawsze wygrywa limit, niezależnie od kolejności, w jakiej zdarzenia dotarły do sesji.
 
 ### Fazy sesji
 
@@ -167,12 +169,15 @@ W fazie `AWAITING_REPLY`: wynik parsera `BgReport` (dla `BG`) albo `PumpStatus` 
 
 ### SESSION-07: Limit oczekiwania na pierwszą odpowiedź
 
-Limit odpowiedzi (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysyłania polecenia (wejście w `SENDING_COMMAND`) i obejmuje fazy `SENDING_COMMAND`, `AWAITING_REPLY` i `AWAITING_CODE_REQUEST`. Gdy upłynie, a sesja jest w jednej z tych faz, kończy się wynikiem `TimedOut` z tą fazą. Limit przestaje obowiązywać po wejściu w `PREPARING_CODE`. Brak automatycznego ponawiania (SESSION-20).
+Limit odpowiedzi (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysyłania polecenia (wejście w `SENDING_COMMAND`) i obejmuje fazy `SENDING_COMMAND`, `AWAITING_REPLY` i `AWAITING_CODE_REQUEST`. Gdy upłynie, a sesja jest w jednej z tych faz, kończy się wynikiem `TimedOut` z tą fazą. Limit przestaje obowiązywać po wejściu w `PREPARING_CODE`. Przy równej chwili obowiązuje pierwszeństwo limitu (Pojęcia). Brak automatycznego ponawiania (SESSION-20).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** sesję `BG` bez odpowiedzi, **gdy** czas wirtualny = 179 999 ms, **wtedy** faza to `AWAITING_REPLY`; **gdy** czas = 180 000 ms, **wtedy** wynik to `TimedOut(AWAITING_REPLY)`.
 - **Zakładając** sesję `BG`, **gdy** `bg.txt` przychodzi w chwili 179 999, **wtedy** wynik to `Completed`.
+- **Zakładając** sesję `BG`, **gdy** `bg.txt` przychodzi w chwili 180 000, **wtedy** wynik to `TimedOut(AWAITING_REPLY)`.
+- **Zakładając** sesję `CARBS 1`, **gdy** `carbs-prosba-o-kod.txt` przychodzi w chwili 180 000, **wtedy** wynik to `TimedOut(AWAITING_CODE_REQUEST)` i żaden SMS z kodem nie jest wysyłany.
+- **Zakładając** port wysyłania zwracający „wysłano” po dokładnie 180 000 ms, **gdy** uruchomiono sesję `BG`, **wtedy** wynik to `TimedOut(SENDING_COMMAND)`.
 - **Zakładając** sesję `CARBS 1` bez odpowiedzi, **gdy** czas = 180 000 ms, **wtedy** wynik to `TimedOut(AWAITING_CODE_REQUEST)` i żaden kod nie jest wysyłany.
 - **Zakładając** limit odpowiedzi 30 000 ms i sesję `PUMP` bez odpowiedzi, **gdy** czas = 30 000 ms, **wtedy** wynik to `TimedOut(AWAITING_REPLY)`.
 - **Zakładając** port wysyłania, który nigdy nie zwraca wyniku, **gdy** czas = 180 000 ms, **wtedy** wynik to `TimedOut(SENDING_COMMAND)`.
@@ -182,6 +187,8 @@ Limit odpowiedzi (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysy
 ### SESSION-08: Przyjęcie prośby o kod
 
 Jedynym zdarzeniem, które prowadzi do wysłania kodu, jest wynik parsera `CodeRequest` dla wiadomości przetwarzanej w fazie `AWAITING_CODE_REQUEST` (więc z `receivedAtEpochMillis` ≥ chwili wysłania polecenia, SESSION-05). Parser zwraca `CodeRequest` tylko przy ilości równej wysłanej (PARSER-06). Po przyjęciu sesja zapamiętuje chwilę odbioru prośby i przechodzi do `PREPARING_CODE`. W żadnej innej fazie `CodeRequest` nie prowadzi do wysłania kodu (SESSION-11, SESSION-13). Sesja wysyła kod najwyżej raz.
+
+**Ograniczenie (brak identyfikatora prośby):** AAPS nie nadaje prośbie o kod identyfikatora, a jej treść niesie tylko ilość i godzinę (godziny parser nie porównuje z zegarem – PARSER-05). Sesja nie odróżni więc prośby dla bieżącego polecenia od starej prośby z tą samą ilością, która zostanie dostarczona ponownie albo z opóźnieniem i ma chwilę odbioru ≥ chwili wysłania polecenia (np. prośba z wcześniejszej, anulowanej sesji). Taka wiadomość w `AWAITING_CODE_REQUEST` zostanie przyjęta i sesja odeśle kod. Skutek jest ograniczony: AAPS trzyma tylko jedną oczekującą prośbę – dla najnowszego polecenia (A6) – i kod odnosi się do niej, a nie do prośby, której treść przyszła. Polecenie tej sesji zostało wysłane później niż stara prośba i ma tę samą ilość (inaczej parser zwróciłby „niezgodna ilość”), więc kod potwierdza bieżące, identyczne polecenie i nie powoduje ponownego wykonania starego. Ryzyko ponownego dostarczenia już przekazanej wiadomości ogranicza kontrakt portu odbioru (K2, sekcja „Kontrakt portów”); wiadomości odebrane przed wysłaniem polecenia odrzuca SESSION-05.
 
 **Kryteria akceptacji:**
 
@@ -203,7 +210,7 @@ W fazie `PREPARING_CODE` sesja pobiera kod z `UsableTotpProvider.awaitUsableCode
 
 ### SESSION-10: Ważność prośby o kod i czas przygotowania kodu
 
-AAPS przyjmuje kod przez 5 min od utworzenia prośby (A1), a sesja zna tylko chwilę odbioru prośby. Bezpośrednio przed rozpoczęciem wysyłania kodu (po otrzymaniu kodu TOTP) sesja liczy wiek prośby = zegar − chwila odbioru prośby. Kod jest wysyłany tylko, gdy 0 ≤ wiek ≤ 240 000 ms (4 min, margines 60 s na doręczenie prośby do aplikacji, doręczenie kodu do AAPS i czekanie na kod TOTP do 5000 ms). W przeciwnym razie sesja kończy się `Failed(CODE_REQUEST_EXPIRED)` z treścią prośby, bez wysyłania kodu. Faza `PREPARING_CODE` trwa najwyżej 10 000 ms czasu korutyn; po tym czasie bez rozpoczęcia wysyłania kodu sesja kończy się `Failed(CODE_PREPARATION_TIMEOUT)` bez wysyłania kodu.
+AAPS przyjmuje kod przez 5 min od utworzenia prośby (A1), a sesja zna tylko chwilę odbioru prośby. Bezpośrednio przed rozpoczęciem wysyłania kodu (po otrzymaniu kodu TOTP) sesja liczy wiek prośby = zegar − chwila odbioru prośby. Kod jest wysyłany tylko, gdy 0 ≤ wiek ≤ 240 000 ms (4 min, margines 60 s na doręczenie prośby do aplikacji, doręczenie kodu do AAPS i czekanie na kod TOTP do 5000 ms). W przeciwnym razie sesja kończy się `Failed(CODE_REQUEST_EXPIRED)` z treścią prośby, bez wysyłania kodu. Faza `PREPARING_CODE` trwa najwyżej 10 000 ms czasu korutyn; po tym czasie bez rozpoczęcia wysyłania kodu sesja kończy się `Failed(CODE_PREPARATION_TIMEOUT)` bez wysyłania kodu. Kod TOTP gotowy dokładnie po 10 000 ms nie jest wysyłany (pierwszeństwo limitu, Pojęcia).
 
 **Kryteria akceptacji** (limit odpowiedzi 600 000 ms, chwila wysłania polecenia 1111110811000, prośba `carbs-prosba-o-kod.txt` przetwarzana, gdy zegar = 1111111111000):
 
@@ -211,6 +218,11 @@ AAPS przyjmuje kod przez 5 min od utworzenia prośby (A1), a sesja zna tylko chw
 - **Zakładając** prośbę z `receivedAtEpochMillis = 1111110870999` (wiek 240 001 ms), **gdy** sesja ją przetworzy, **wtedy** wynik to `Failed(CODE_REQUEST_EXPIRED)` i żaden SMS z kodem nie jest wysyłany.
 - **Zakładając** prośbę z `receivedAtEpochMillis = 1111111111001` (wiek −1 ms, zegar cofnięty), **gdy** sesja ją przetworzy, **wtedy** wynik to `Failed(CODE_REQUEST_EXPIRED)` i żaden SMS z kodem nie jest wysyłany.
 - **Zakładając** zegar zatrzymany na 1111111109000 (kod TOTP nigdy nie osiąga 5000 ms ważności) i prośbę z tą chwilą odbioru, **gdy** od wejścia w `PREPARING_CODE` minie 9 999 ms, **wtedy** faza to `PREPARING_CODE`; **gdy** minie 10 000 ms, **wtedy** wynik to `Failed(CODE_PREPARATION_TIMEOUT)` i żaden SMS z kodem nie jest wysyłany.
+
+Kryteria równości limitu (`T0 = 1111111051000`, prośba `carbs-prosba-o-kod.txt` w chwili 60 000, podstawiony dostawca kodu TOTP, który po zadanym czasie zwraca kod `050471` z oknem 1111111110000–1111111140000):
+
+- **Zakładając** dostawcę zwracającego kod po 9 999 ms, **gdy** kod jest gotowy w chwili 69 999, **wtedy** w chwili 69 999 wysyłany jest SMS `0504714321`.
+- **Zakładając** dostawcę zwracającego kod po 10 000 ms, **gdy** kod jest gotowy w chwili 70 000, **wtedy** wynik to `Failed(CODE_PREPARATION_TIMEOUT)` i żaden SMS z kodem nie jest wysyłany.
 
 ### SESSION-11: Wiadomości przed wysłaniem kodu (CARBS)
 
@@ -279,12 +291,14 @@ Wynik `Unknown` oznacza, że kod mógł dotrzeć do AAPS, ale sesja nie może st
 
 ### SESSION-15: Limit oczekiwania na potwierdzenie
 
-Limit potwierdzenia (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysyłania kodu i obejmuje fazy `SENDING_CODE` i `AWAITING_CONFIRMATION`. Gdy upłynie, sesja kończy się `Unknown(CONFIRMATION_TIMEOUT)` bez treści.
+Limit potwierdzenia (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysyłania kodu i obejmuje fazy `SENDING_CODE` i `AWAITING_CONFIRMATION`. Gdy upłynie, sesja kończy się `Unknown(CONFIRMATION_TIMEOUT)` bez treści. Przy równej chwili obowiązuje pierwszeństwo limitu (Pojęcia).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** sesję `CARBS 1` z rozpoczęciem wysyłania kodu w chwili 60 000 i brak dalszych wiadomości, **gdy** czas = 419 999 ms, **wtedy** faza to `AWAITING_CONFIRMATION`; **gdy** czas = 420 000 ms, **wtedy** wynik to `Unknown(CONFIRMATION_TIMEOUT)`.
 - **Zakładając** tę sesję, **gdy** `carbs-sukces.txt` przychodzi w chwili 419 999, **wtedy** wynik to `CarbsConfirmed`.
+- **Zakładając** tę sesję, **gdy** `carbs-sukces.txt` przychodzi w chwili 420 000, **wtedy** wynik to `Unknown(CONFIRMATION_TIMEOUT)`, nie `CarbsConfirmed`.
+- **Zakładając** port wysyłania kodu zwracający „wysłano” po dokładnie 360 000 ms (w chwili 420 000), **gdy** przyjęto prośbę o kod w chwili 60 000, **wtedy** wynik to `Unknown(CONFIRMATION_TIMEOUT)`.
 - **Zakładając** limit potwierdzenia 60 000 ms, **gdy** czas = 120 000 ms, **wtedy** wynik to `Unknown(CONFIRMATION_TIMEOUT)`.
 - **Zakładając** port wysyłania kodu, który nigdy nie zwraca wyniku, **gdy** czas = 420 000 ms, **wtedy** wynik to `Unknown(CONFIRMATION_TIMEOUT)`, a tablica z kodem jest wyzerowana.
 
@@ -301,7 +315,7 @@ Gdy port wysyłania zwróci „błąd wysyłania” albo rzuci wyjątek inny ni�
 
 Sesję można anulować w każdej fazie przed `FINISHED`; anulowanie w `FINISHED` nic nie zmienia. Skutek zależy od fazy w chwili przetworzenia anulowania:
 
-- Fazy przed kodem (`NOT_STARTED`, `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `PREPARING_CODE`): wynik `Cancelled`, PIN czyszczony, żaden SMS nie jest już wysyłany (w szczególności kod), późniejsze wiadomości – także prośba o kod – nie są przetwarzane. Anulowanie w `NOT_STARTED` sprawia, że uruchomienie zwraca od razu wynik `Cancelled` bez wysyłania.
+- Fazy przed kodem (`NOT_STARTED`, `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `PREPARING_CODE`): wynik `Cancelled`, PIN czyszczony, żaden SMS nie jest już wysyłany (w szczególności kod), późniejsze wiadomości – także prośba o kod – nie są przetwarzane. Anulowanie w `NOT_STARTED` od razu kończy sesję (`FINISHED`, `Cancelled`, PIN wyczyszczony); pierwsze późniejsze uruchomienie zwraca ten wynik bez subskrypcji portu odbioru, bez limitu czasu i bez wywołania portu wysyłania. Przejście `NOT_STARTED` → `SENDING_COMMAND` i anulowanie w `NOT_STARTED` są atomowe względem siebie: albo anulowanie zostaje zapisane przed przejściem (wtedy zero SMS-ów), albo po nim (wtedy działa jak anulowanie w `SENDING_COMMAND`).
 - Fazy po kodzie (`SENDING_CODE`, `AWAITING_CONFIRMATION`): czekanie się kończy, wynik `Unknown(CANCELLED_AFTER_CODE)`.
 
 Anulowanie korutyny wykonującej sesję z zewnątrz (np. zamknięcie zakresu) daje ten sam wynik i stan co anulowanie przez użytkownika w tej samej fazie, a potem `CancellationException` jest przekazywany dalej.
@@ -313,7 +327,8 @@ Anulowanie korutyny wykonującej sesję z zewnątrz (np. zamknięcie zakresu) da
 - **Zakładając** sesję `BG` w `AWAITING_REPLY`, **gdy** użytkownik anuluje, **wtedy** wynik to `Cancelled`.
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CONFIRMATION`, **gdy** użytkownik anuluje, **wtedy** wynik to `Unknown(CANCELLED_AFTER_CODE)`.
 - **Zakładając** port wysyłania kodu, który nie zwraca wyniku, **gdy** użytkownik anuluje w `SENDING_CODE`, **wtedy** wynik to `Unknown(CANCELLED_AFTER_CODE)`, a tablica z kodem jest wyzerowana.
-- **Zakładając** sesję `CARBS 1` w `NOT_STARTED`, **gdy** użytkownik anuluje, a potem sesja jest uruchomiona, **wtedy** wynik to `Cancelled`, PIN wyczyszczony i port wysyłania nie otrzymał żadnego SMS-a.
+- **Zakładając** sesję `CARBS 1` w `NOT_STARTED`, **gdy** użytkownik anuluje, **wtedy** od razu (przed uruchomieniem) faza to `FINISHED` z wynikiem `Cancelled` i PIN jest wyczyszczony; **gdy** potem sesja jest uruchomiona, **wtedy** zwraca `Cancelled`, port wysyłania nie otrzymał żadnego SMS-a, a liczba subskrybentów portu odbioru przez cały test wynosi 0.
+- **Zakładając** 1000 powtórzeń, w których `cancel()` i uruchomienie sesji `CARBS 1` startują równocześnie na `Dispatchers.Default`, **gdy** każda sesja się zakończyła, **wtedy** każdy wynik to `Cancelled`, port wysyłania otrzymał w każdym powtórzeniu 0 albo 1 SMS (tylko `CARBS 1`) i nigdy SMS-a z kodem.
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** korutyna sesji zostaje anulowana z zewnątrz, **wtedy** faza to `FINISHED` z wynikiem `Cancelled`, PIN wyczyszczony, a wywołujący dostaje `CancellationException`.
 - **Zakładając** sesję zakończoną wynikiem `Completed`, **gdy** użytkownik anuluje, **wtedy** wynik pozostaje `Completed`.
 
@@ -332,10 +347,15 @@ PIN jest czyszczony najpóźniej w chwili przejścia do `FINISHED`, w każdym wy
 
 Wyjątek inny niż `CancellationException`, którego nie obsługują SESSION-04, SESSION-05 i SESSION-16 (np. z zegara albo dostawcy kodu TOTP), kończy sesję: w fazach przed kodem wynikiem `Failed(INTERNAL_ERROR)` bez wysyłania kodu, w fazach po kodzie – `Unknown(INTERNAL_ERROR)`. Uruchomienie sesji zwraca ten wynik zamiast rzucać wyjątek; komunikat wyjątku nie jest zapisywany.
 
+Zakończenie sesji odczytuje zegar najwyżej raz (chwila zakończenia). Jeśli ten odczyt rzuci wyjątek, zegar nie jest odczytywany ponownie, wynik nie zmienia się (wyjątek zegara przy zakończeniu nie zamienia np. `CarbsConfirmed` na `INTERNAL_ERROR`), a chwila zakończenia = ostatni poprawny odczyt zegara w tej sesji. Gdy zegar nie zwrócił w sesji żadnej poprawnej wartości, chwile rozpoczęcia i zakończenia w wyniku są puste (`null`). W każdym z tych przypadków sesja przechodzi do `FINISHED`, czyści PIN, a uruchomienie zwraca wynik bez wyjątku.
+
 **Kryteria akceptacji:**
 
 - **Zakładając** sesję `CARBS 1`, **gdy** kończy się każdym z wyników: `CarbsConfirmed`, `Failed` (każdy powód z kryteriów SESSION-04, SESSION-10, SESSION-11, SESSION-13), `TimedOut`, `Unknown` (każdy powód), `Cancelled`, **wtedy** w chwili, gdy stan ma fazę `FINISHED`, PIN jest wyczyszczony.
 - **Zakładając** sesję `CARBS 1` i dostawcę kodu TOTP, który rzuca `IllegalStateException("x")`, **gdy** przychodzi `carbs-prosba-o-kod.txt`, **wtedy** wynik to `Failed(INTERNAL_ERROR)`, PIN jest wyczyszczony, żaden SMS z kodem nie jest wysyłany, uruchomienie zwraca wynik bez wyjątku, a `toString()` wyniku nie zawiera `x`.
+- **Zakładając** sesję `CARBS 1` i zegar, który do chwili 59 999 zwraca `T0 + czas wirtualny`, a od chwili 60 000 rzuca `IllegalStateException` przy każdym odczycie, **gdy** w chwili 60 000 przychodzi `carbs-prosba-o-kod.txt`, **wtedy** uruchomienie zwraca bez wyjątku wynik `Failed(INTERNAL_ERROR)`, faza to `FINISHED`, PIN jest wyczyszczony, żaden SMS z kodem nie jest wysyłany, a chwila zakończenia = `T0` (ostatni poprawny odczyt – chwila wysłania polecenia).
+- **Zakładając** sesję `BG` i zegar, który rzuca `IllegalStateException` przy każdym odczycie, **gdy** uruchomiono sesję, **wtedy** uruchomienie zwraca bez wyjątku `Failed(INTERNAL_ERROR)`, faza to `FINISHED`, port wysyłania nie otrzymał żadnego SMS-a, a chwile rozpoczęcia i zakończenia są puste (`null`).
+- **Zakładając** sesję `CARBS 1` z kodem wysłanym w chwili 60 000 i zegar, który od chwili 60 001 rzuca `IllegalStateException`, **gdy** w chwili 120 000 przychodzi `carbs-sukces.txt`, **wtedy** wynik to `CarbsConfirmed`, faza `FINISHED`, a chwila zakończenia = `T0 + 60 000` (ostatni poprawny odczyt – chwila wysłania kodu).
 
 ### SESSION-20: Brak ponawiania i koniec przetwarzania
 
@@ -349,7 +369,7 @@ Sesja wysyła najwyżej jeden SMS z poleceniem i najwyżej jeden SMS z kodem, ni
 
 ### SESSION-21: Stan i wynik sesji
 
-Sesja udostępnia stan jako `StateFlow`: fazę, listę wiadomości nieoczekiwanych i – w `FINISHED` – wynik końcowy. Wynik końcowy niesie dane dla historii: polecenie, chwilę rozpoczęcia, chwilę zakończenia, chwilę wysłania polecenia i kodu (jeśli były), rodzaj wyniku z polami z tabeli „Wyniki końcowe” i wiadomości nieoczekiwane. Wynik ani stan nie zawierają PIN-u, kodu TOTP ani odpowiedzi z kodem. Uruchomienie sesji zwraca ten sam wynik, który jest w stanie `FINISHED`.
+Sesja udostępnia stan jako `StateFlow`: fazę, listę wiadomości nieoczekiwanych i – w `FINISHED` – wynik końcowy. Wynik końcowy niesie dane dla historii: polecenie, chwilę rozpoczęcia i chwilę zakończenia (puste tylko w przypadku z SESSION-19, gdy zegar nie zwrócił żadnej wartości), chwilę wysłania polecenia i kodu (jeśli były), rodzaj wyniku z polami z tabeli „Wyniki końcowe” i wiadomości nieoczekiwane. Wynik ani stan nie zawierają PIN-u, kodu TOTP ani odpowiedzi z kodem. Uruchomienie sesji zwraca ten sam wynik, który jest w stanie `FINISHED`.
 
 **Kryteria akceptacji:**
 
@@ -360,12 +380,14 @@ Sesja udostępnia stan jako `StateFlow`: fazę, listę wiadomości nieoczekiwany
 
 ### SESSION-22: Jedno aktywne polecenie
 
-Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesję. Sesja jest aktywna od udanego startu przez koordynatora do przejścia do `FINISHED`. Start przy aktywnej sesji zwraca „zajęte”, nie tworzy sesji, niczego nie wysyła i czyści przekazany PIN. Start i sprawdzenie aktywnej sesji są atomowe: z dowolnej liczby równoczesnych startów co najwyżej jeden się udaje. Koordynator udostępnia aktywną sesję jako `StateFlow` (pusta, gdy brak), żeby `ui` blokowało przyciski. `ui` uruchamia polecenia wyłącznie przez koordynatora.
+Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesję. Sesja jest aktywna od udanego startu przez koordynatora do przejścia do `FINISHED`. Start najpierw atomowo rezerwuje miejsce na aktywną sesję, a dopiero potem tworzy sesję. Gdy miejsce jest zajęte (aktywna sesja albo trwający start), start zwraca „zajęte” bez sprawdzania danych wejściowych (także dla niepoprawnego zestawu polecenie/dane do kodu nie rzuca wyjątku), nie tworzy sesji, niczego nie wysyła i czyści przekazany PIN. Gdy utworzenie sesji po rezerwacji rzuci `IllegalArgumentException` (SESSION-02), rezerwacja jest zwalniana, PIN jest wyczyszczony, a wyjątek trafia do wywołującego. Z dowolnej liczby równoczesnych startów co najwyżej jeden się udaje. Koordynator udostępnia aktywną sesję jako `StateFlow` (pusta, gdy brak), żeby `ui` blokowało przyciski. `ui` uruchamia polecenia wyłącznie przez koordynatora.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** brak aktywnej sesji, **gdy** wystartowano `BG`, **wtedy** wynik to „wystartowano”, a aktywna sesja jest niepusta.
 - **Zakładając** aktywną sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** wystartowano `CARBS 2` z PIN-em `4321`, **wtedy** wynik to „zajęte”, port wysyłania nie otrzymał `CARBS 2`, a przekazany PIN jest wyczyszczony.
+- **Zakładając** aktywną sesję `CARBS 1`, **gdy** wystartowano `BG` z danymi do kodu (PIN `4321`) albo `CARBS 2` bez danych do kodu, **wtedy** w obu przypadkach wynik to „zajęte” bez wyjątku, a przekazany PIN `4321` jest wyczyszczony.
+- **Zakładając** brak aktywnej sesji, **gdy** wystartowano `BG` z danymi do kodu (PIN `4321`), **wtedy** rzucany jest `IllegalArgumentException`, PIN jest wyczyszczony, aktywna sesja jest pusta, a kolejny start `BG` bez danych do kodu zwraca „wystartowano”.
 - **Zakładając** aktywną sesję, która właśnie przeszła do `FINISHED`, **gdy** odczytano aktywną sesję, **wtedy** jest pusta, a kolejny start `BG` się udaje.
 - **Zakładając** 100 równoczesnych startów `BG` na `Dispatchers.Default` przy braku aktywnej sesji, **gdy** wszystkie się zakończyły, **wtedy** dokładnie jeden zwrócił „wystartowano”.
 - **Zakładając** aktywną sesję anulowaną z zewnątrz (zakres zamknięty), **gdy** odczytano aktywną sesję, **wtedy** jest pusta.
@@ -381,6 +403,19 @@ PIN, kod TOTP, odpowiedź z kodem, sekret, treść wiadomości AAPS i ilość w�
 - **Zakładając** wiadomość z treścią `bg.txt`, **gdy** wywołano `toString()` na wiadomości, stanie z nią na liście nieoczekiwanych i na wyniku `Completed`, **wtedy** żaden tekst nie zawiera `210` ani żadnej linii treści.
 - **Zakładając** wynik `CarbsConfirmed` dla `CARBS 37` (syntetyczne potwierdzenie `Pomyslnie wprowadzono 37 g weglowodanow`), **gdy** wywołano `toString()` na wyniku i stanie, **wtedy** tekst nie zawiera `37`.
 - **Zakładając** wyjątki z SESSION-01, SESSION-02, SESSION-03, **gdy** odczytano ich komunikaty, **wtedy** nie zawierają PIN-u, ilości ani treści wiadomości.
+
+## Kontrakt portów (wymagania dla spec `sms`)
+
+Sesja zakłada, że implementacje portów spełniają poniższe warunki. Nie są testowane w `session` (testy używają podstawionych portów, które je spełniają); spec `sms` musi je przejąć jako własne wymagania z testami.
+
+| Nr | Warunek | Po co |
+| --- | --- | --- |
+| K1 | `receivedAtEpochMillis` jest stemplowane w chwili odbioru SMS-a przez aplikację tym samym `EpochClock`, którego używa sesja – nie znacznikiem centrum SMS ani nadawcy. | Porównanie z chwilą wysłania polecenia i kodu (SESSION-05, SESSION-12) oraz wiek prośby (SESSION-10). |
+| K2 | Każda odebrana wiadomość jest dostarczana do strumienia najwyżej raz: brak ponownego dostarczania wiadomości już przekazanych (deduplikacja, np. po powtórzonym broadcaście albo ponownym uruchomieniu procesu), a ponowne dostarczenie nie może nadawać nowej chwili odbioru. | Ogranicza przyjęcie ponownie dostarczonej prośby o kod (SESSION-08, „Ograniczenie”). |
+| K3 | Strumień odbioru jest gorący: nie powtarza nowemu kolektorowi wiadomości odebranych przed rozpoczęciem zbierania. | Wiadomości sprzed sesji nie trafiają do sesji. |
+| K4 | Strumień zawiera wyłącznie wiadomości od skonfigurowanego numeru AAPS, z treścią sklejoną ze wszystkich części. | Filtr numeru nadawcy (AGENTS.md); parser dostaje całą treść (Spec 002). |
+| K5 | Port wysyłania zawiesza się do wyniku wysłania i zwraca „wysłano” dopiero po potwierdzeniu wysłania przez system; anulowanie korutyny przerywa czekanie. | Chwile wysłania (Pojęcia), limity (SESSION-07, SESSION-15). |
+| K6 | Port wysyłania nie przechowuje `CodeReply.chars` ani żadnej kopii (w tym `String` dla `SmsManager`) po powrocie z wywołania i nie loguje treści. | PIN tylko w pamięci (Bezpieczeństwo). |
 
 ## Przypadki błędów
 
@@ -401,6 +436,9 @@ PIN, kod TOTP, odpowiedź z kodem, sekret, treść wiadomości AAPS i ilość w�
 | Prośba o kod starsza niż 240 000 ms albo z chwilą odbioru w przyszłości | `Failed(CODE_REQUEST_EXPIRED)`, kod nie jest wysyłany | SESSION-10 |
 | Kod TOTP niedostępny przez 10 000 ms (np. zatrzymany zegar) | `Failed(CODE_PREPARATION_TIMEOUT)` | SESSION-10 |
 | Nieoczekiwany wyjątek (zegar, dostawca TOTP) | przed kodem `Failed(INTERNAL_ERROR)`, po kodzie `Unknown(INTERNAL_ERROR)`, PIN wyczyszczony | SESSION-19 |
+| Zegar rzuca wyjątek przy zakończeniu sesji | zegar nie jest odczytywany ponownie; wynik bez zmian; chwila zakończenia = ostatni poprawny odczyt albo `null` | SESSION-19 |
+| Zdarzenie w tej samej chwili co termin limitu | wygrywa limit (`TimedOut`, `CODE_PREPARATION_TIMEOUT`, `CONFIRMATION_TIMEOUT`) | SESSION-07, SESSION-10, SESSION-15 |
+| Stara prośba o kod z tą samą ilością dostarczona po wysłaniu polecenia | przyjęta; kod potwierdza bieżące identyczne polecenie (ograniczenie); ponowne dostarczenie blokuje `sms` (K2) | SESSION-08 |
 | Port wysyłania: błąd lub wyjątek przy kodzie | `Unknown(CODE_SEND_FAILED)` | SESSION-16 |
 | AAPS odrzuca kod („Zly kod”) | `Failed(WRONG_CODE)` z treścią | SESSION-13 |
 | Nierozpoznana odpowiedź po kodzie (np. przekroczony czas kolejki pompy) | `Unknown(UNRECOGNIZED_REPLY)` z treścią | SESSION-13 |
@@ -409,17 +447,19 @@ PIN, kod TOTP, odpowiedź z kodem, sekret, treść wiadomości AAPS i ilość w�
 | Potwierdzenie odebrane przed chwilą wysłania kodu | wiadomość nieoczekiwana | SESSION-12 |
 | Brak potwierdzenia w limicie | `Unknown(CONFIRMATION_TIMEOUT)` | SESSION-15 |
 | Anulowanie przed kodem / po kodzie | `Cancelled` / `Unknown(CANCELLED_AFTER_CODE)` | SESSION-17 |
-| Start drugiego polecenia | „zajęte”, PIN wyczyszczony | SESSION-22 |
+| Anulowanie przed uruchomieniem (także równoczesne z uruchomieniem) | `Cancelled`; przy anulowaniu przed uruchomieniem zero SMS-ów i brak subskrypcji | SESSION-17 |
+| Start drugiego polecenia (także z niepoprawnymi danymi do kodu) | „zajęte” bez wyjątku, PIN wyczyszczony | SESSION-22 |
+| Niepoprawne dane do kodu przy wolnym miejscu | `IllegalArgumentException`, rezerwacja zwolniona, PIN wyczyszczony | SESSION-22 |
 | Wiadomości po zakończeniu sesji | nieprzetwarzane, nic nie jest wysyłane | SESSION-20 |
 
 ## Bezpieczeństwo
 
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej funkcji:
 
-- **Nigdy nie odsyłamy kodu, gdy odpowiedź AAPS nie zgadza się z poleceniem.** Kod powstaje wyłącznie po wyniku `CodeRequest` (dokładne dopasowanie całej treści i ilości równej wysłanej – Spec 002) przetworzonym w fazie `AWAITING_CODE_REQUEST` (SESSION-08). Inny numer nadawcy odcina `sms` (kontrakt portu odbioru, SESSION-05); odpowiedź sprzed wysłania – SESSION-05; inna ilość – SESSION-11; nierozpoznana treść – SESSION-11; wiadomość niepasująca do fazy – SESSION-11, SESSION-13; stara prośba – SESSION-10. Każda wątpliwa wiadomość w czasie przygotowania kodu przerywa je bez wysłania (SESSION-11).
+- **Nigdy nie odsyłamy kodu, gdy odpowiedź AAPS nie zgadza się z poleceniem.** Kod powstaje wyłącznie po wyniku `CodeRequest` (dokładne dopasowanie całej treści i ilości równej wysłanej – Spec 002) przetworzonym w fazie `AWAITING_CODE_REQUEST` (SESSION-08). Inny numer nadawcy odcina `sms` (kontrakt portu odbioru, SESSION-05); odpowiedź sprzed wysłania – SESSION-05; inna ilość – SESSION-11; nierozpoznana treść – SESSION-11; wiadomość niepasująca do fazy – SESSION-11, SESSION-13; stara prośba – SESSION-10; ponownie dostarczona prośba – kontrakt K2 i ograniczenie opisane w SESSION-08 (AAPS nie ma identyfikatora prośby, więc kod może potwierdzić tylko bieżące, identyczne polecenie). Każda wątpliwa wiadomość w czasie przygotowania kodu przerywa je bez wysłania (SESSION-11).
 - **Potwierdzenie `CARBS` nie dowodzi wykonania naszego polecenia** (A5). Przyjmowane tylko po wysłaniu kodu (SESSION-12), prezentowane jako „AAPS potwierdził wprowadzenie X g”. Ryzyko szczątkowe: `CARBS` z tą samą ilością wysłane z innego dozwolonego numeru, którego potwierdzenie przyjdzie w czasie `AWAITING_CONFIRMATION`, zostanie przyjęte jako potwierdzenie dla tej sesji. Sesja nie potrafi tego odróżnić; dlatego treść wyniku mówi o potwierdzeniu AAPS, a nie o wykonaniu polecenia z aplikacji.
 - **Brak automatycznego ponawiania i omijania limitów AAPS.** Najwyżej 1 SMS z poleceniem i 1 z kodem na sesję (SESSION-20); po niezgodnej ilości (A3) sesja kończy się błędem, bez korekty ilości i bez nowej próby. Wyniki „nieznany” istnieją po to, żeby użytkownik sprawdził AAPS przed ponowieniem ręcznym – zamiast fałszywego „błąd”, które zachęcałoby do powtórzenia `CARBS` (ryzyko podwójnego wprowadzenia).
-- **PIN nigdy nie jest zapisywany.** `AapsPin` żyje tylko w pamięci, nie jest serializowany ani przekazywany poza sesję i port wysyłania (w odpowiedzi z kodem); jest czyszczony zaraz po złożeniu kodu i w każdym zakończeniu sesji (SESSION-02, SESSION-09, SESSION-19, SESSION-22). Odpowiedź z kodem jest tablicą znaków zerowaną po wysłaniu (SESSION-09). Ograniczenie: port `sms` musi utworzyć `String` dla `SmsManager`; tej kopii nie da się wyzerować – wymóg dla spec `sms`: nie przechowywać jej poza wywołaniem.
+- **PIN nigdy nie jest zapisywany.** `AapsPin` żyje tylko w pamięci, nie jest serializowany ani przekazywany poza sesję i port wysyłania (w odpowiedzi z kodem); jest czyszczony zaraz po złożeniu kodu i w każdym zakończeniu sesji (SESSION-02, SESSION-09, SESSION-19, SESSION-22). Odpowiedź z kodem jest tablicą znaków zerowaną po wysłaniu (SESSION-09). Ograniczenie: port `sms` musi utworzyć `String` dla `SmsManager`; tej kopii nie da się wyzerować – wymóg dla spec `sms`: nie przechowywać jej poza wywołaniem (K6).
 - **Nie logujemy PIN-u, kodów, sekretu.** SESSION-23; wynik i stan nie zawierają PIN-u ani kodu (SESSION-21), więc mogą trafić do historii.
 - **Dane w repo.** Testy używają sekretu z RFC 6238, fikcyjnych PIN-ów `4321` i `987654` oraz danych z `../002-parser-odpowiedzi/dane/`; brak numerów telefonu.
 
