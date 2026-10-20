@@ -1,11 +1,19 @@
 package pl.twojanazwa.aapsremote.session
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.testTimeSource
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SessionRedactionTest {
 
     private fun carbs37(): Command {
@@ -60,6 +68,36 @@ class SessionRedactionTest {
         val state = SessionState(SessionPhase.FINISHED, emptyList(), result)
         assertFalse(result.toString().contains("37"))
         assertFalse(state.toString().contains("37"))
+    }
+
+    @Test
+    fun `SESSION-23 komunikaty wyjatkow sesji nie zawieraja PIN-u ani ilosci`() = runTest {
+        val clock = virtualClock()
+        fun create(command: Command, credentials: CodeCredentials?) = CommandSession(
+            command = command,
+            credentials = credentials,
+            sender = FakeSmsSender(),
+            incoming = FakeIncomingSmsSource(),
+            clock = clock,
+            totp = UsableTotpProvider(clock),
+            timeSource = testTimeSource,
+        )
+        val messages = mutableListOf<String>()
+        messages += assertThrows<IllegalArgumentException> { create(carbs37(), null) }.message.orEmpty()
+        messages += assertThrows<IllegalArgumentException> {
+            create(Command.Bg, SessionTestFixtures.credentials())
+        }.message.orEmpty()
+        val session = create(Command.Bg, null)
+        val first = async { session.run() }
+        runCurrent()
+        messages += assertThrows<IllegalStateException> { session.run() }.message.orEmpty()
+        first.cancel()
+        assertEquals(3, messages.count { it.isNotEmpty() })
+        for (message in messages) {
+            assertFalse(message.contains("4321"))
+            assertFalse(message.contains("37"))
+            assertFalse(message.contains("BG"))
+        }
     }
 
     @Test
