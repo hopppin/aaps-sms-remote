@@ -215,7 +215,7 @@ class CommandSession(
     fun cancel() {
         if (lifecycle.compareAndSet(Lifecycle.NOT_STARTED, Lifecycle.CANCELLED_BEFORE_START)) {
             finish(SessionOutcome.Cancelled)
-        } else if (lifecycle.get() == Lifecycle.RUNNING) {
+        } else if (lifecycle.get() == Lifecycle.RUNNING && _state.value.phase != SessionPhase.FINISHED) {
             events.trySend(Event.Cancel)
         }
     }
