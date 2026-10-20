@@ -11,7 +11,7 @@ Pakiet `pl.twojanazwa.aapsremote.data` dostaje dwie niezależne części: ustawi
 
 Zależności (kierunek): `data` → `sms` (`AapsNumber`, `AapsNumberProvider`), `data` → `session` (`SessionResult`, `SessionOutcome`, `SessionState`, enumy), `data` → `commands` (`Command`, `CommandId`). `sms`, `session` i `commands` nie importują `data`. `ui` (przyszła spec): `AapsNumberSettingsStore` (ekran ustawień, blokada przycisków w `Loading`), `CommandHistory` (lista, czyszczenie), `SessionHistoryRecorder.track` (po `StartResult.Started`).
 
-Przepływ numeru: start procesu → pierwsze wstrzyknięcie `AapsNumberSettings` (np. przez `IncomingSmsHub`, `AapsSmsSender` albo ekran `ui`) → zadanie wczytania w `@DataScope` → `SettingsStorage.readAapsNumber()` na `@DataDispatcher` → `StateFlow<AapsNumberState>`; `sms` czyta `currentNumber()` = `state.value`.
+Przepływ numeru: start procesu → pierwsze wstrzyknięcie `AapsNumberSettings` (np. przez `IncomingSmsHub`, `AapsSmsSender` albo ekran `ui`) → zadanie wczytania w `@DataScope` → `SettingsStorage.readAapsNumber()` na `@DataDispatcher` → `StateFlow<AapsNumberState>`; `sms` czyta `currentNumber()` = znormalizowany numer z `state.value` (`Configured.number.destination`, inaczej `null`).
 
 Przepływ historii: `ui` → `SessionCoordinator.start` → `Started(session)` → `SessionHistoryRecorder.track(session.state)` → (w `@DataScope`) `state.first { FINISHED }` → `CommandHistory.record(result)` → `HistoryCodec.toRow` → `HistoryStorage.inTransaction { insert; count; deleteOldest }`. `ui` → `CommandHistory.entries` → `HistoryStorage.observeNewestFirst()` → `HistoryCodec.toEntry`.
 
