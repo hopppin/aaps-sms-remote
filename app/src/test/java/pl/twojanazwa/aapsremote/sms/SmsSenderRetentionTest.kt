@@ -1,7 +1,9 @@
 package pl.twojanazwa.aapsremote.sms
 
 import java.lang.reflect.Modifier
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
+import pl.twojanazwa.aapsremote.sms.platform.AndroidSmsSystemApi
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -24,6 +26,29 @@ class SmsSenderRetentionTest {
             assertFalse(Collection::class.java.isAssignableFrom(type), "pole kolekcji")
             assertFalse(Map::class.java.isAssignableFrom(type), "pole mapy")
         }
+    }
+
+    @Test
+    fun `SMS-13 pola AndroidSmsSystemApi sa niezmienne i nie przechowuja tresci`() {
+        val fields = AndroidSmsSystemApi::class.java.declaredFields.filter { !it.isSynthetic }
+        assertTrue(fields.isNotEmpty())
+        for (field in fields) {
+            val type = field.type
+            assertTrue(Modifier.isFinal(field.modifiers), "pole nie jest final")
+            assertFalse(type == String::class.java, "pole typu String")
+            assertFalse(type == CharArray::class.java, "pole typu CharArray")
+            assertFalse(type.isArray, "pole tablicowe")
+            assertFalse(CharSequence::class.java.isAssignableFrom(type), "pole CharSequence")
+            assertFalse(Collection::class.java.isAssignableFrom(type), "pole kolekcji")
+            assertFalse(Map::class.java.isAssignableFrom(type), "pole mapy")
+        }
+    }
+
+    @Test
+    fun `SMS-13 toString AndroidSmsSystemApi nie zawiera kodu ani PIN-u`() {
+        val text = AndroidSmsSystemApi(mockk(relaxed = true)).toString()
+        assertFalse(text.contains("050471"))
+        assertFalse(text.contains("4321"))
     }
 
     @Test
