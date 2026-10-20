@@ -343,7 +343,7 @@ Stan: `AtomicBoolean reserved` (miejsce zajęte od rezerwacji do zakończenia se
 1. `reserved.compareAndSet(false, true)`; porażka → `credentials?.pin?.clear()`, `Busy` – bez tworzenia sesji i bez walidacji danych (brak wyjątku dla niepoprawnego zestawu polecenie/dane).
 2. Utworzenie `CommandSession` w `try`; wyjątek → `credentials?.pin?.clear()` (konstruktor też czyści), `reserved.set(false)`, wyjątek dalej.
 3. `active.value = session`; `job = scope.launch { session.run() }`.
-4. Zwolnienie miejsca w jednej funkcji `release(session)`: jeśli `active.compareAndSet(session, null)` – `reserved.set(false)`. Wywołują ją `onFinished` sesji (po publikacji `FINISHED`, przed `finishedResult.complete`) i `job.invokeOnCompletion { credentials?.pin?.clear(); release(session) }` – ta druga zwalnia miejsce także, gdy zakres był już anulowany i `run()` nie wystartował.
+4. Zwolnienie miejsca w jednej funkcji `release(session)`: jeśli `active.compareAndSet(session, null)` – `reserved.set(false)`. Wywołują ją `onFinished` sesji (po publikacji `FINISHED`, przed `finishedResult.complete`) i `job.invokeOnCompletion { session.cancel(); release(session) }` – gdy zakres był już anulowany i `run()` nie wystartował, `session.cancel()` w `NOT_STARTED` wykonuje pełne `finish(Cancelled)` (PIN wyczyszczony, `FINISHED` opublikowane, `finishedResult` uzupełniony, potem `onFinished`); w każdym innym stanie `cancel()` nic nie robi (sesja już w `FINISHED` albo właśnie kończy się sama), a `release` jest idempotentne. Miejsce nigdy nie jest więc zwalniane bez opublikowania `FINISHED`.
 
 Rezerwacja przed utworzeniem sesji sprawia, że przy zajętym miejscu wynik zawsze brzmi „zajęte”, niezależnie od poprawności danych wejściowych (SESSION-22).
 

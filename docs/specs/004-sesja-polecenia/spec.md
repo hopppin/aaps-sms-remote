@@ -393,6 +393,7 @@ Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesj
 - **Zakładając** sesję wstrzymaną po opublikowaniu `FINISHED`, a przed zwolnieniem miejsca, **gdy** wystartowano `BG`, **wtedy** wynik to „zajęte” i istnieje najwyżej jedna sesja bez `FINISHED`.
 - **Zakładając** 100 równoczesnych startów `BG` na `Dispatchers.Default` przy braku aktywnej sesji, **gdy** wszystkie się zakończyły, **wtedy** dokładnie jeden zwrócił „wystartowano”.
 - **Zakładając** aktywną sesję anulowaną z zewnątrz (zakres zamknięty), **gdy** odczytano aktywną sesję, **wtedy** jest pusta.
+- **Zakładając** zakres koordynatora anulowany po starcie `CARBS 1` z PIN-em `4321`, zanim uruchomienie sesji się rozpoczęło, **gdy** odczytano stan sesji i aktywną sesję, **wtedy** faza to `FINISHED` z wynikiem `Cancelled`, PIN jest wyczyszczony, żaden SMS nie został wysłany, a aktywna sesja jest pusta.
 
 ### SESSION-23: Brak ujawniania danych
 
