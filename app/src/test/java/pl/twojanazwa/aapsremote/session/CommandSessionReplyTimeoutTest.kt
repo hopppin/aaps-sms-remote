@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.session
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -84,6 +85,34 @@ class CommandSessionReplyTimeoutTest {
         assertEquals(0, sender.sentCodeCopies.size)
         assertEquals(1, sender.sendCount)
     }
+
+    @Test
+    fun `SESSION-07 limit odpowiedzi nie obowiazuje po wejsciu w PREPARING_CODE - kod w SENDING_CODE a potem AWAITING_CONFIRMATION`() =
+        runTest {
+            val slowCodeSender = SmsSender { message ->
+                if (message is OutgoingSms.CodeReply) delay(5_000)
+                SendResult.Sent
+            }
+            // T0 = 1111110932000: prośba w chwili 179 000 przypada na zegar 1111111111000.
+            val clock = pl.twojanazwa.aapsremote.otp.EpochClock { 1111110932000 + testScheduler.currentTime }
+            val session = testSession(
+                carbs1(), slowCodeSender, source, SessionTestFixtures.credentials(), clock = clock,
+            )
+            val run = async { session.run() }
+            runCurrent()
+            advanceTimeBy(179_000)
+            runCurrent()
+            source.emit(IncomingSms(AapsSamples.carbsCodeRequest, 1111110932000 + 179_000))
+            runCurrent()
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertEquals(180_000, testScheduler.currentTime)
+            assertEquals(SessionPhase.SENDING_CODE, session.state.value.phase)
+            advanceTimeBy(4_000)
+            runCurrent()
+            assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+            run.cancel()
+        }
 
     @Test
     fun `SESSION-07 port wysylania zwraca Sent po dokladnie 180000 ms - TimedOut SENDING_COMMAND`() = runTest {

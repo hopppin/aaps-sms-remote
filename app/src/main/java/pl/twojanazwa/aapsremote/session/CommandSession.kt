@@ -18,12 +18,14 @@ import pl.twojanazwa.aapsremote.commands.definition
 import pl.twojanazwa.aapsremote.commands.smsText
 import pl.twojanazwa.aapsremote.commands.toExpectedCommand
 import pl.twojanazwa.aapsremote.otp.EpochClock
+import pl.twojanazwa.aapsremote.otp.TotpCode
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeMark
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -39,7 +41,7 @@ class CommandSession(
     private val sender: SmsSender,
     private val incoming: IncomingSmsSource,
     private val clock: EpochClock,
-    @Suppress("unused") private val totp: UsableTotpProvider,
+    private val totp: UsableTotpProvider,
     private val timeouts: SessionTimeouts = SessionTimeouts(),
     /** Czas korutyn dla terminów limitów; w testach testScheduler.timeSource. */
     private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
@@ -52,6 +54,11 @@ class CommandSession(
 
         /** Tylko wybudzenie pętli; o limicie decyduje znacznik [deadline]. */
         data object ReplyDeadline : Event
+        data object PreparationDeadline : Event
+        data object ConfirmationDeadline : Event
+        class CodeReady(val code: TotpCode) : Event
+        data object CodeError : Event
+        class CodeSendResult(val result: SendResult) : Event
         data object Cancel : Event
     }
 
@@ -65,6 +72,15 @@ class CommandSession(
     private var lastClockReading: Long? = null
     private var startedAt: Long? = null
     private var commandSentAt: Long? = null
+    private var codeSentAt: Long? = null
+    private var codeRequestReceivedAt: Long? = null
+    private var codeRequestText: String? = null
+
+    /** true od rozpoczęcia wysyłania kodu: od tej chwili wynik niepewny to Unknown (SESSION-14). */
+    private var codeSendStarted = false
+
+    /** Odpowiedź z kodem; zerowana po powrocie z portu i przy zakończeniu sesji. */
+    private var codeChars: CharArray? = null
     private val pendingMessages = mutableListOf<IncomingSms>()
 
     /** Termin limitu bieżącej fazy (czas korutyn). Zadania CARBS ustawiają go przy zmianie fazy. */
@@ -129,21 +145,42 @@ class CommandSession(
                 result
             }
         } catch (e: CancellationException) {
-            // Anulowanie z zewnątrz (SESSION-17). Fazy po kodzie (Unknown(CANCELLED_AFTER_CODE)) dopisze zadanie CARBS.
-            if (_state.value.phase != SessionPhase.FINISHED) finish(SessionOutcome.Cancelled)
+            // Anulowanie z zewnątrz (SESSION-17): przed kodem Cancelled, po rozpoczęciu wysyłania kodu Unknown.
+            if (_state.value.phase != SessionPhase.FINISHED) finish(cancelOutcome())
             throw e
         } catch (e: Exception) {
-            finish(SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null))
+            finish(
+                if (codeSendStarted) {
+                    SessionOutcome.Unknown(UnknownReason.INTERNAL_ERROR, null)
+                } else {
+                    SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null)
+                },
+            )
         }
     }
 
-    private suspend fun eventLoop(): SessionResult {
+    private suspend fun CoroutineScope.eventLoop(): SessionResult {
         for (event in events) {
             // Pierwszeństwo limitu: przy równej chwili limit wygrywa z każdym zdarzeniem (nie jest ono obsługiwane).
             if (deadline?.hasPassedNow() == true) return endWith(timeoutOutcome())
             when (event) {
-                Event.ReplyDeadline -> Unit // wybudzenie; termin sprawdzony wyżej
-                Event.Cancel -> return endWith(SessionOutcome.Cancelled) // tylko fazy przed kodem
+                // Wybudzenia; termin sprawdzony wyżej. Stare liczniki (poprzednie fazy) też trafiają tutaj.
+                Event.ReplyDeadline, Event.PreparationDeadline, Event.ConfirmationDeadline -> Unit
+                Event.Cancel -> return endWith(cancelOutcome())
+                Event.CodeError ->
+                    if (_state.value.phase == SessionPhase.PREPARING_CODE) {
+                        return endWith(SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null))
+                    }
+                is Event.CodeReady ->
+                    if (_state.value.phase == SessionPhase.PREPARING_CODE) {
+                        startCodeSending(event.code)?.let { return endWith(it) }
+                    }
+                is Event.CodeSendResult ->
+                    // Błąd wysyłania kodu (Failed) obsłuży zadanie „CARBS po wysłaniu kodu”.
+                    if (_state.value.phase == SessionPhase.SENDING_CODE && event.result == SendResult.Sent) {
+                        codeSentAt = readClock()
+                        _state.value = _state.value.copy(phase = SessionPhase.AWAITING_CONFIRMATION)
+                    }
                 is Event.Message -> {
                     if (_state.value.phase == SessionPhase.SENDING_COMMAND) {
                         pendingMessages += event.sms
@@ -179,19 +216,95 @@ class CommandSession(
 
     /**
      * Wiadomość po wysłaniu polecenia. Zwraca wynik, gdy sesja się kończy, inaczej null.
-     * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W fazie AWAITING_CODE_REQUEST
-     * i pozostałych stan się nie zmienia (obsługa w zadaniach CARBS).
+     * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W AWAITING_CODE_REQUEST przyjmowana jest
+     * tylko prośba o kod; inne wyniki parsera i pozostałe fazy nie zmieniają stanu (kolejne zadania CARBS).
      */
-    private fun processMessage(sms: IncomingSms): SessionOutcome? {
+    private fun CoroutineScope.processMessage(sms: IncomingSms): SessionOutcome? {
         val sentAt = commandSentAt ?: return null
         if (sms.receivedAtEpochMillis < sentAt) return null
-        if (_state.value.phase != SessionPhase.AWAITING_REPLY) return null
-        val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
-        return when (reply) {
-            is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
-            else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
+        when (_state.value.phase) {
+            SessionPhase.AWAITING_REPLY -> {
+                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                return when (reply) {
+                    is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
+                    else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
+                }
+            }
+            SessionPhase.AWAITING_CODE_REQUEST -> {
+                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                if (reply is AapsReply.CodeRequest) startPreparingCode(sms)
+                return null
+            }
+            else -> return null
         }
     }
+
+    /** Prośba o kod: wyłącza limit odpowiedzi, zaczyna limit przygotowania i czeka na użyteczny kod TOTP. */
+    private fun CoroutineScope.startPreparingCode(sms: IncomingSms) {
+        val secret = checkNotNull(credentials).secret
+        codeRequestReceivedAt = sms.receivedAtEpochMillis
+        codeRequestText = sms.body
+        _state.value = _state.value.copy(phase = SessionPhase.PREPARING_CODE)
+        val preparationDeadline = timeSource.markNow() + SessionLimits.CODE_PREPARATION_TIMEOUT_MILLIS.milliseconds
+        deadline = preparationDeadline
+        launchDeadlineTimer(preparationDeadline, Event.PreparationDeadline)
+        launch {
+            val event = try {
+                Event.CodeReady(totp.awaitUsableCode(secret))
+            } catch (e: CancellationException) {
+                ensureActive() // cudzy CancellationException = błąd dostawcy
+                Event.CodeError
+            } catch (e: Exception) {
+                Event.CodeError
+            }
+            events.trySend(event)
+        }
+    }
+
+    /**
+     * Kod gotowy: kontrola wieku prośby, złożenie odpowiedzi, czyszczenie PIN-u, start wysyłania kodu.
+     * Zwraca wynik, gdy kod nie może być wysłany.
+     */
+    private fun CoroutineScope.startCodeSending(code: TotpCode): SessionOutcome? {
+        val age = readClock() - checkNotNull(codeRequestReceivedAt)
+        if (age < 0 || age > SessionLimits.CODE_REQUEST_MAX_AGE_MILLIS) {
+            return SessionOutcome.Failed(FailureReason.CODE_REQUEST_EXPIRED, codeRequestText)
+        }
+        val pin = checkNotNull(credentials).pin
+        val chars = CharArray(CODE_DIGITS + pin.length)
+        codeChars = chars
+        val pinChars = pin.copyChars()
+        try {
+            for (i in 0 until CODE_DIGITS) chars[i] = code.value[i]
+            pinChars.copyInto(chars, CODE_DIGITS)
+        } finally {
+            pinChars.fill('\u0000')
+            pin.clear()
+        }
+        codeSendStarted = true
+        _state.value = _state.value.copy(phase = SessionPhase.SENDING_CODE)
+        val confirmationDeadline = timeSource.markNow() + timeouts.confirmation
+        deadline = confirmationDeadline
+        launchDeadlineTimer(confirmationDeadline, Event.ConfirmationDeadline)
+        launch {
+            val result = try {
+                sender.send(OutgoingSms.CodeReply(chars))
+            } catch (e: CancellationException) {
+                ensureActive()
+                SendResult.Failed
+            } catch (e: Exception) {
+                SendResult.Failed
+            } finally {
+                chars.fill('\u0000')
+            }
+            events.trySend(Event.CodeSendResult(result))
+        }
+        return null
+    }
+
+    /** Anulowanie: przed rozpoczęciem wysyłania kodu Cancelled, potem Unknown (SESSION-17). */
+    private fun cancelOutcome(): SessionOutcome =
+        if (codeSendStarted) SessionOutcome.Unknown(UnknownReason.CANCELLED_AFTER_CODE, null) else SessionOutcome.Cancelled
 
     /**
      * Każde zakończenie z pętli: najpierw anulowanie korutyn potomnych (zawieszone send nie dokończy się
@@ -216,8 +329,13 @@ class CommandSession(
         }
     }
 
-    /** Wynik limitu bieżącej fazy. Fazy z kodu (PREPARING_CODE, po kodzie) dopisują zadania CARBS. */
-    private fun timeoutOutcome(): SessionOutcome = SessionOutcome.TimedOut(_state.value.phase)
+    /** Wynik limitu bieżącej fazy. */
+    private fun timeoutOutcome(): SessionOutcome = when (_state.value.phase) {
+        SessionPhase.PREPARING_CODE -> SessionOutcome.Failed(FailureReason.CODE_PREPARATION_TIMEOUT, null)
+        SessionPhase.SENDING_CODE, SessionPhase.AWAITING_CONFIRMATION ->
+            SessionOutcome.Unknown(UnknownReason.CONFIRMATION_TIMEOUT, null)
+        else -> SessionOutcome.TimedOut(_state.value.phase)
+    }
 
     /** Nieblokujące, bezpieczne z dowolnego wątku. Bez efektu po FINISHED. */
     fun cancel() {
@@ -231,6 +349,7 @@ class CommandSession(
     /** Kolejność wg design.md: PIN → jeden odczyt zegara → FINISHED → onFinished → wynik. Nie rzuca. */
     private fun finish(outcome: SessionOutcome): SessionResult {
         credentials?.pin?.clear()
+        codeChars?.fill('\u0000')
         val finishedAt = try {
             clock.nowEpochMillis()
         } catch (e: Exception) {
@@ -240,7 +359,7 @@ class CommandSession(
             command = command,
             startedAtEpochMillis = startedAt,
             commandSentAtEpochMillis = commandSentAt,
-            codeSentAtEpochMillis = null,
+            codeSentAtEpochMillis = codeSentAt,
             finishedAtEpochMillis = finishedAt,
             outcome = outcome,
             unexpectedMessages = _state.value.unexpectedMessages,
@@ -252,4 +371,8 @@ class CommandSession(
     }
 
     override fun toString(): String = "CommandSession(phase=${_state.value.phase})"
+
+    private companion object {
+        const val CODE_DIGITS = 6
+    }
 }

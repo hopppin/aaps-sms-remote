@@ -52,6 +52,19 @@ class CommandSessionIncomingTest {
     }
 
     @Test
+    fun `SESSION-05 CARBS 1 prosba o kod o T0 minus 1 jest ignorowana i kod nie jest wysylany`() = runTest {
+        val carbs = (Command.Carbs.of(1) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid).command
+        val session = testSession(carbs, sender, source, SessionTestFixtures.credentials())
+        val run = async { session.run() }
+        runCurrent()
+        source.emit(IncomingSms(AapsSamples.carbsCodeRequest, SessionTestFixtures.T0 - 1))
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CODE_REQUEST, session.state.value.phase)
+        assertTrue(sender.sentCodeCopies.isEmpty())
+        run.cancel()
+    }
+
+    @Test
     fun `SESSION-05 wiadomosc o T0 minus 1 jest ignorowana a o T0 konczy sesje`() = runTest {
         val session = session(Command.Bg)
         val run = async { session.run() }
