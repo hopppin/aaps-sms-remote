@@ -205,4 +205,58 @@ class SessionCancelTest {
         runCurrent()
         assertEquals(result, session.state.value.result)
     }
+
+    @Test
+    fun `SESSION-17 CARBS 1 anulowane w AWAITING_CONFIRMATION daje Unknown CANCELLED_AFTER_CODE`() = runTest {
+        val credentials = SessionTestFixtures.credentials()
+        val session = testSession(carbs1(), sender, source, credentials)
+        val run = async { session.run() }
+        runCurrent()
+        requestCodeAt(source, 60_000)
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        session.cancel()
+        runCurrent()
+        assertEquals(SessionOutcome.Unknown(UnknownReason.CANCELLED_AFTER_CODE, null), run.await().outcome)
+        assertTrue(credentials.pin.isCleared)
+    }
+
+    @Test
+    fun `SESSION-17 CARBS 1 anulowane w SENDING_CODE przy zawieszonym porcie daje Unknown CANCELLED_AFTER_CODE`() =
+        runTest {
+            var captured: CharArray? = null
+            val session = testSession(
+                carbs1(), hangingCodeSender { captured = it }, source, SessionTestFixtures.credentials(),
+            )
+            val run = async { session.run() }
+            runCurrent()
+            requestCodeAt(source, 60_000)
+            assertEquals(SessionPhase.SENDING_CODE, session.state.value.phase)
+            session.cancel()
+            runCurrent()
+            assertEquals(SessionOutcome.Unknown(UnknownReason.CANCELLED_AFTER_CODE, null), run.await().outcome)
+            assertTrue(checkNotNull(captured).all { it == '\u0000' })
+        }
+
+    @Test
+    fun `SESSION-17 CARBS 1 w AWAITING_CONFIRMATION - anulowanie z zewnatrz daje Unknown i CancellationException`() =
+        runTest {
+            val session = testSession(carbs1(), sender, source, SessionTestFixtures.credentials())
+            val run = async { session.run() }
+            runCurrent()
+            requestCodeAt(source, 60_000)
+            run.cancel()
+            runCurrent()
+            assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+            assertEquals(
+                SessionOutcome.Unknown(UnknownReason.CANCELLED_AFTER_CODE, null),
+                session.state.value.result?.outcome,
+            )
+            var thrown: Throwable? = null
+            try {
+                run.await()
+            } catch (e: CancellationException) {
+                thrown = e
+            }
+            assertTrue(thrown is CancellationException)
+        }
 }

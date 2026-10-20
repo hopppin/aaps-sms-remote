@@ -63,8 +63,9 @@ class CarbsSessionCodeTest {
         assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
         requestAt(61_000)
         assertEquals(1, sender.sentCodeCopies.size)
-        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
-        run.cancel()
+        // SESSION-13: ponowna prosba o kod po wyslaniu kodu konczy sesje, kod nie jest wysylany ponownie.
+        assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+        assertEquals(SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, AapsSamples.carbsCodeRequest), run.await().outcome)
     }
 
     @Test

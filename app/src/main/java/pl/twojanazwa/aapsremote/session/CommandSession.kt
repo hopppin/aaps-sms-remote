@@ -176,13 +176,26 @@ class CommandSession(
                         startCodeSending(event.code)?.let { return endWith(it) }
                     }
                 is Event.CodeSendResult ->
-                    // Błąd wysyłania kodu (Failed) obsłuży zadanie „CARBS po wysłaniu kodu”.
-                    if (_state.value.phase == SessionPhase.SENDING_CODE && event.result == SendResult.Sent) {
-                        codeSentAt = readClock()
-                        _state.value = _state.value.copy(phase = SessionPhase.AWAITING_CONFIRMATION)
+                    if (_state.value.phase == SessionPhase.SENDING_CODE) {
+                        when (event.result) {
+                            SendResult.Sent -> {
+                                codeSentAt = readClock()
+                                _state.value = _state.value.copy(phase = SessionPhase.AWAITING_CONFIRMATION)
+                                // Wiadomości odłożone w trakcie wysyłania kodu – w kolejności odbioru (SESSION-12).
+                                val pending = pendingMessages.toList()
+                                pendingMessages.clear()
+                                for (sms in pending) processMessage(sms)?.let { return endWith(it) }
+                            }
+                            // Odłożone wiadomości są porzucane, kod nie jest wysyłany ponownie (SESSION-16).
+                            SendResult.Failed -> {
+                                pendingMessages.clear()
+                                return endWith(SessionOutcome.Unknown(UnknownReason.CODE_SEND_FAILED, null))
+                            }
+                        }
                     }
                 is Event.Message -> {
-                    if (_state.value.phase == SessionPhase.SENDING_COMMAND) {
+                    val phase = _state.value.phase
+                    if (phase == SessionPhase.SENDING_COMMAND || phase == SessionPhase.SENDING_CODE) {
                         pendingMessages += event.sms
                     } else {
                         processMessage(event.sms)?.let { return endWith(it) }
@@ -218,7 +231,7 @@ class CommandSession(
      * Wiadomość po wysłaniu polecenia. Zwraca wynik, gdy sesja się kończy, inaczej null.
      * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W AWAITING_CODE_REQUEST i PREPARING_CODE
      * (SESSION-11): pierwsza zgodna prośba o kod uruchamia przygotowanie, CarbsDone trafia do unexpectedMessages
-     * (SESSION-18), każdy inny wynik kończy sesję. Fazy po wysłaniu kodu nie zmieniają stanu (kolejne zadanie CARBS).
+     * (SESSION-18), każdy inny wynik kończy sesję. Po kodzie: AWAITING_CONFIRMATION (SESSION-12, SESSION-13); w SENDING_CODE wiadomości są odkładane.
      */
     private fun CoroutineScope.processMessage(sms: IncomingSms): SessionOutcome? {
         val sentAt = commandSentAt ?: return null
@@ -244,17 +257,37 @@ class CommandSession(
                         }
                     is AapsReply.CarbsAmountMismatch -> SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, sms.body)
                     // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
-                    is AapsReply.CarbsDone -> {
-                        _state.value = _state.value.copy(unexpectedMessages = _state.value.unexpectedMessages + sms)
-                        null
-                    }
+                    is AapsReply.CarbsDone -> addUnexpected(sms)
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
                     // Unrecognized oraz wyniki niemożliwe dla CARBS (BgReport, PumpStatus).
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
+            // Po kodzie (SESSION-12, SESSION-13). SENDING_CODE nie trafia tu: wiadomości są wtedy odkładane.
+            SessionPhase.AWAITING_CONFIRMATION -> {
+                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                return when (reply) {
+                    is AapsReply.CarbsDone ->
+                        if (sms.receivedAtEpochMillis >= checkNotNull(codeSentAt)) {
+                            SessionOutcome.CarbsConfirmed(reply.grams, sms.body)
+                        } else {
+                            addUnexpected(sms)
+                        }
+                    AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.WRONG_CODE, sms.body)
+                    is AapsReply.CarbsAmountMismatch ->
+                        SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, sms.body)
+                    is AapsReply.CodeRequest -> SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, sms.body)
+                    else -> SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, sms.body)
+                }
+            }
             else -> return null
         }
+    }
+
+    /** Wiadomość nieoczekiwana (SESSION-18): trafia do wyniku, nie zmienia fazy ani limitów. Zawsze null. */
+    private fun addUnexpected(sms: IncomingSms): SessionOutcome? {
+        _state.value = _state.value.copy(unexpectedMessages = _state.value.unexpectedMessages + sms)
+        return null
     }
 
     /** Prośba o kod: wyłącza limit odpowiedzi, zaczyna limit przygotowania i czeka na użyteczny kod TOTP. */
