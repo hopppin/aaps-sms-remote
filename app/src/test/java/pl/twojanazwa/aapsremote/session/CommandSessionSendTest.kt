@@ -148,6 +148,15 @@ class CommandSessionSendTest {
     }
 
     @Test
+    fun `SESSION-04 CancellationException z portu wysylania daje SEND_FAILED a nie zawieszenie`() = runTest {
+        sender.failure = kotlinx.coroutines.CancellationException("timeout portu")
+        val session = session(Command.Bg)
+        val result = session.run()
+        assertEquals(SessionOutcome.Failed(FailureReason.SEND_FAILED, null), result.outcome)
+        assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+    }
+
+    @Test
     fun `SESSION-04 wiadomosc po bledzie wysylania nie zmienia wyniku`() = runTest {
         sender.commandResult = SendResult.Failed
         val session = session(Command.Bg)

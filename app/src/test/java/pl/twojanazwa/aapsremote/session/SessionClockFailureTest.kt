@@ -32,4 +32,28 @@ class SessionClockFailureTest {
         assertNull(result.startedAtEpochMillis)
         assertNull(result.finishedAtEpochMillis)
     }
+
+    @Test
+    fun `SESSION-19 zegar rzuca przy odczycie chwili wysylki - Failed INTERNAL_ERROR i ostatni poprawny odczyt`() =
+        runTest {
+            var reads = 0
+            val clock = EpochClock {
+                if (reads++ == 0) SessionTestFixtures.T0 else throw IllegalStateException("zegar")
+            }
+            val session = CommandSession(
+                command = Command.Bg,
+                credentials = null,
+                sender = FakeSmsSender(),
+                incoming = FakeIncomingSmsSource(),
+                clock = clock,
+                totp = UsableTotpProvider(clock),
+                timeSource = testTimeSource,
+            )
+            val result = session.run()
+            assertEquals(SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null), result.outcome)
+            assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+            assertEquals(SessionTestFixtures.T0, result.startedAtEpochMillis)
+            assertNull(result.commandSentAtEpochMillis)
+            assertEquals(SessionTestFixtures.T0, result.finishedAtEpochMillis)
+        }
 }

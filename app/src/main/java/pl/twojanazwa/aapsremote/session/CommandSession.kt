@@ -3,6 +3,7 @@ package pl.twojanazwa.aapsremote.session
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,7 +82,8 @@ class CommandSession(
                     try {
                         incoming.messages().collect { events.trySend(Event.Message(it)) }
                     } catch (e: CancellationException) {
-                        throw e
+                        // Anulowana sesja przepuszcza wyjątek; cudzy CancellationException nie kończy sesji.
+                        ensureActive()
                     } catch (e: Exception) {
                         // Błędy strumienia są połykane (SESSION-05).
                     }
@@ -90,7 +92,9 @@ class CommandSession(
                     val result = try {
                         sender.send(OutgoingSms.CommandText(command.smsText()))
                     } catch (e: CancellationException) {
-                        throw e
+                        // Anulowana sesja przepuszcza wyjątek; CancellationException z samego portu = błąd wysyłania.
+                        ensureActive()
+                        SendResult.Failed
                     } catch (e: Exception) {
                         SendResult.Failed
                     }
