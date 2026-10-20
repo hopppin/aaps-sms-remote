@@ -87,6 +87,7 @@ class SessionStateFlowTest {
                 ),
                 states.map { it.phase },
             )
+            assertEquals(result, states.last().result)
             assertEquals(carbsCommand(1), result.command)
             assertEquals(SessionTestFixtures.T0, result.startedAtEpochMillis)
             assertEquals(SessionTestFixtures.T0 + 1000, result.commandSentAtEpochMillis)
