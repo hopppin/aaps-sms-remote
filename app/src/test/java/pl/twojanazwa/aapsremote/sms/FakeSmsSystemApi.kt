@@ -26,6 +26,7 @@ class FakeSmsSystemApi(
     val totalCalls: Int get() = divideCalls + registerCalls + sendPartsCalls
 
     private var onPartResult: ((Int, Boolean) -> Unit)? = null
+    var onRegister: (() -> Unit)? = null
 
     override fun divideMessage(text: String): List<String> {
         divideCalls++
@@ -39,11 +40,13 @@ class FakeSmsSystemApi(
         registerCalls++
         registerException?.let { throw it }
         this.onPartResult = onPartResult
-        return object : SentResultsRegistration {
+        val registration = object : SentResultsRegistration {
             override fun unregister() {
                 unregisterCount++
             }
         }
+        onRegister?.invoke()
+        return registration
     }
 
     override fun sendParts(destination: String, parts: List<String>, registration: SentResultsRegistration) {

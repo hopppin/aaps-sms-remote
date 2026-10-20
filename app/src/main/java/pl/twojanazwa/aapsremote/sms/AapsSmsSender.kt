@@ -5,6 +5,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import pl.twojanazwa.aapsremote.session.OutgoingSms
 import pl.twojanazwa.aapsremote.session.SendResult
@@ -23,6 +25,8 @@ class AapsSmsSender @Inject constructor(
     @Suppress("TooGenericExceptionCaught")
     override suspend fun send(message: OutgoingSms): SendResult {
         return try {
+            // SMS-11: anulowana korutyna nie może wysłać SMS.
+            currentCoroutineContext().ensureActive()
             // SMS-12: uprawnienie sprawdzane przy każdym send, przed odczytem numeru.
             if (!permissions.canSend()) return SendResult.Failed
             // SMS-09: numer odczytywany przy każdym wywołaniu.
@@ -57,6 +61,8 @@ class AapsSmsSender @Inject constructor(
             }
             holder.set(registration)
             cont.invokeOnCancellation { registration.unregister() }
+            // SMS-11: anulowanie w trakcie rejestracji – nie wysyłaj.
+            if (!cont.isActive) return@suspendCancellableCoroutine
             try {
                 system.sendParts(destination, parts, registration)
             } catch (e: Exception) {
