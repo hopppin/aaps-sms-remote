@@ -37,6 +37,19 @@ class KeystoreTotpSecretStoreUnavailableTest {
     }
 
     @Test
+    fun `SECRET-10 KEY_GENERATION_FAILED przy odszyfrowaniu daje Unavailable i nic nie usuwa`() = runTest {
+        val s = store(fakeCipher)
+        s.save(s1())
+        val before = storage.record
+        fakeCipher.enqueueDecryptFailure(CryptoFailure.KEY_GENERATION_FAILED)
+        assertEquals(LoadResult.Unavailable, s.load())
+        assertEquals(before, storage.record)
+        assertEquals(0, storage.clearCount)
+        assertEquals(0, fakeCipher.deleteKeyCount)
+        assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
     fun `SECRET-10 wyjatek odczytu magazynu daje Unavailable bez wywolania szyfratora i bez usuwania`() = runTest {
         storage.readError = RuntimeException("test")
         val s = store(fakeCipher)
