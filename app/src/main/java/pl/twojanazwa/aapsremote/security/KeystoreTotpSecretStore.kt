@@ -105,6 +105,7 @@ class KeystoreTotpSecretStore @Inject constructor(
             if (!safeClear()) {
                 DeleteResult.Failed
             } else {
+                _state.value = SecretState.ABSENT
                 try {
                     cipher.deleteKey()
                 } catch (e: CancellationException) {
@@ -112,7 +113,6 @@ class KeystoreTotpSecretStore @Inject constructor(
                 } catch (_: Exception) {
                     // wynik ignorowany
                 }
-                _state.value = SecretState.ABSENT
                 DeleteResult.Deleted
             }
         }

@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.security
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -7,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.otp.TotpSecret
 
@@ -93,5 +95,21 @@ class KeystoreTotpSecretStoreDeleteTest {
         assertEquals(DeleteResult.Failed, s.delete())
         assertEquals(0, fakeCipher.deleteKeyCount)
         assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
+    fun `SECRET-11 anulowanie przy usuwaniu klucza zostawia stan ABSENT`() = runTest {
+        val s = store()
+        s.save(s1())
+        fakeCipher.deleteKeyError = CancellationException("test")
+        var thrown: Throwable? = null
+        try {
+            s.delete()
+        } catch (e: CancellationException) {
+            thrown = e
+        }
+        assertTrue(thrown is CancellationException)
+        assertNull(storage.record)
+        assertEquals(SecretState.ABSENT, s.state.value)
     }
 }
