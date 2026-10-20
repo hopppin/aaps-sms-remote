@@ -139,6 +139,53 @@ class KeystoreTotpSecretStoreFailureTest {
     }
 
     @Test
+    fun `SECRET-17 szyfrator rzucajacy RuntimeException w encrypt daje Failed CRYPTO, nic nie zapisane, kopia wyzerowana`() = runTest {
+        val cipher = FakeSecretCipher().apply { encryptError = RuntimeException("x") }
+        val s = store(cipher)
+        assertEquals(SaveResult.Failed(SaveFailure.CRYPTO), s.save(s1()))
+        assertEquals(0, storage.writeCount)
+        assertTrue(cipher.encryptInputs.single().all { it == 0.toByte() })
+    }
+
+    @Test
+    fun `SECRET-17 szyfrator rzucajacy RuntimeException w decrypt daje Unavailable bez usuwania i bez zmiany stanu`() = runTest {
+        val cipher = FakeSecretCipher()
+        val s = store(cipher)
+        s.save(s1())
+        val before = storage.record
+        cipher.decryptError = RuntimeException("x")
+        assertEquals(LoadResult.Unavailable, s.load())
+        assertEquals(before, storage.record)
+        assertEquals(0, storage.clearCount)
+        assertEquals(0, cipher.deleteKeyCount)
+        assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
+    fun `SECRET-17 szyfrator rzucajacy RuntimeException w deleteKey nie psuje delete ani wyczyszczenia`() = runTest {
+        val cipher = FakeSecretCipher().apply { deleteKeyError = RuntimeException("x") }
+        val s = store(cipher)
+        s.save(s1())
+        assertEquals(DeleteResult.Deleted, s.delete())
+        s.save(s1())
+        cipher.enqueueDecryptFailure(CryptoFailure.CORRUPTED)
+        assertEquals(LoadResult.Invalidated, s.load())
+    }
+
+    @Test
+    fun `SECRET-17 CancellationException z szyfratora jest przepuszczana`() = runTest {
+        val cipher = FakeSecretCipher().apply { encryptError = CancellationException("x") }
+        val s = store(cipher)
+        try {
+            s.save(s1())
+            fail("oczekiwano CancellationException")
+        } catch (_: CancellationException) {
+            // oczekiwane
+        }
+        assertTrue(cipher.encryptInputs.single().all { it == 0.toByte() })
+    }
+
+    @Test
     fun `SECRET-17 CancellationException z odczytu load jest przepuszczana`() = runTest {
         storage.readError = CancellationException("x")
         val s = store(FakeSecretCipher())

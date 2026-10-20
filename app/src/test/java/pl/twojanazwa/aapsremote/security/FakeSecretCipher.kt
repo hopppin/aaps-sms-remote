@@ -21,6 +21,10 @@ class FakeSecretCipher : SecretCipher {
     /** Gdy ustawiony, [deleteKey] go rzuca (po zliczeniu). */
     var deleteKeyError: Exception? = null
 
+    /** Gdy ustawione, [encrypt] / [decrypt] rzucają (po zliczeniu). */
+    var encryptError: Exception? = null
+    var decryptError: Exception? = null
+
     /** Akcja wywoływana w [deleteKey] (np. odczyt licznika magazynu - kolejność wywołań). */
     var onDeleteKey: (() -> Unit)? = null
 
@@ -56,11 +60,13 @@ class FakeSecretCipher : SecretCipher {
         encryptCount++
         encryptInputs += plaintext
         encryptInputSnapshots += plaintext.copyOf()
+        encryptError?.let { throw it }
         return encryptQueue.removeFirstOrNull() ?: transparentEncrypt(plaintext)
     }
 
     private fun decryptImpl(sealed: SealedSecret): DecryptResult {
         decryptCount++
+        decryptError?.let { throw it }
         val result = decryptQueue.removeFirstOrNull() ?: transparentDecrypt(sealed)
         if (result is DecryptResult.Success) decryptOutputs += result.plaintext
         return result
