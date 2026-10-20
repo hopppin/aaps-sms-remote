@@ -53,4 +53,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 002 | [Parser odpowiedzi SMS z AAPS](002-parser-odpowiedzi/spec.md) | `PARSER` | zatwierdzona |
 | 003 | [Katalog poleceń](003-katalog-polecen/spec.md) | `CMD` | zatwierdzona |
 | 004 | [Sesja polecenia](004-sesja-polecenia/spec.md) | `SESSION` | zatwierdzona |
-| 005 | [SMS (wysyłanie i odbiór)](005-sms/spec.md) | `SMS` | szkic |
+| 005 | [SMS (wysyłanie i odbiór)](005-sms/spec.md) | `SMS` | zatwierdzona |

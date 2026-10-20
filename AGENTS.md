@@ -79,7 +79,7 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 ## Bezpieczeństwo
 
 - Nigdy nie loguj sekretu TOTP, kodów TOTP ani PIN-u (także w wyjątkach, `toString()` i komunikatach UI).
-- PIN AAPS nigdy nie jest zapisywany (dysk, DataStore, Room, Keystore). Trzymaj go tylko w pamięci do końca polecenia i potem wyczyść.
+- Aplikacja nigdy nie zapisuje PIN-u AAPS (dysk, DataStore, Room, Keystore). Trzymaj go tylko w pamięci do końca polecenia i potem wyczyść. Wyjątek poza kontrolą aplikacji: system Android zapisuje wysłany SMS z kodem (`<kod><PIN>`) w skrzynce wysłanych, tak jak przy ręcznym wysłaniu ([spec 005](docs/specs/005-sms/spec.md#bezpieczeństwo)).
 - Żadnych prawdziwych sekretów, PIN-ów ani numerów telefonu w repo. W przykładach używaj fikcyjnych danych.
 - W testach TOTP używaj wyłącznie wektorów testowych z RFC 6238.
 - Aplikacja nigdy nie odsyła kodu, jeśli odpowiedź AAPS nie zgadza się z poleceniem (inny numer nadawcy, inna ilość, nierozpoznana treść, odpowiedź sprzed wysłania). W razie wątpliwości: stop i komunikat dla użytkownika.

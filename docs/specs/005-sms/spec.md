@@ -1,6 +1,6 @@
 # Spec 005: SMS (wysyłanie i odbiór)
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `SMS`
 - **Pakiety:** `sms`; `otp` (tylko wiązanie Hilt dla `EpochClock`, jeśli jeszcze nie istnieje – design, zadanie 6)
 - **Powiązane:** [docs/plan.md](../../plan.md#wybór-technologii), [docs/plan.md](../../plan.md#parsowanie-odpowiedzi-i-obsługa-błędów); [Spec 004: Sesja polecenia](../004-sesja-polecenia/spec.md) (porty `SmsSender`, `IncomingSmsSource`, sekcja [Kontrakt portów](../004-sesja-polecenia/spec.md#kontrakt-portów-wymagania-dla-spec-sms) K1–K6); [Spec 001: Generator TOTP](../001-totp/spec.md) (`EpochClock`); [stan prac – ustalenia](../../stan-prac.md#ustalenia-z-użytkownikiem-decyzje); przyszłe specyfikacje `data` (przechowywanie numeru AAPS), `ui` (prośba o uprawnienia, komunikaty)
@@ -22,14 +22,21 @@ Sesja polecenia (Spec 004) wysyła i odbiera SMS-y wyłącznie przez dwa porty: 
 
 **Poza zakresem:**
 
-- **Wybór karty SIM.** Wysyłanie zawsze z domyślnej karty SMS systemu, bez ustawienia w aplikacji; odbiór z dowolnej karty. To świadome odstępstwo od [docs/plan.md](../../plan.md#wybór-technologii) (wiersz „Wysyłanie SMS: `SmsManager` z wyborem karty SIM przez `SubscriptionManager`”, ekran konfiguracji „wybór karty SIM”, `data` „karta SIM”) – decyzja użytkownika dla MVP. Plan zostanie poprawiony osobno (propozycja w opisie PR); wybór karty może wrócić jako osobna specyfikacja.
-- Usługa pierwszoplanowa, receiver w manifeście i odbiór przy zabitym procesie. Zabity proces = sesja przepada (otwarte pytanie P2 dotyczy procesu w stanie „cached”).
+- **Wybór karty SIM.** Wysyłanie zawsze z domyślnej karty SMS systemu, bez ustawienia w aplikacji; odbiór z dowolnej karty. To świadome odstępstwo od [docs/plan.md](../../plan.md#wybór-technologii) (wiersz „Wysyłanie SMS: `SmsManager` z wyborem karty SIM przez `SubscriptionManager`”, ekran konfiguracji „wybór karty SIM”, `data` „karta SIM”) – decyzja użytkownika dla MVP. Plan poprawiony w tym samym PR; wybór karty może wrócić jako osobna specyfikacja.
+- Usługa pierwszoplanowa, receiver w manifeście i odbiór przy zabitym procesie. Zabity proces = sesja przepada. Usługa pierwszoplanowa (odbiór i limity przy aplikacji w tle lub w stanie „cached”) – przyszła osobna specyfikacja.
 - Ekrany, prośba o uprawnienia, komunikaty i ich teksty – spec `ui`.
 - Przechowywanie i edycja numeru AAPS – spec `data`.
 - Rozszerzenie `SendResult.Failed` o przyczynę błędu (np. brak zasięgu) – ewentualna zmiana Spec 004 (sekcja „Przyszłe zmiany”). Interfejsy z `session/SmsPorts.kt` nie są zmieniane.
 - `READ_SMS`, bycie domyślną aplikacją SMS, odczyt skrzynki SMS, raporty doręczenia (`deliveryIntent`).
 - Obsługa wiadomości, gdy żadna sesja nie zbiera strumienia (wtedy receiver nie jest zarejestrowany).
 - SMS-y binarne (`DATA_SMS_RECEIVED`), MMS, RCS.
+
+## Założenia i zależności
+
+- **Aplikacja na pierwszym planie w trakcie polecenia (założenie MVP).** Od wysłania polecenia do wyniku sesji aplikacja jest na pierwszym planie, a ekran przebiegu polecenia trzyma ekran włączony – wymaganie dla spec `ui`. Powód: na Androidzie 14+ system może odkładać broadcasty do receiverów rejestrowanych dynamicznie i zamrażać proces w stanie „cached”, więc odbiór (SMS-07) i limity sesji przy aplikacji w tle nie są gwarantowane. Ta specyfikacja nie obiecuje odbioru przy wygaszonym ekranie ani w tle; odbiór w tle (usługa pierwszoplanowa) to przyszła osobna specyfikacja.
+- **Numer AAPS** dostarcza `AapsNumberProvider` (implementacja: spec `data`).
+- **Prośba o uprawnienia** i komunikaty o ich braku – spec `ui`, na podstawie `SmsPermissions` (SMS-14).
+- **Testy:** logika czysta w testach JVM (JUnit 5); cienka warstwa Androida bez Robolectric i `androidTest`, sprawdzana ręcznie na telefonie według listy W1–W7 (sekcja „Weryfikacja na urządzeniu”), gdy powstanie `ui`.
 
 ## Pojęcia
 
@@ -192,7 +199,7 @@ Anulowanie korutyny wywołującej `send` przerywa czekanie na wynik: `send` koń
 
 ### SMS-13: Odpowiedź z kodem nie jest przechowywana (K6)
 
-Port wysyłania tworzy tekst odpowiedzi z kodem (`String` z `CodeReply.chars`) tylko jako zmienną lokalną wywołania i przekazuje go wyłącznie do `SmsManager` (przez warstwę systemową). Po powrocie z `send` (dowolny wynik, wyjątek, anulowanie) żaden obiekt pakietu `sms` nie trzyma referencji do tablicy `chars`, tekstu ani jego części: wszystkie pola klas wysyłania są niezmienne i żadne nie może przechować treści (w praktyce: zależności – dostawca numeru, uprawnienia, warstwa systemowa, `Context`). Treść nie trafia do logów, wyjątków ani `toString()`. Ograniczenie: `String` w JVM nie da się wyzerować; zostaje w pamięci do odśmiecenia, a kopie poza aplikacją (system, `SmsManager`, skrzynka SMS – otwarte pytanie P1) są poza jej kontrolą.
+Port wysyłania tworzy tekst odpowiedzi z kodem (`String` z `CodeReply.chars`) tylko jako zmienną lokalną wywołania i przekazuje go wyłącznie do `SmsManager` (przez warstwę systemową). Po powrocie z `send` (dowolny wynik, wyjątek, anulowanie) żaden obiekt pakietu `sms` nie trzyma referencji do tablicy `chars`, tekstu ani jego części: wszystkie pola klas wysyłania są niezmienne i żadne nie może przechować treści (w praktyce: zależności – dostawca numeru, uprawnienia, warstwa systemowa, `Context`). Treść nie trafia do logów, wyjątków ani `toString()`. Ograniczenie: `String` w JVM nie da się wyzerować; zostaje w pamięci do odśmiecenia, a kopie poza aplikacją (system, `SmsManager`, skrzynka wysłanych – ryzyko zaakceptowane, sekcja Bezpieczeństwo) są poza jej kontrolą.
 
 **Kryteria akceptacji:**
 
@@ -263,7 +270,7 @@ Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej fu
 
 - **Nie odsyłamy kodu, gdy odpowiedź nie pochodzi od AAPS.** Inny numer nadawcy odcina SMS-02/SMS-04; nadawca alfanumeryczny nigdy nie pasuje; nieprawidłowa konfiguracja numeru blokuje odbiór i wysyłanie. Ponowne dostarczenie tej samej wiadomości blokuje SMS-06 (K2); odpowiedź sprzed wysłania polecenia odrzuca sesja dzięki chwili odbioru z tego samego zegara (SMS-05, K1). Receiver `SMS_RECEIVED` przyjmuje broadcasty tylko od nadawcy z uprawnieniem `android.permission.BROADCAST_SMS` (design), więc inna aplikacja nie podsunie fałszywego SMS-a.
 - **Znane ograniczenie porównania po 9 cyfrach** (decyzja użytkownika): numer z inną kierunkową i tą samą końcówką (np. `+17700900123` wobec `+447700900123`) pasuje. Ryzyko jest małe wobec ryzyka, które już istnieje: AAPS sam przyjmuje polecenia tylko z dozwolonych numerów, a podszycie się pod numer nadawcy SMS jest możliwe niezależnie od sposobu porównania. Ochroną kodu pozostaje dokładne dopasowanie treści i ilości (Spec 002, Spec 004).
-- **PIN nigdy nie jest zapisywany przez aplikację.** Odpowiedź z kodem istnieje w `sms` tylko jako zmienna lokalna wywołania (SMS-13); port nie ma pól z danymi, nie modyfikuje tablicy sesji, nie loguje. Ograniczenie JVM: kopii `String` nie da się wyzerować. Kopia w systemie Androida (skrzynka „wysłane”) – otwarte pytanie P1.
+- **PIN nigdy nie jest zapisywany przez aplikację.** Odpowiedź z kodem istnieje w `sms` tylko jako zmienna lokalna wywołania (SMS-13); port nie ma pól z danymi, nie modyfikuje tablicy sesji, nie loguje. Ograniczenie JVM: kopii `String` nie da się wyzerować. **Ryzyko zaakceptowane przez użytkownika (P1):** aplikacja nie przechowuje PIN-u, ale system Android zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (dostawca SMS), tak jak przy ręcznym wysłaniu kodu z aplikacji SMS. Aplikacja nie może tego wyłączyć ani usunąć wpisu bez roli domyślnej aplikacji SMS (poza zakresem). Do potwierdzenia na telefonie (W7); AGENTS.md opisuje ten wyjątek.
 - **Nie logujemy treści, kodów, PIN-u ani numerów** (SMS-16).
 - **Brak automatycznego ponawiania.** Jedno wywołanie `send` = jedno zlecenie wysłania; port nie ponawia po błędzie ani po braku wyniku (SMS-10, SMS-12). Ponawianie wykluczone także w sesji (SESSION-20).
 - **Minimum uprawnień:** tylko `SEND_SMS` i `RECEIVE_SMS`, bez `READ_SMS` i bez roli domyślnej aplikacji SMS (SMS-15). `allowBackup=false` bez zmian.
@@ -279,7 +286,7 @@ Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej fu
 
 ## Weryfikacja na urządzeniu
 
-Fakty o zachowaniu Androida przyjęte w tej specyfikacji na podstawie dokumentacji, do potwierdzenia na telefonie (etap 2 planu) w ramach zadań 5 i 6 z [design.md](design.md#podział-na-zadania). Wynik niezgodny z założeniem = zmiana spec, nie obejście w kodzie.
+Fakty o zachowaniu Androida przyjęte w tej specyfikacji na podstawie dokumentacji, do potwierdzenia na telefonie (etap 2 planu) ręcznie, gdy powstanie `ui` (decyzja P3: bez Robolectric i `androidTest`; zadania 5 i 6 z [design.md](design.md#podział-na-zadania)). Wynik niezgodny z założeniem = zmiana spec, nie obejście w kodzie.
 
 | Nr | Do sprawdzenia | Wymaganie |
 | --- | --- | --- |
@@ -289,12 +296,19 @@ Fakty o zachowaniu Androida przyjęte w tej specyfikacji na podstawie dokumentac
 | W4 | Długa odpowiedź (> 160 znaków GSM) przychodzi w jednym broadcaście z częściami w kolejności | SMS-03 |
 | W5 | Zachowanie przy telefonie dual SIM bez ustawionej domyślnej karty SMS („pytaj za każdym razem”) – wynik trafia jako `Failed` albo zawieszenie (bez zmiany wymagań) | SMS-09, SMS-10 |
 | W6 | Przyznanie `SEND_SMS`/`RECEIVE_SMS` aplikacji instalowanej z pliku APK (ograniczone uprawnienia na nowszych Androidach) – informacja dla spec `ui` | SMS-14 |
+| W7 | Wysłana odpowiedź z kodem `<kod><PIN>` pojawia się w skrzynce wysłanych domyślnej aplikacji SMS (ryzyko zaakceptowane, sekcja Bezpieczeństwo) | SMS-13 |
 
 ## Otwarte pytania
 
-- [ ] **P1. Kopia odpowiedzi z kodem w skrzynce SMS.** Według dokumentacji Androida (zmiany SMS w Androidzie 4.4) system sam zapisuje do dostawcy SMS (folder „wysłane” domyślnej aplikacji SMS) każdą wiadomość wysłaną przez `SmsManager` aplikacji, która nie jest domyślną aplikacją SMS. Odpowiedź `<TOTP><PIN>` z PIN-em trafiłaby więc na dysk poza kontrolą aplikacji – tak samo jak przy ręcznym wysłaniu kodu z aplikacji SMS. Wysyłanie bez zapisu (`sendTextMessageWithoutPersisting`) wymaga uprawnień systemowych, a usunięcie wpisu – roli domyślnej aplikacji SMS (poza zakresem). Czy akceptujesz to ryzyko szczątkowe (wpis w sekcji Bezpieczeństwo i doprecyzowanie AGENTS.md: „aplikacja nie zapisuje PIN-u; kopię wysłanego SMS-a przechowuje system”), czy szukamy innego rozwiązania? Do potwierdzenia na urządzeniu.
-- [ ] **P2. Odbiór i limity przy wygaszonym ekranie na Androidzie 14+.** Decyzja „działa przy wygaszonym ekranie, dopóki żyje proces” zakłada, że proces pracuje. Według dokumentacji zmian Androida 14 system może odkładać broadcasty do receiverów rejestrowanych dynamicznie, gdy aplikacja jest w stanie „cached” (np. po wygaszeniu ekranu bez usługi pierwszoplanowej), a procesy w tym stanie są zamrażane. Wtedy prośba o kod i odpowiedzi mogłyby dotrzeć z opóźnieniem (chwila odbioru = chwila `onReceive`, późniejsza niż faktyczna), a liczniki sesji mogłyby stać. Czy akceptujesz w MVP wymóg „ekran włączony z aplikacją na wierzchu w trakcie polecenia” (komunikat w `ui`), czy usługa pierwszoplanowa ma wejść do MVP (osobna spec)? Do sprawdzenia na telefonie (nie zgaduję, czy `SMS_RECEIVED` jest z tego wyjęty).
-- [ ] **P3. Testy cienkiej warstwy Androida.** W projekcie nie ma Robolectric ani testów instrumentalnych; logika czysta ma testy JUnit 5, a klasy z `android.*` (receiver, `SmsManager`, `checkSelfPermission`) nie dadzą się uruchomić w testach jednostkowych bez dodatkowej biblioteki. Propozycja: warstwa Androida bez testów automatycznych, sprawdzana listą W1–W6 na telefonie, opisaną w PR; test manifestu (SMS-15) jako zwykły test JVM. Alternatywy: Robolectric (wymaga JUnit 4 przez silnik vintage) albo testy `androidTest` na emulatorze (CI ich nie uruchamia). Którą opcję wybierasz?
+Brak. Decyzje użytkownika przyjęte przy tej specyfikacji:
+
+- [x] **P1. Kopia odpowiedzi z kodem w skrzynce SMS.** Według dokumentacji Androida (zmiany SMS w Androidzie 4.4) system sam zapisuje do dostawcy SMS (folder „wysłane”) każdą wiadomość wysłaną przez `SmsManager` aplikacji, która nie jest domyślną aplikacją SMS, więc odpowiedź `<kod><PIN>` trafia na dysk poza kontrolą aplikacji. Rozstrzygnięte: użytkownik akceptuje to ryzyko szczątkowe (tak samo jest przy ręcznym wysłaniu kodu z aplikacji SMS). Opis w sekcji Bezpieczeństwo, doprecyzowanie w AGENTS.md, potwierdzenie na telefonie – W7.
+- [x] **P2. Odbiór i limity przy wygaszonym ekranie na Androidzie 14+.** System może odkładać broadcasty do receiverów rejestrowanych dynamicznie i zamrażać proces aplikacji w stanie „cached”. Rozstrzygnięte: założenie MVP – w trakcie polecenia aplikacja jest na pierwszym planie, a ekran przebiegu polecenia trzyma ekran włączony (wymaganie dla spec `ui`, sekcja „Założenia i zależności”). Usługa pierwszoplanowa – przyszła osobna specyfikacja (Poza zakresem).
+- [x] **P3. Testy cienkiej warstwy Androida.** Rozstrzygnięte: bez Robolectric i bez `androidTest`. Logika czysta (`sms`) ma testy JVM (JUnit 5); cienka warstwa Androida (`sms.platform`) jest sprawdzana ręcznie na telefonie według listy W1–W7, gdy powstanie `ui`. Test manifestu (SMS-15) jest zwykłym testem JVM.
+- [x] Wybór karty SIM: tylko domyślna karta SMS systemu, odbiór z dowolnej karty (Poza zakresem; `docs/plan.md` poprawiony).
+- [x] Numer AAPS: porównanie po ostatnich 9 cyfrach, nadawca z literami nie pasuje (SMS-01, SMS-02).
+- [x] Uprawnienia: brak `SEND_SMS` → `Failed` bez wyjątku; brak `RECEIVE_SMS` → strumień nic nie dostarcza; prośba o uprawnienia w `ui` (SMS-08, SMS-12, SMS-14).
+- [x] Odbiór: receiver dynamiczny tylko na czas zbierania strumienia, bez receivera w manifeście (SMS-07, SMS-15).
 
 ## Przyszłe zmiany (nie blokują)
 

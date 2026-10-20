@@ -26,7 +26,7 @@ Wybór: natywnie w **Kotlinie z Jetpack Compose**. SMS i Keystore to API Android
 | --- | --- |
 | Język / UI | Kotlin, Jetpack Compose, Material 3 |
 | Min. wersja Androida | API 28 (Android 9), cel: najnowsze API |
-| Wysyłanie SMS | `SmsManager` (z wyborem karty SIM przez `SubscriptionManager`) |
+| Wysyłanie SMS | `SmsManager` z domyślnej karty SMS systemu, bez wyboru karty w aplikacji (ustalenie użytkownika, spec 005) |
 | Odbiór SMS | `BroadcastReceiver` na `SMS_RECEIVED` |
 | TOTP | własna implementacja RFC 6238 (HMAC-SHA1, 30 s, 6 cyfr) albo biblioteka `kotlin-onetimepassword` |
 | Skan kodu QR | CameraX + ML Kit Barcode Scanning |
@@ -74,7 +74,7 @@ Całość to jedna aplikacja z wyraźnie rozdzielonymi warstwami. Logikę potwie
 | `parser` | rozpoznawanie odpowiedzi AAPS (prośba o kod, sukces, błąd, odrzucenie) na podstawie wzorców |
 | `otp` | generowanie TOTP z sekretu, kontrola czasu ważności kodu |
 | `security` | Keystore, szyfrowanie sekretu TOTP, obsługa PIN-u AAPS w pamięci |
-| `data` | ustawienia (numer AAPS, karta SIM), historia poleceń w Room |
+| `data` | ustawienia (numer AAPS), historia poleceń w Room |
 
 Katalog poleceń jest danymi, a nie kodem rozsianym po ekranach. Dodanie bolusa czy zmiany celu w przyszłości to nowy wpis w katalogu, nowe wzorce w parserze i testy.
 
@@ -115,11 +115,11 @@ Pięć ekranów wystarczy na MVP.
 
 | Ekran | Zawartość |
 | --- | --- |
-| Konfiguracja (pierwsze uruchomienie) | numer telefonu AAPS, wybór karty SIM, skan QR sekretu TOTP, test połączenia `BG` |
+| Konfiguracja (pierwsze uruchomienie) | numer telefonu AAPS, skan QR sekretu TOTP, test połączenia `BG` |
 | Polecenia (główny) | duże przyciski BG, PUMP, CARBS; ostatnia znana glikemia i czas odpowiedzi |
 | CARBS | pole ilości (klawiatura numeryczna, szybkie wartości 10/20/30 g), ekran podsumowania z polem PIN AAPS (maskowane), przycisk Zatwierdź |
 | Przebieg polecenia | kroki na żywo: wysłano → AAPS prosi o kod → kod wysłany → wykonano; treść SMS z AAPS |
-| Historia i ustawienia | lista poleceń z wynikiem i czasem; zmiana numeru, SIM, ponowny skan QR, limit oczekiwania |
+| Historia i ustawienia | lista poleceń z wynikiem i czasem; zmiana numeru, ponowny skan QR, limit oczekiwania |
 
 ## Etapy realizacji
 
@@ -134,7 +134,7 @@ Sześć etapów, każdy kończy się czymś, co da się sprawdzić na telefonie.
 **Etap 2. Prototyp techniczny**
 
 - [ ] Projekt w Android Studio (Kotlin, Compose, Hilt)
-- [ ] Wysłanie SMS z wybranej karty SIM
+- [ ] Wysłanie SMS z domyślnej karty SMS systemu
 - [ ] Odbiór SMS z filtrem po numerze
 - [ ] Generator TOTP i porównanie kodów z Authenticatorem w tej samej sekundzie
 
@@ -177,5 +177,5 @@ Wdrożenie: podpisany APK z własnym kluczem, instalacja z pliku, aktualizacje t
 - [ ] Przykładowe SMS-y: prośba o kod dla CARBS, sukces, błąd (do etapu 1)
 - [ ] Jak przenieść sekret TOTP: ponowne wygenerowanie QR w AAPS czy eksport z obecnego Authenticatora?
 - [x] Domyślne potwierdzenie: biometria z zapisanym PIN-em czy ręczny PIN za każdym razem? → ręczny PIN AAPS za każdym razem, bez biometrii.
-- [ ] Telefon nadawcy: jedna karta SIM czy dual SIM, i czy jego numer jest na liście dozwolonych w AAPS?
+- [ ] Telefon nadawcy: czy jego numer jest na liście dozwolonych w AAPS? (Karta SIM: w MVP zawsze domyślna karta SMS systemu – spec 005.)
 - [x] Maksymalna ilość CARBS do wpisania w aplikacji (dodatkowy limit poza AAPS)? → 1–50 g, powyżej 40 g dodatkowe potwierdzenie (spec 003).
