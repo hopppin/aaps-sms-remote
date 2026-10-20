@@ -10,7 +10,11 @@ class FakeSmsBroadcastRegistrar : SmsBroadcastRegistrar {
         private set
     private var handler: ((List<RawSmsPart>) -> Unit)? = null
 
+    /** Jeśli ustawiony, [register] rzuca ten wyjątek (symulacja np. SecurityException). */
+    var registerException: Exception? = null
+
     override fun register(onBroadcast: (List<RawSmsPart>) -> Unit) {
+        registerException?.let { throw it }
         registerCount++
         handler = onBroadcast
         isRegistered = true

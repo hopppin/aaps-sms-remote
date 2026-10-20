@@ -28,8 +28,8 @@ class IncomingSmsHub @Inject constructor(
 
     override fun messages(): Flow<IncomingSms> = flow {
         val channel = Channel<IncomingSms>(Channel.UNLIMITED)
-        join(channel)
         try {
+            join(channel)
             for (sms in channel) emit(sms)
         } finally {
             leave(channel)

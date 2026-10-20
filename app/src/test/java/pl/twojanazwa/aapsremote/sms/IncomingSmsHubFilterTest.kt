@@ -1,6 +1,8 @@
 package pl.twojanazwa.aapsremote.sms
 
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -55,6 +57,28 @@ class IncomingSmsHubFilterTest {
         f.registrar.deliver(RawSmsPart("70090012", AapsSamples.bg, 2L))
         runCurrent()
         assertTrue(received.isEmpty())
+    }
+
+    @Test
+    fun `SMS-04 po nieudanej rejestracji osierocony kanal nie blokuje wyrejestrowania`() = runTest {
+        val f = HubFixture()
+        f.registrar.registerException = SecurityException("odmowa")
+        val failed = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            runCatching { f.hub.messages().collect { } }
+        }
+        runCurrent()
+        assertTrue(failed.isCompleted)
+
+        f.registrar.registerException = null
+        val received = mutableListOf<IncomingSms>()
+        val second = f.collect(backgroundScope, received)
+        f.registrar.deliver(RawSmsPart(aaps, AapsSamples.bg, 1L))
+        runCurrent()
+        assertEquals(listOf(AapsSamples.bg), received.map { it.body })
+
+        second.cancel()
+        runCurrent()
+        assertEquals(1, f.registrar.unregisterCount)
     }
 
     @Test
