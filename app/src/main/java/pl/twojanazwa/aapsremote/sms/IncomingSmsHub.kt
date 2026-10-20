@@ -11,13 +11,14 @@ import pl.twojanazwa.aapsremote.session.IncomingSmsSource
 
 /**
  * Implementacja [IncomingSmsSource] (SMS-04 – SMS-06). Jedna na aplikację.
- * Kanał `UNLIMITED` na kolektora, jedna rejestracja receivera. Uprawnienia i wyjątki
- * rejestratora (SMS-07, SMS-08) obsłuży osobne zadanie – [permissions] jest jeszcze nieużywane.
+ * Kanał `UNLIMITED` na kolektora, jedna rejestracja receivera. Brak `RECEIVE_SMS` albo wyjątek
+ * rejestratora (SMS-07, SMS-08) nie przerywa strumienia: kolektor czeka bez wiadomości,
+ * a kolejny kolektor ponawia sprawdzenie uprawnienia i rejestrację.
  */
 @Singleton
 class IncomingSmsHub @Inject constructor(
     private val registrar: SmsBroadcastRegistrar,
-    @Suppress("unused") private val permissions: SmsPermissions,
+    private val permissions: SmsPermissions,
     private val numberProvider: AapsNumberProvider,
     private val clock: EpochClock,
     private val registry: DeliveredSmsRegistry,
@@ -39,11 +40,22 @@ class IncomingSmsHub @Inject constructor(
     private fun join(channel: Channel<IncomingSms>) {
         synchronized(lock) {
             subscribers.add(channel)
-            if (!registered) {
-                registrar.register(::onBroadcast)
-                registered = true
+            if (!registered && hasReceivePermission()) {
+                try {
+                    registrar.register(::onBroadcast)
+                    registered = true
+                } catch (e: Exception) {
+                    // Rejestracja nieudana (np. SecurityException): kolektor czeka bez wiadomości.
+                }
             }
         }
+    }
+
+    /** Wyjątek z [SmsPermissions.canReceive] traktowany jest jak brak uprawnienia. */
+    private fun hasReceivePermission(): Boolean = try {
+        permissions.canReceive()
+    } catch (e: Exception) {
+        false
     }
 
     private fun leave(channel: Channel<IncomingSms>) {
@@ -52,7 +64,11 @@ class IncomingSmsHub @Inject constructor(
             channel.close()
             if (subscribers.isEmpty() && registered) {
                 registered = false
-                registrar.unregister()
+                try {
+                    registrar.unregister()
+                } catch (e: Exception) {
+                    // Wyrejestrowanie nieudane (np. IllegalArgumentException): kończymy zwykłym anulowaniem.
+                }
             }
         }
     }

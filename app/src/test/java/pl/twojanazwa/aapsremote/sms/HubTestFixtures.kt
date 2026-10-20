@@ -35,8 +35,9 @@ class HubFixture(
     val numberProvider: MutableNumberProvider = MutableNumberProvider(AAPS),
     val registry: DeliveredSmsRegistry = DeliveredSmsRegistry(),
     val registrar: FakeSmsBroadcastRegistrar = FakeSmsBroadcastRegistrar(),
+    val permissions: FakeSmsPermissions = FakeSmsPermissions(),
 ) {
-    val hub = IncomingSmsHub(registrar, FakeSmsPermissions(), numberProvider, clock, registry)
+    val hub = IncomingSmsHub(registrar, permissions, numberProvider, clock, registry)
 
     /** Kolektor dołączający synchronicznie; zebrane wiadomości trafiają do [received]. */
     fun collect(scope: CoroutineScope, received: MutableList<IncomingSms>): Job =

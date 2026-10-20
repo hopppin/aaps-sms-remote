@@ -67,7 +67,7 @@ class IncomingSmsHubFilterTest {
             runCatching { f.hub.messages().collect { } }
         }
         runCurrent()
-        assertTrue(failed.isCompleted)
+        assertTrue(failed.isActive) // SMS-08: wyjątek rejestracji jest połykany, kolektor czeka
 
         f.registrar.registerException = null
         val received = mutableListOf<IncomingSms>()
@@ -77,6 +77,7 @@ class IncomingSmsHubFilterTest {
         assertEquals(listOf(AapsSamples.bg), received.map { it.body })
 
         second.cancel()
+        failed.cancel()
         runCurrent()
         assertEquals(1, f.registrar.unregisterCount)
     }
