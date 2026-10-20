@@ -5,6 +5,7 @@ import java.util.Base64
 /** SECRET-03. Tablice nie są kopiowane (szyfrogram nie jest tajny), toString() redagowane (SECRET-15). */
 class SealedSecret(val version: Byte, val iv: ByteArray, val ciphertext: ByteArray) {
     init {
+        require(version == SealedSecretFormat.VERSION_1) { "invalid version" }
         require(iv.size == SealedSecretFormat.IV_LENGTH) { "invalid iv length" }
         require(ciphertext.size >= SealedSecretFormat.MIN_CIPHERTEXT_LENGTH) { "invalid ciphertext length" }
     }

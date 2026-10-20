@@ -69,6 +69,14 @@ class SealedSecretFormatTest {
     }
 
     @Test
+    fun `SECRET-03 konstruktor odrzuca wersje inna niz 0x01`() {
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            SealedSecret(2, ByteArray(12), ByteArray(17))
+        }
+        assertEquals("invalid version", ex.message)
+    }
+
+    @Test
     fun `SECRET-03 konstruktor odrzuca szyfrogram krotszy niz 17 bajtow`() {
         assertThrows(IllegalArgumentException::class.java) {
             SealedSecret(SealedSecretFormat.VERSION_1, ByteArray(12), ByteArray(16))
