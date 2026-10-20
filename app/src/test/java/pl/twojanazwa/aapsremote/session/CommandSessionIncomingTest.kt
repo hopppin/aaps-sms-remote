@@ -84,11 +84,12 @@ class CommandSessionIncomingTest {
         )
         val run = async { session.run() }
         runCurrent()
-        advanceTimeBy(1000)
-        source.emit(IncomingSms(AapsSamples.bg, SessionTestFixtures.T0 + 2000))
+        advanceTimeBy(2000)
+        runCurrent()
+        // K1: znacznik odbioru = zegar w chwili emisji (T0 + 2000).
+        source.emit(IncomingSms(AapsSamples.bg, clock.nowEpochMillis()))
         runCurrent()
         assertEquals(SessionPhase.SENDING_COMMAND, session.state.value.phase)
-        advanceTimeBy(1000)
         gate.complete(Unit)
         runCurrent()
         val result = run.await()
