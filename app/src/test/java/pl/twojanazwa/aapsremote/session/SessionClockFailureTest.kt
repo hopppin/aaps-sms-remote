@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
+import pl.twojanazwa.aapsremote.parser.AapsSamples
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SessionClockFailureTest {
@@ -71,6 +72,29 @@ class SessionClockFailureTest {
         assertTrue(sender.sentCodeCopies.isEmpty())
         assertEquals(SessionTestFixtures.T0, result.finishedAtEpochMillis)
     }
+
+    @Test
+    fun `SESSION-19 zegar rzuca od 60001 po wyslaniu kodu - potwierdzenie w 120000 daje CarbsConfirmed i chwile 60000`() =
+        runTest {
+            val sender = FakeSmsSender()
+            val source = FakeIncomingSmsSource()
+            val clock = EpochClock {
+                if (testScheduler.currentTime > 60_000) {
+                    throw IllegalStateException("zegar")
+                }
+                SessionTestFixtures.T0 + testScheduler.currentTime
+            }
+            val session = testSession(carbsCommand(1), sender, source, SessionTestFixtures.credentials(), clock = clock)
+            val run = async { session.run() }
+            runCurrent()
+            requestCodeAt(source, 60_000)
+            assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+            deliverAt(source, 120_000, AapsSamples.carbsDone)
+            val result = run.await()
+            assertEquals(SessionOutcome.CarbsConfirmed(1, AapsSamples.carbsDone), result.outcome)
+            assertEquals(SessionPhase.FINISHED, session.state.value.phase)
+            assertEquals(SessionTestFixtures.T0 + 60_000, result.finishedAtEpochMillis)
+        }
 
     @Test
     fun `SESSION-19 zegar rzuca przy odczycie chwili wysylki - Failed INTERNAL_ERROR i ostatni poprawny odczyt`() =

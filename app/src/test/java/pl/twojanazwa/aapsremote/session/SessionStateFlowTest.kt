@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.testTimeSource
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
@@ -52,6 +53,55 @@ class SessionStateFlowTest {
             expectNoEvents()
         }
         run.await()
+    }
+
+    @Test
+    fun `SESSION-21 CARBS 1 pelny przebieg - fazy i pola wyniku`() = runTest {
+        sender.delayMillis = 1000
+        val session = testSession(carbsCommand(1), sender, source, SessionTestFixtures.credentials())
+        val states = mutableListOf<SessionState>()
+        session.state.test {
+            val run = async { session.run() }
+            states += awaitItem()
+            runCurrent()
+            states += awaitItem()
+            advanceTimeBy(1000)
+            runCurrent()
+            states += awaitItem()
+            assertEquals(SessionPhase.AWAITING_CODE_REQUEST, states.last().phase)
+            deliverAt(source, 60_000, AapsSamples.carbsCodeRequest)
+            states += awaitItem()
+            states += awaitItem()
+            advanceTimeBy(1000)
+            runCurrent()
+            states += awaitItem()
+            deliverAt(source, 120_000, AapsSamples.carbsDone)
+            states += awaitItem()
+            expectNoEvents()
+            val result = run.await()
+            assertEquals(
+                listOf(
+                    SessionPhase.NOT_STARTED, SessionPhase.SENDING_COMMAND, SessionPhase.AWAITING_CODE_REQUEST,
+                    SessionPhase.PREPARING_CODE, SessionPhase.SENDING_CODE, SessionPhase.AWAITING_CONFIRMATION,
+                    SessionPhase.FINISHED,
+                ),
+                states.map { it.phase },
+            )
+            assertEquals(result, states.last().result)
+            assertEquals(carbsCommand(1), result.command)
+            assertEquals(SessionTestFixtures.T0, result.startedAtEpochMillis)
+            assertEquals(SessionTestFixtures.T0 + 1000, result.commandSentAtEpochMillis)
+            assertEquals(SessionTestFixtures.T0 + 61_000, result.codeSentAtEpochMillis)
+            assertEquals(SessionTestFixtures.T0 + 120_000, result.finishedAtEpochMillis)
+            assertEquals(SessionOutcome.CarbsConfirmed(1, AapsSamples.carbsDone), result.outcome)
+            // SESSION-21 kryterium 3: ani PIN, ani kod TOTP w polach tekstowych wyniku i stanu.
+            val texts = states.map { it.toString() } + result.toString() + result.outcome.toString() +
+                (result.outcome as SessionOutcome.CarbsConfirmed).text + states.last().unexpectedMessages
+            texts.forEach { text ->
+                assertFalse(text.toString().contains("4321"))
+                assertFalse(text.toString().contains("050471"))
+            }
+        }
     }
 
     @Test
