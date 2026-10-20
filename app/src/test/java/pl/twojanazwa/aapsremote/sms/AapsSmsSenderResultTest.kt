@@ -83,6 +83,15 @@ class AapsSmsSenderResultTest {
     }
 
     @Test
+    fun `SMS-10 pusta lista czesci z divideMessage daje Failed bez wysylania`() = runTest {
+        val system = FakeSmsSystemApi { emptyList() }
+        val sender = AapsSmsSender({ "+447700900123" }, FakeSmsPermissions(), system)
+        val result = sender.send(OutgoingSms.CommandText("BG"))
+        assertEquals(SendResult.Failed, result)
+        assertTrue(system.requests.isEmpty())
+    }
+
+    @Test
     fun `SMS-10 brak wyniku po 600000 ms nadal zawiesza send`() = runTest {
         start(1) { _, result ->
             testScheduler.advanceTimeBy(600_000)
