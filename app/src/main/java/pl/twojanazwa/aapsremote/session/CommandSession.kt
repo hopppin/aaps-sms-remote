@@ -230,10 +230,27 @@ class CommandSession(
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
-            SessionPhase.AWAITING_CODE_REQUEST -> {
+            SessionPhase.AWAITING_CODE_REQUEST, SessionPhase.PREPARING_CODE -> {
                 val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
-                if (reply is AapsReply.CodeRequest) startPreparingCode(sms)
-                return null
+                val preparing = _state.value.phase == SessionPhase.PREPARING_CODE
+                return when (reply) {
+                    is AapsReply.CodeRequest ->
+                        if (preparing) {
+                            SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
+                        } else {
+                            startPreparingCode(sms)
+                            null
+                        }
+                    is AapsReply.CarbsAmountMismatch -> SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, sms.body)
+                    // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
+                    is AapsReply.CarbsDone -> {
+                        _state.value = _state.value.copy(unexpectedMessages = _state.value.unexpectedMessages + sms)
+                        null
+                    }
+                    AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
+                    // Unrecognized oraz wyniki niemożliwe dla CARBS (BgReport, PumpStatus).
+                    else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
+                }
             }
             else -> return null
         }
