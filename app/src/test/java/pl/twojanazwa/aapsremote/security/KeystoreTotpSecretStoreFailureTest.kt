@@ -9,8 +9,13 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.otp.TotpSecret
+import javax.crypto.spec.SecretKeySpec
 import kotlin.coroutines.cancellation.CancellationException
 
+/**
+ * SECRET-17: każda awaria jednego portu daje wynik zamiast wyjątku. W każdym teście awaria dotyczy
+ * tylko jednego portu, reszta działa.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class KeystoreTotpSecretStoreFailureTest {
 
@@ -23,32 +28,34 @@ class KeystoreTotpSecretStoreFailureTest {
         KeystoreTotpSecretStore(storage, cipher, StandardTestDispatcher(testScheduler))
 
     @Test
-    fun `SECRET-17 kazdy port rzucajacy RuntimeException nie powoduje wyjatku z magazynu`() = runTest {
-        val boom = RuntimeException("x")
-        val keySource = FakeSecretKeySource().apply {
-            getKeyError = boom
-            generateKeyError = boom
-            deleteKeyError = boom
-        }
-        val environment = FakeKeystoreEnvironment(lockedCheckError = boom, predicateError = boom)
-        storage.readError = boom
-        storage.writeError = boom
-        storage.clearError = boom
-        val s = store(AesGcmSecretCipher(keySource, environment))
+    fun `SECRET-17 getKey rzuca przy zapisie daje Failed CRYPTO bez wyjatku i bez zapisu`() = runTest {
+        val keySource = FakeSecretKeySource().apply { getKeyError = RuntimeException("x") }
+        val s = store(AesGcmSecretCipher(keySource, FakeKeystoreEnvironment()))
 
-        val state = s.refreshState()
-        val save = s.save(s1())
-        val load = s.load()
-        val delete = s.delete()
+        assertEquals(SaveResult.Failed(SaveFailure.CRYPTO), s.save(s1()))
+        assertEquals(0, keySource.generateKeyCount)
+        assertEquals(0, storage.writeCount)
+        assertEquals(SecretState.UNKNOWN, s.state.value)
+    }
 
-        assertEquals(SecretState.UNKNOWN, state)
-        assertTrue(
-            save == SaveResult.Saved || save == SaveResult.Locked || save is SaveResult.Failed,
-            "nieoczekiwany wynik save",
-        )
-        assertEquals(SaveResult.Failed(SaveFailure.CRYPTO), save)
-        assertEquals(LoadResult.Unavailable, load)
-        assertEquals(DeleteResult.Failed, delete)
+    @Test
+    fun `SECRET-17 generateKey rzuca przy braku klucza daje Failed KEY_GENERATION`() = runTest {
+        val keySource = FakeSecretKeySource(hasKey = false).apply { generateKeyError = RuntimeException("x") }
+        val s = store(AesGcmSecretCipher(keySource, FakeKeystoreEnvironment()))
+
+        assertEquals(SaveResult.Failed(SaveFailure.KEY_GENERATION), s.save(s1()))
+        assertEquals(1, keySource.generateKeyCount)
+        assertEquals(0, storage.writeCount)
+    }
+
+    @Test
+    fun `SECRET-17 Cipher odrzuca klucz o zlej dlugosci przy zapisie daje Failed CRYPTO`() = runTest {
+        // AES nie przyjmuje klucza 5-bajtowego: Cipher.init rzuca InvalidKeyException wewnątrz szyfratora.
+        val keySource = FakeSecretKeySource().apply { currentKey = SecretKeySpec(ByteArray(5), "AES") }
+        val s = store(AesGcmSecretCipher(keySource, FakeKeystoreEnvironment()))
+
+        assertEquals(SaveResult.Failed(SaveFailure.CRYPTO), s.save(s1()))
+        assertEquals(0, storage.writeCount)
     }
 
     @Test
@@ -56,6 +63,65 @@ class KeystoreTotpSecretStoreFailureTest {
         storage.writeError = RuntimeException("x")
         val s = store(FakeSecretCipher())
         assertEquals(SaveResult.Failed(SaveFailure.STORAGE), s.save(s1()))
+    }
+
+    @Test
+    fun `SECRET-17 odczyt magazynu rzucajacy w load daje Unavailable i nic nie usuwa`() = runTest {
+        val s = store(FakeSecretCipher())
+        assertEquals(SaveResult.Saved, s.save(s1()))
+        storage.readError = RuntimeException("x")
+
+        assertEquals(LoadResult.Unavailable, s.load())
+        assertEquals(0, storage.clearCount)
+        assertTrue(storage.record != null, "rekord zostal usuniety")
+        assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
+    fun `SECRET-17 getKey rzuca przy odszyfrowaniu daje Unavailable i nie usuwa rekordu ani klucza`() = runTest {
+        val keySource = FakeSecretKeySource()
+        val s = store(AesGcmSecretCipher(keySource, FakeKeystoreEnvironment()))
+        assertEquals(SaveResult.Saved, s.save(s1()))
+        keySource.getKeyError = RuntimeException("x")
+
+        assertEquals(LoadResult.Unavailable, s.load())
+        assertEquals(0, storage.clearCount)
+        assertTrue(storage.record != null, "rekord zostal usuniety")
+        assertEquals(0, keySource.deleteKeyCount)
+        assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
+    fun `SECRET-17 magazyn rzucajacy w delete daje Failed i nie usuwa klucza`() = runTest {
+        val cipher = FakeSecretCipher()
+        val s = store(cipher)
+        assertEquals(SaveResult.Saved, s.save(s1()))
+        storage.clearError = RuntimeException("x")
+
+        assertEquals(DeleteResult.Failed, s.delete())
+        assertEquals(0, cipher.deleteKeyCount)
+        assertEquals(SecretState.PRESENT, s.state.value)
+    }
+
+    @Test
+    fun `SECRET-17 deleteKey rzuca po usunieciu rekordu daje Deleted`() = runTest {
+        val cipher = FakeSecretCipher().apply { deleteKeyError = RuntimeException("x") }
+        val s = store(cipher)
+        assertEquals(SaveResult.Saved, s.save(s1()))
+
+        assertEquals(DeleteResult.Deleted, s.delete())
+        assertEquals(1, cipher.deleteKeyCount)
+        assertEquals(SecretState.ABSENT, s.state.value)
+        assertEquals(null, storage.record)
+    }
+
+    @Test
+    fun `SECRET-17 odczyt magazynu rzucajacy w refreshState nie zmienia stanu`() = runTest {
+        val s = store(FakeSecretCipher())
+        storage.readError = RuntimeException("x")
+
+        assertEquals(SecretState.UNKNOWN, s.refreshState())
+        assertEquals(SecretState.UNKNOWN, s.state.value)
     }
 
     @Test

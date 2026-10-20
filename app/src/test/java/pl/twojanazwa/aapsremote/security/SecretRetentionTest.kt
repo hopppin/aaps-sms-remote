@@ -23,6 +23,7 @@ class SecretRetentionTest {
         assertTrue(fields.isNotEmpty())
         for (field in fields) {
             assertTrue(Modifier.isFinal(field.modifiers), "pole nie jest final")
+            if (field.type.isPrimitive) continue // np. $stable z wtyczki Compose (static final int)
             assertFalse(field.type.isArray, "pole jest tablica")
             assertFalse(forbidden.any { it.isAssignableFrom(field.type) }, "pole zabronionego typu")
         }
@@ -46,10 +47,11 @@ class SecretRetentionTest {
             kotlinx.coroutines.flow.MutableStateFlow::class.java,
             kotlinx.coroutines.flow.StateFlow::class.java,
         )
-        val fields = KeystoreTotpSecretStore::class.java.declaredFields.filterNot { it.isSynthetic || it.type.isPrimitive }
+        val fields = KeystoreTotpSecretStore::class.java.declaredFields.filterNot { it.isSynthetic }
         assertTrue(fields.isNotEmpty())
         for (field in fields) {
             assertTrue(Modifier.isFinal(field.modifiers), "pole nie jest final")
+            if (field.type.isPrimitive) continue // np. $stable z wtyczki Compose (static final int)
             assertFalse(field.type.isArray, "pole jest tablica")
             assertFalse(forbidden.any { it.isAssignableFrom(field.type) }, "pole zabronionego typu")
             assertTrue(field.type in allowed, "nieoczekiwany typ pola")
