@@ -20,6 +20,9 @@ class InMemorySecretRecordStorage(var record: String? = null) : SecretRecordStor
     var writeError: Exception? = null
     var clearError: Exception? = null
 
+    /** Akcja wywoływana na początku [write] (np. anulowanie korutyny). */
+    var onWrite: (() -> Unit)? = null
+
     override fun read(): String? {
         readCount++
         readError?.let { throw it }
@@ -28,6 +31,7 @@ class InMemorySecretRecordStorage(var record: String? = null) : SecretRecordStor
 
     override fun write(record: String): Boolean {
         writeCount++
+        onWrite?.invoke()
         writeError?.let { throw it }
         if (writeResult || writeChangesValueButReturnsFalse) this.record = record
         return writeResult
