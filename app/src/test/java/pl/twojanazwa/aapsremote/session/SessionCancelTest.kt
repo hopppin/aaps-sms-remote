@@ -49,6 +49,27 @@ class SessionCancelTest {
     }
 
     @Test
+    fun `SESSION-17 CARBS 1 anulowane w PREPARING_CODE konczy sie Cancelled bez kodu`() = runTest {
+        val credentials = SessionTestFixtures.credentials()
+        val session = testSession(carbs1(), sender, source, credentials)
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(58_000)
+        runCurrent()
+        source.emit(IncomingSms(AapsSamples.carbsCodeRequest, SessionTestFixtures.T0 + 58_000))
+        runCurrent()
+        assertEquals(SessionPhase.PREPARING_CODE, session.state.value.phase)
+        advanceTimeBy(500)
+        session.cancel()
+        runCurrent()
+        assertEquals(SessionOutcome.Cancelled, run.await().outcome)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertTrue(sender.sentCodeCopies.isEmpty())
+        assertTrue(credentials.pin.isCleared)
+    }
+
+    @Test
     fun `SESSION-17 BG anulowane w AWAITING_REPLY konczy sie Cancelled`() = runTest {
         val session = testSession(Command.Bg, sender, source)
         val run = async { session.run() }
