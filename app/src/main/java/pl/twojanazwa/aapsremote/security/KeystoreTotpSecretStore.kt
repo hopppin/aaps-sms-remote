@@ -31,10 +31,10 @@ class KeystoreTotpSecretStore @Inject constructor(
         withContext(dispatcher) {
             val plain = secret.copyBytes()
             try {
-                var r = cipher.encrypt(plain)
+                var r = safeEncrypt(plain)
                 if (r is EncryptResult.Failure && r.reason == CryptoFailure.KEY_INVALIDATED) {
                     wipe() // SECRET-08: jedno ponowne zaszyfrowanie po wyczyszczeniu, na tej samej kopii bajtów
-                    r = cipher.encrypt(plain)
+                    r = safeEncrypt(plain)
                 }
                 when (r) {
                     is EncryptResult.Success -> {
@@ -80,7 +80,7 @@ class KeystoreTotpSecretStore @Inject constructor(
                 return@withContext LoadResult.Absent
             }
             val sealed = SealedSecretFormat.decode(record) ?: return@withContext wipeAndInvalidate()
-            when (val r = cipher.decrypt(sealed)) {
+            when (val r = safeDecrypt(sealed)) {
                 is DecryptResult.Success -> try {
                     val secret = TotpSecret.fromBytes(r.plaintext) // kopiuje bajty
                     _state.value = SecretState.PRESENT
@@ -141,6 +141,23 @@ class KeystoreTotpSecretStore @Inject constructor(
     private fun wipeAndInvalidate(): LoadResult {
         wipe()
         return LoadResult.Invalidated
+    }
+
+    /** Kontrakt szyfratora: nie rzuca; wyjątek (poza anulowaniem) traktujemy jak `UNAVAILABLE` (SECRET-17). */
+    private fun safeEncrypt(plain: ByteArray): EncryptResult = try {
+        cipher.encrypt(plain)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        EncryptResult.Failure(CryptoFailure.UNAVAILABLE)
+    }
+
+    private fun safeDecrypt(sealed: SealedSecret): DecryptResult = try {
+        cipher.decrypt(sealed)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        DecryptResult.Failure(CryptoFailure.UNAVAILABLE)
     }
 
     private fun safeClear(): Boolean = try {

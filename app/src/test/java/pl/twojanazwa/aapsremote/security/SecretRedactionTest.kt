@@ -1,5 +1,7 @@
 package pl.twojanazwa.aapsremote.security
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -53,6 +55,24 @@ class SecretRedactionTest {
         val decrypted = cipher.decrypt(encrypted.sealed) as DecryptResult.Success
         assertEquals("Success(***)", decrypted.toString())
         assertRedacted(decrypted.toString(), record)
+    }
+
+    @Test
+    fun `SECRET-15 toString magazynu i wynikow nie ujawnia sekretu, rekordu ani komunikatow wyjatkow`() = runBlocking {
+        val storage = InMemorySecretRecordStorage()
+        val cipher = AesGcmSecretCipher(FakeSecretKeySource(), FakeKeystoreEnvironment())
+        val store = KeystoreTotpSecretStore(storage, cipher, Dispatchers.Unconfined)
+        val saved = store.save(TotpSecret.fromBytes(s1.copyOf()))
+        val loaded = store.load()
+        val record = storage.record!!
+        assertEquals("KeystoreTotpSecretStore(***)", store.toString())
+        for (text in listOf(store.toString(), saved.toString(), loaded.toString(), store.state.value.toString())) {
+            assertRedacted(text, record)
+        }
+        storage.writeError = RuntimeException("sekret-w-komunikacie")
+        val failed = store.save(TotpSecret.fromBytes(s1.copyOf()))
+        assertEquals("Failed(STORAGE)", failed.toString())
+        assertFalse(failed.toString().contains("sekret-w-komunikacie"))
     }
 
     @Test
