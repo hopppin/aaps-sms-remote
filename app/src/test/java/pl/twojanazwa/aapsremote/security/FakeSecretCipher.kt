@@ -41,21 +41,32 @@ class FakeSecretCipher : SecretCipher {
 
     fun enqueueDecryptFailure(reason: CryptoFailure) = enqueueDecrypt(DecryptResult.Failure(reason))
 
-    override fun encrypt(plaintext: ByteArray): EncryptResult {
+    /** Opcjonalny licznik równoczesnych wywołań i rejestr nazw wątków (SECRET-13). */
+    var probe: ConcurrencyProbe? = null
+
+    private fun <T> tracked(block: () -> T): T = probe?.track(block) ?: block()
+
+    override fun encrypt(plaintext: ByteArray): EncryptResult = tracked { encryptImpl(plaintext) }
+
+    override fun decrypt(sealed: SealedSecret): DecryptResult = tracked { decryptImpl(sealed) }
+
+    override fun deleteKey(): Boolean = tracked { deleteKeyImpl() }
+
+    private fun encryptImpl(plaintext: ByteArray): EncryptResult {
         encryptCount++
         encryptInputs += plaintext
         encryptInputSnapshots += plaintext.copyOf()
         return encryptQueue.removeFirstOrNull() ?: transparentEncrypt(plaintext)
     }
 
-    override fun decrypt(sealed: SealedSecret): DecryptResult {
+    private fun decryptImpl(sealed: SealedSecret): DecryptResult {
         decryptCount++
         val result = decryptQueue.removeFirstOrNull() ?: transparentDecrypt(sealed)
         if (result is DecryptResult.Success) decryptOutputs += result.plaintext
         return result
     }
 
-    override fun deleteKey(): Boolean {
+    private fun deleteKeyImpl(): Boolean {
         deleteKeyCount++
         onDeleteKey?.invoke()
         deleteKeyError?.let { throw it }
