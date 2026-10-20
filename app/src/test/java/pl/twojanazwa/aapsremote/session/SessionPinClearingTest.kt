@@ -25,7 +25,7 @@ class SessionPinClearingTest {
         val source = FakeIncomingSmsSource()
         val credentials = SessionTestFixtures.credentials()
         val totp = mockk<UsableTotpProvider>()
-        coEvery { totp.awaitUsableCode(any()) } throws IllegalStateException("x")
+        coEvery { totp.awaitUsableCode(any()) } throws IllegalStateException("TOTP_PROVIDER_FAILURE_MARKER")
         val session = CommandSession(
             command = (Command.Carbs.of(1) as CarbsValidation.Valid).command,
             credentials = credentials,
@@ -45,6 +45,6 @@ class SessionPinClearingTest {
         assertEquals(SessionOutcome.Failed(FailureReason.INTERNAL_ERROR, null), result.outcome)
         assertTrue(credentials.pin.isCleared)
         assertTrue(sender.sentCodeCopies.isEmpty())
-        assertFalse(result.outcome.toString().contains("x"))
+        assertFalse(result.outcome.toString().contains("TOTP_PROVIDER_FAILURE_MARKER"))
     }
 }
