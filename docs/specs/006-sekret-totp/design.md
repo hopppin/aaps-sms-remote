@@ -309,8 +309,17 @@ try {
     var r = cipher.encrypt(plain)
     if (r is Failure && r.reason == KEY_INVALIDATED) { wipe(); r = cipher.encrypt(plain) }
     when (r) {
-        is Success -> if (safeWrite(SealedSecretFormat.encode(r.sealed))) { _state.value = PRESENT; Saved }
-                      else Failed(STORAGE)
+        is Success -> {
+            // rekord sprzed zapisu: Known(record | null) albo Unknown, gdy odczyt rzucił (wtedy bez wycofania)
+            val previous = readForRollback()
+            if (safeWrite(SealedSecretFormat.encode(r.sealed))) { _state.value = PRESENT; Saved }
+            else {
+                // commit() == false mógł już zmienić stan w pamięci SharedPreferences – jedna próba wycofania (SECRET-05)
+                if (previous is Known) { if (previous.record != null) safeWrite(previous.record) else safeClear() }
+                updateStateFromStorage()   // jak refreshState(), bez ponownego brania blokady
+                Failed(STORAGE)
+            }
+        }
         is Failure -> when (r.reason) {
             LOCKED -> SaveResult.Locked
             KEY_GENERATION_FAILED -> Failed(KEY_GENERATION)
@@ -323,7 +332,9 @@ try {
 `load()`:
 
 ```kotlin
-val record = try { storage.read() } catch (e: Exception) { return Unavailable }   // stan bez zmian
+val record = try { storage.read() }
+    catch (e: CancellationException) { throw e }   // podtyp IllegalStateException – nie zamieniać na wynik (SECRET-17)
+    catch (e: Exception) { return Unavailable }    // stan bez zmian
 if (record == null) { if (_state.value != INVALIDATED) _state.value = ABSENT; return Absent }
 val sealed = SealedSecretFormat.decode(record) ?: return wipeAndInvalidate()
 when (val r = cipher.decrypt(sealed)) {
@@ -344,7 +355,7 @@ when (val r = cipher.decrypt(sealed)) {
 
 `delete()`: `if (!safeClear()) Failed else { cipher.deleteKey(); _state.value = ABSENT; Deleted }`.
 
-`refreshState()`: `try { storage.read() } catch → return _state.value`; `!= null` → `PRESENT`; `null` → `ABSENT` chyba że `INVALIDATED`.
+`refreshState()`: `try { storage.read() } catch (CancellationException) → throw; catch (Exception) → return _state.value`; `!= null` → `PRESENT`; `null` → `ABSENT` chyba że `INVALIDATED`.
 
 | Stan | Zdarzenie | Nowy stan | Wynik / akcja | Wymaganie |
 | --- | --- | --- | --- | --- |

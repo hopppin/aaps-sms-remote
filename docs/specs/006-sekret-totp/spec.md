@@ -106,16 +106,19 @@ Rekord = Base64 (alfabet standardowy RFC 4648, z dopełnieniem `=`, bez znaków 
 - **Zakładając** szyfrator zwracający `LOCKED`, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Locked`, magazyn klucz-wartość nie był zapisywany, klucz nie był usuwany, stan bez zmian.
 - **Zakładając** źródło klucza rzucające przy generacji, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Failed(KEY_GENERATION)`, magazyn nie był zapisywany.
 - **Zakładając** szyfrator zwracający `UNAVAILABLE`, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Failed(CRYPTO)`, magazyn nie był zapisywany, klucz nie był usuwany.
-- **Zakładając** magazyn klucz-wartość, którego zapis zwraca `false` albo rzuca `IllegalStateException`, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Failed(STORAGE)`, klucz nie był usuwany, stan bez zmian.
+- **Zakładając** magazyn klucz-wartość, którego zapis zwraca `false` albo rzuca `IllegalStateException`, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Failed(STORAGE)`, klucz nie był usuwany, stan odpowiada zawartości magazynu (SECRET-05).
 
 ### SECRET-05: Zamiana sekretu atomowo, bez rotacji klucza
 
-Zapis przy istniejącym rekordzie zastępuje go jednym zapisem nowego rekordu (jedna wartość pod jednym kluczem, `commit()`): po `Saved` magazyn zawiera tylko nowy rekord; przy każdym innym wyniku stary rekord pozostaje bez zmian (wyjątek: wyczyszczenie po `KEY_INVALIDATED`, SECRET-08). Zamiana używa istniejącego klucza (bez generowania nowego i bez usuwania starego). Pytanie użytkownika o zgodę na zastąpienie należy do `ui`.
+Zapis przy istniejącym rekordzie zastępuje go jednym zapisem nowego rekordu (jedna wartość pod jednym kluczem, `commit()`): po `Saved` magazyn zawiera tylko nowy rekord. Przy wynikach `Locked` i `Failed(KEY_GENERATION|CRYPTO)` magazyn klucz-wartość nie jest zapisywany, więc stary rekord pozostaje bez zmian (wyjątek: wyczyszczenie po `KEY_INVALIDATED`, SECRET-08). Przy `Failed(STORAGE)`: `SharedPreferences.commit()` zwracające `false` mogło już zmienić wartość w pamięci procesu, dlatego magazyn odczytuje rekord przed zapisem i po nieudanym zapisie wykonuje jedną próbę wycofania – zapis poprzedniego rekordu (albo usunięcie, gdy go nie było); gdy odczyt przed zapisem rzucił, wycofania nie ma. Gwarancja po `Failed(STORAGE)`: magazyn zawiera stary albo nowy rekord (oba prawidłowe, tym samym kluczem), nigdy rekordu nieprawidłowego; odczyt zwraca stary albo nowy sekret, nigdy `Invalidated`; stan sekretu odpowiada zawartości magazynu po wycofaniu. Zamiana używa istniejącego klucza (bez generowania nowego i bez usuwania starego). Pytanie użytkownika o zgodę na zastąpienie należy do `ui`.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** zapisany S1, **gdy** wywołano `save(S2)`, **wtedy** wynik to `Saved`, magazyn zawiera dokładnie jeden rekord, odczyt zwraca S2, a źródło klucza nie generowało ani nie usuwało klucza.
-- **Zakładając** zapisany S1 i magazyn, którego zapis zwraca `false`, **gdy** wywołano `save(S2)`, **wtedy** wynik to `Failed(STORAGE)`, a rekord jest identyczny (tekstowo) z rekordem sprzed wywołania i odczyt zwraca S1.
+- **Zakładając** zapisany S1 i magazyn, którego zapis zwraca `false` (bez zmiany wartości), **gdy** wywołano `save(S2)`, **wtedy** wynik to `Failed(STORAGE)`, a rekord jest identyczny (tekstowo) z rekordem sprzed wywołania i odczyt zwraca S1.
+- **Zakładając** zapisany S1 i magazyn, którego pierwszy zapis po `save` zmienia wartość, ale zwraca `false` (jak `commit()` przy błędzie dysku), a kolejne zapisy działają, **gdy** wywołano `save(S2)`, **wtedy** wynik to `Failed(STORAGE)`, wykonano dokładnie jedną próbę wycofania, rekord jest identyczny z rekordem sprzed wywołania i odczyt zwraca S1.
+- **Zakładając** pusty magazyn, którego zapis zmienia wartość, ale zwraca `false`, **gdy** wywołano `save(S1)`, **wtedy** wynik to `Failed(STORAGE)`, magazyn jest pusty (wycofanie przez usunięcie), stan = `ABSENT`.
+- **Zakładając** zapisany S1 i magazyn, którego każdy zapis zmienia wartość, ale zwraca `false`, **gdy** wywołano `save(S2)`, **wtedy** wynik to `Failed(STORAGE)`, wykonano 2 zapisy (nowy rekord, wycofanie), a `load()` zwraca S1 albo S2 (nie `Invalidated`), stan = `PRESENT`.
 - **Zakładając** zapisany S1 i szyfrator zwracający `LOCKED` albo `UNAVAILABLE`, **gdy** wywołano `save(S2)`, **wtedy** rekord jest identyczny z rekordem sprzed wywołania.
 - **Zakładając** zapis rekordu przerwany zabiciem procesu (sprawdzenie na urządzeniu – założenie o `SharedPreferences.commit()`, W9), **gdy** aplikacja startuje ponownie, **wtedy** odczyt zwraca stary albo nowy sekret, nigdy `Invalidated`.
 
@@ -274,7 +277,7 @@ Rekord jest zapisywany w osobnym pliku `SharedPreferences` o nazwie `totp_secret
 | Brak StrongBox | jedna próba bez StrongBox (TEE) | SECRET-02 |
 | Generacja klucza nieudana (inny powód) | `Failed(KEY_GENERATION)`, bez obniżania parametrów | SECRET-02, SECRET-04 |
 | Telefon zablokowany przy zapisie | `Locked`, nic nie zmienione | SECRET-04 |
-| Zapis rekordu `false` / wyjątek | `Failed(STORAGE)`, stary rekord bez zmian | SECRET-04, SECRET-05 |
+| Zapis rekordu `false` / wyjątek | `Failed(STORAGE)`, jedna próba wycofania; stary albo nowy rekord, nigdy nieprawidłowy | SECRET-04, SECRET-05 |
 | Proces zabity w trakcie zapisu | stary albo nowy sekret (W9) | SECRET-05 |
 | Brak rekordu | `Absent` | SECRET-06 |
 | Rekord nieprawidłowy (Base64, długość, wersja) | wyczyszczenie, `Invalidated` | SECRET-03, SECRET-08 |
