@@ -30,6 +30,8 @@ class SmsPartsRedactionTest {
     fun `SMS-16 DeliveredSmsRegistry toString nie zawiera nadawcy tresci ani skrotu`() {
         val registry = DeliveredSmsRegistry()
         registry.markFirstDelivery(AssembledSms(sender, body, 1111111000000L))
-        assertRedacted(registry.toString())
+        val text = registry.toString()
+        assertRedacted(text)
+        assertFalse(Regex("[0-9a-f]{64}").containsMatchIn(text), "toString() nie moze zawierac skrotu SHA-256")
     }
 }
