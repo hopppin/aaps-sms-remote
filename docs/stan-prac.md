@@ -28,8 +28,8 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Spec `sms` (005): implementacja portów `SmsSender` i `IncomingSmsSource` (SmsManager z wyborem SIM, `BroadcastReceiver`, filtr numeru AAPS). Musi przejąć kontrakt K1–K6 ze [spec 004](specs/004-sesja-polecenia/spec.md) jako wymagania `SMS-xx`: znacznik odbioru tym samym `EpochClock` przy odbiorze, każda wiadomość dostarczona najwyżej raz (deduplikacja), kopia `String` odpowiedzi z kodem nieprzechowywana, szczegóły błędu wysyłania (rozszerzenie `SendResult.Failed` = zmiana spec 004).
-2. Potem: `security` (Keystore dla sekretu TOTP), `data` (ustawienia, historia w Room z `SessionResult`), `ui` (ekrany; przyciski blokowane przez `SessionCoordinator.active`).
+1. Spec `sms` (005): implementacja portów `SmsSender` i `IncomingSmsSource` (SmsManager z wyborem SIM, `BroadcastReceiver`, filtr numeru AAPS). Musi przejąć cały kontrakt K1–K6 ze [spec 004](specs/004-sesja-polecenia/spec.md#kontrakt-portów-wymagania-dla-spec-sms) jako wymagania `SMS-xx` (pełna lista tam – m.in. znacznik odbioru tym samym `EpochClock`, dostarczenie najwyżej raz, filtr nadawcy i sklejanie wiadomości wieloczęściowych, anulowalne wysyłanie, kopia `String` odpowiedzi z kodem nieprzechowywana i nielogowana). Szczegóły błędu wysyłania (rozszerzenie `SendResult.Failed`) = zmiana spec 004.
+2. Potem: `security` (Keystore dla sekretu TOTP), `data` (ustawienia, historia w Room z `SessionResult`), `ui` (ekrany; przyciski blokowane przez `SessionCoordinator.activeSession`).
 
 ## Ustalenia z użytkownikiem (decyzje)
 
@@ -38,7 +38,7 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 - **Sekret TOTP:** każdy niepusty sekret jest przyjmowany; nieznane parametry `otpauth://` są ignorowane. QR z AAPS: `otpauth://totp/AAPS?secret=…&issuer=AAPS&algorithm=SHA1&digits=6&period=30`.
 - **SMS z AAPS 3.4.2.6, po polsku, bez znaków diakrytycznych.** Każda odpowiedź to jeden SMS. Odpowiedź na kod: `<6 cyfr><PIN>` bez spacji.
 - **Brak odpowiedzi AAPS:** na nieznane polecenie, z numeru spoza listy dozwolonych i po upływie czasu na kod AAPS nic nie wysyła.
-- **Sesja (spec 004):** pierwsza odpowiedź AAPS do 3 min (potem „AAPS nie odpowiada”); po kodzie czekanie na potwierdzenie do 6 min, potem „nieznany – sprawdź w AAPS”. Potwierdzenie CARBS przyjmowane tylko po wysłaniu naszego kodu, z tą samą ilością, pokazywane jako „AAPS potwierdził wprowadzenie X g” (AAPS wysyła je do wszystkich dozwolonych numerów); w innym momencie – wiadomość nieoczekiwana. Każda wątpliwa odpowiedź kończy polecenie bez odsyłania kodu; po kodzie – „nieznany”. Anulowanie przed kodem zawsze możliwe; po kodzie tylko kończy czekanie („nieznany”).
+- **Sesja (spec 004):** pierwsza odpowiedź AAPS do 3 min (potem „AAPS nie odpowiada”); po kodzie czekanie na potwierdzenie do 6 min, potem „nieznany – sprawdź w AAPS”. Potwierdzenie CARBS przyjmowane tylko po wysłaniu naszego kodu, z tą samą ilością, pokazywane jako „AAPS potwierdził wprowadzenie X g” (AAPS wysyła je do wszystkich dozwolonych numerów); w innym momencie – wiadomość nieoczekiwana (bez zmiany fazy). Przed kodem każda inna wątpliwa odpowiedź kończy polecenie bez odsyłania kodu; po kodzie – „nieznany”, z wyjątkiem „zły kod” (błąd). Limity i anulowanie obejmują też fazy wysyłania (polecenia i kodu). Anulowanie przed rozpoczęciem wysyłania kodu zawsze możliwe; potem tylko kończy czekanie („nieznany”). Szczegóły: tabela przejść w [design 004](specs/004-sesja-polecenia/design.md).
 - **Fakty z kodu AAPS** (spec 004, źródła A1–A7): czas na kod 5 min, po nim cisza; CARBS ponad limit AAPS obcina i prosi o kod z mniejszą ilością (parser: niezgodna ilość → stop); po kodzie AAPS czeka do 3 min na kolejkę pompy; każde nowe polecenie nadpisuje oczekującą prośbę o kod.
 
 ## Otwarte (do ustalenia)
