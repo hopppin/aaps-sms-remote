@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.session
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.TestScope
@@ -62,6 +63,50 @@ class CommandSessionIncomingTest {
         source.emit(IncomingSms(AapsSamples.bg, SessionTestFixtures.T0))
         runCurrent()
         assertTrue(run.await().outcome is SessionOutcome.Completed)
+    }
+
+    @Test
+    fun `SESSION-05 wiadomosc odlozona w trakcie wysylania z czasem chwili wysylki konczy sesje po Sent`() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val gatedSender = SmsSender {
+            gate.await()
+            SendResult.Sent
+        }
+        val clock = virtualClock()
+        val session = CommandSession(
+            command = Command.Bg,
+            credentials = null,
+            sender = gatedSender,
+            incoming = source,
+            clock = clock,
+            totp = UsableTotpProvider(clock),
+            timeSource = testTimeSource,
+        )
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(1000)
+        source.emit(IncomingSms(AapsSamples.bg, SessionTestFixtures.T0 + 2000))
+        runCurrent()
+        assertEquals(SessionPhase.SENDING_COMMAND, session.state.value.phase)
+        advanceTimeBy(1000)
+        gate.complete(Unit)
+        runCurrent()
+        val result = run.await()
+        assertTrue(result.outcome is SessionOutcome.Completed)
+        assertEquals(SessionTestFixtures.T0 + 2000, result.commandSentAtEpochMillis)
+    }
+
+    @Test
+    fun `SESSION-05 normalny koniec strumienia odbioru nie konczy sesji - faza pozostaje AWAITING_REPLY`() = runTest {
+        source.completeImmediately = true
+        val session = session(Command.Bg)
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(5000)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_REPLY, session.state.value.phase)
+        assertTrue(run.isActive)
+        run.cancel()
     }
 
     @Test
