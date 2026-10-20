@@ -30,6 +30,9 @@ class InMemorySecretRecordStorage(var record: String? = null) : SecretRecordStor
     /** Tryb „pierwsze N zapisów zmienia wartość i zwraca false, kolejne działają normalnie”. */
     var failFirstWritesWithChange = 0
 
+    /** Tryb „pierwsze N zapisów zmienia wartość i rzuca RuntimeException” (wyjątek po zmianie stanu). */
+    var failFirstWritesWithChangeAndThrow = 0
+
     /** Rejestr wartości przekazanych do [write] (kolejno). */
     val writes = mutableListOf<String>()
 
@@ -45,6 +48,11 @@ class InMemorySecretRecordStorage(var record: String? = null) : SecretRecordStor
         writes += record
         onWrite?.invoke()
         writeError?.let { throw it }
+        if (failFirstWritesWithChangeAndThrow > 0) {
+            failFirstWritesWithChangeAndThrow--
+            this.record = record
+            throw RuntimeException("test: zapis zmienił wartość i rzucił")
+        }
         if (failFirstWritesWithChange > 0) {
             failFirstWritesWithChange--
             this.record = record

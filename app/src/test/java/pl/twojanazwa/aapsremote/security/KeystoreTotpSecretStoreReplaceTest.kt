@@ -90,7 +90,21 @@ class KeystoreTotpSecretStoreReplaceTest {
         assertEquals(SaveResult.Failed(SaveFailure.STORAGE), s.save(secret(s2Bytes)))
         assertEquals(2, storage.writeCount - writesBefore)
         assertEquals(SecretState.PRESENT, s.state.value)
-        assertEquals(true, s.load() is LoadResult.Loaded)
+        s.assertLoads(s1Bytes)
+    }
+
+    @Test
+    fun `SECRET-05 wyjatek przy zapisie nowego rekordu wycofuje do S1`() = runTest {
+        val s = store()
+        s.saveS1()
+        val before = storage.record
+        storage.failFirstWritesWithChangeAndThrow = 1
+        val writesBefore = storage.writeCount
+        assertEquals(SaveResult.Failed(SaveFailure.STORAGE), s.save(secret(s2Bytes)))
+        assertEquals(2, storage.writeCount - writesBefore) // nowy rekord (wyjątek) + dokładnie jedna próba wycofania
+        assertEquals(before, storage.record)
+        assertEquals(SecretState.PRESENT, s.state.value)
+        s.assertLoads(s1Bytes)
     }
 
     @Test
