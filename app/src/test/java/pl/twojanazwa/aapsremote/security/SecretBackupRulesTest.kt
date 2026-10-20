@@ -33,8 +33,10 @@ class SecretBackupRulesTest {
             val nodes = doc.getElementsByTagName(section)
             assertEquals(1, nodes.length, "Sekcja $section")
             val excludes = (nodes.item(0) as Element).getElementsByTagName("exclude")
-            val domains = (0 until excludes.length).map { (excludes.item(it) as Element).getAttribute("domain") }
-            assertTrue("sharedpref" in domains, "Sekcja $section nie wyklucza sharedpref")
+            val sharedPrefExcludes = (0 until excludes.length)
+                .map { excludes.item(it) as Element }
+                .filter { it.getAttribute("domain") == "sharedpref" }
+            assertTrue(sharedPrefExcludes.any { !it.hasAttribute("path") }, "Sekcja $section nie wyklucza całej domeny sharedpref")
         }
     }
 
