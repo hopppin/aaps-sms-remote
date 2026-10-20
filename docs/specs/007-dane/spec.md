@@ -98,7 +98,7 @@ Zapis przyjmuje numer wpisany. Gdy `AapsNumber.parse` zwraca `null`, wynik to `I
 - **Zakładając** stan `Configured(+447700900999)` i magazyn zwracający `false` z `commit()`, **gdy** zapisano `+44 7700 900123`, **wtedy** wynik = `Failed`, stan = `Configured` z `+447700900999`.
 - **Zakładając** magazyn rzucający `RuntimeException("x")` przy zapisie, **gdy** zapisano `+44 7700 900123`, **wtedy** wynik = `Failed` bez wyjątku, stan bez zmian.
 - **Zakładając** stan `LoadFailed`, **gdy** zapisano `+44 7700 900123`, **wtedy** wynik = `Saved`, stan = `Configured`.
-- **Zakładając** zapis, po którego `commit()` = `true` test anuluje korutynę zapisu, **gdy** anulowanie dotarło po zapisie, **wtedy** wywołujący dostaje `CancellationException`, a stan = `Configured` z zapisaną wartością.
+- **Zakładając** zapis, po którym (gdy `commit()` = `true`) test anuluje korutynę zapisu, **gdy** anulowanie dotarło po zapisie, **wtedy** wywołujący dostaje `CancellationException`, a stan = `Configured` z zapisaną wartością.
 
 ### DATA-04: Usunięcie numeru
 

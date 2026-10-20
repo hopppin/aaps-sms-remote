@@ -348,7 +348,7 @@ Pozostałe: `id = 0`, `command` = kod `result.command.id`, `carbsGrams = (result
 
 ```kotlin
 override val entries: Flow<HistorySnapshot> =
-    storage.observeNewestFirst()
+    flow { emitAll(storage.observeNewestFirst()) } // błąd przy tworzeniu strumienia też trafia do catch
         .map<List<HistoryRow>, HistorySnapshot> { rows -> HistorySnapshot.Entries(rows.map(HistoryCodec::toEntry)) }
         .catch { e -> if (e is CancellationException) throw e; emit(HistorySnapshot.Unavailable) }
 
