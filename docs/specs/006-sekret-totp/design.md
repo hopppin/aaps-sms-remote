@@ -370,6 +370,7 @@ when (val r = cipher.decrypt(sealed)) {
 | dowolny | `load`, `LOCKED` | bez zmian | `Locked` | SECRET-09 |
 | dowolny | `load`, `UNAVAILABLE` | bez zmian | `Unavailable` | SECRET-10 |
 | dowolny | `save`, zapis `true` | `PRESENT` | `Saved` | SECRET-04, SECRET-05 |
+| dowolny | `save`, zapis `false` / wyjątek | jak `refreshState()` po wycofaniu (błąd końcowego odczytu: bez zmian) | `Failed(STORAGE)` | SECRET-04, SECRET-05 |
 | dowolny | `save`, `KEY_INVALIDATED` | `INVALIDATED`, potem wg drugiej próby | wyczyszczenie + 1 ponowne zaszyfrowanie | SECRET-08 |
 | dowolny | `save`, `LOCKED` / `KEY_GENERATION_FAILED` / `UNAVAILABLE` / zapis `false` | bez zmian | `Locked` / `Failed(…)` | SECRET-04 |
 | dowolny | `delete`, usunięcie rekordu `true` | `ABSENT` | usunięcie klucza, `Deleted` | SECRET-11 |
