@@ -19,6 +19,8 @@ _Ostatnia aktualizacja: 2026-10-20_
 | Spec 004 sesja | zatwierdzona, w całości zaimplementowana; fakty z kodu AAPS (źródła A1–A7) | PR #27; kod: PR #37–#45 |
 | Pakiet `session` | `CommandSession` (maszyna stanów BG/PUMP/CARBS, limity 3 min / 10 s / 6 min z pierwszeństwem limitu, kontrola wieku prośby o kod ≤ 240 s, anulowanie, wynik `Unknown` po kodzie, `StateFlow` i `SessionResult` dla historii), `SessionCoordinator` (jedno aktywne polecenie), porty `SmsSender`/`IncomingSmsSource` | `app/src/main/java/pl/twojanazwa/aapsremote/session/` |
 | `security/AapsPin` | PIN AAPS tylko w pamięci, kopia z zerowaniem, czyszczenie idempotentne | `app/src/main/java/pl/twojanazwa/aapsremote/security/AapsPin.kt` |
+| Spec 005 SMS | zatwierdzona, w całości zaimplementowana; kontrakt K1–K6 ze spec 004 przejęty jako SMS-01–SMS-16 | PR #47; kod: PR #56–#63 |
+| Pakiet `sms` | `AapsNumber` (ostatnie 9 cyfr), `SmsAssembler` (sklejanie części po nadawcy), `DeliveredSmsRegistry` (SHA-256, 100 wpisów FIFO), `IncomingSmsHub` (gorący strumień, chwila odbioru z `EpochClock`, jedna rejestracja receivera, brak uprawnienia = brak dostarczeń), `AapsSmsSender` (`Sent` po `RESULT_OK` wszystkich części, anulowanie bez wysyłania, wyjątki = `Failed`); `sms.platform`: receiver `SMS_RECEIVED` (`BROADCAST_SMS`), `AndroidSmsSystemApi` (domyślna karta SMS), `AndroidSmsPermissions`, `SmsModule`; `otp/ClockModule` (wspólny `EpochClock`); manifest: `SEND_SMS`, `RECEIVE_SMS` | `app/src/main/java/pl/twojanazwa/aapsremote/sms/` |
 
 ## W toku
 
@@ -28,14 +30,17 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Spec `sms` (005): implementacja portów `SmsSender` i `IncomingSmsSource` (SmsManager z wyborem SIM, `BroadcastReceiver`, filtr numeru AAPS). Musi przejąć cały kontrakt K1–K6 ze [spec 004](specs/004-sesja-polecenia/spec.md#kontrakt-portów-wymagania-dla-spec-sms) jako wymagania `SMS-xx` (pełna lista tam – m.in. znacznik odbioru tym samym `EpochClock`, dostarczenie najwyżej raz, filtr nadawcy i sklejanie wiadomości wieloczęściowych, anulowalne wysyłanie, kopia `String` odpowiedzi z kodem nieprzechowywana i nielogowana). Szczegóły błędu wysyłania (rozszerzenie `SendResult.Failed`) = zmiana spec 004.
-2. Potem: `security` (Keystore dla sekretu TOTP), `data` (ustawienia, historia w Room z `SessionResult`), `ui` (ekrany; przyciski blokowane przez `SessionCoordinator.activeSession`).
+1. `security` (Keystore dla sekretu TOTP).
+2. `data` (ustawienia, historia w Room z `SessionResult`). **Musi dostarczyć wiązanie Hilt `sms.AapsNumberProvider`** (numer AAPS bez blokującego I/O, np. z pamięci podręcznej `StateFlow`) – bez niego build padnie, gdy cokolwiek wstrzyknie `SmsSender`/`IncomingSmsSource`.
+3. `ui` (ekrany; przyciski blokowane przez `SessionCoordinator.activeSession`). Wymagania ze spec 005 dla `ui`: w trakcie polecenia aplikacja na pierwszym planie, ekran przebiegu trzyma ekran włączony; prośba o `SEND_SMS`/`RECEIVE_SMS` i komunikat przy odmowie (`SmsPermissions`). Pierwszy PR `ui` uruchamiający wysyłanie i odbiór opisuje ręczną weryfikację W1–W7 ze [spec 005](specs/005-sms/spec.md) na telefonie.
+4. Ewentualnie później: przyczyna w `SendResult.Failed` (zmiana spec 004), usługa pierwszoplanowa na czas polecenia (osobna spec).
 
 ## Ustalenia z użytkownikiem (decyzje)
 
 - **Bez biometrii.** PIN AAPS wpisywany przy każdym poleceniu z potwierdzeniem, nigdy niezapisywany (plan, AGENTS.md).
 - **CARBS w aplikacji:** liczba całkowita 1–50 g; powyżej 40 g dodatkowe pytanie „Na pewno X g?” przed PIN-em; szybkie wartości 10/20/30 g; SMS zawsze `CARBS <g>` bez godziny. BG i PUMP wysyłane jednym dotknięciem, bez potwierdzenia (spec 003).
 - **Sekret TOTP:** każdy niepusty sekret jest przyjmowany; nieznane parametry `otpauth://` są ignorowane. QR z AAPS: `otpauth://totp/AAPS?secret=…&issuer=AAPS&algorithm=SHA1&digits=6&period=30`.
+- **SMS (spec 005):** tylko domyślna karta SMS systemu (bez wyboru SIM w ustawieniach); nadawca = numer AAPS, gdy zgadza się ostatnie 9 cyfr; odbiór tylko w trakcie zbierania strumienia (receiver dynamiczny, bez usługi pierwszoplanowej); brak uprawnień = `Failed` / brak dostarczeń, bez wyjątków. Ryzyko zaakceptowane: Android zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych wiadomości. Warstwa `sms.platform` bez testów automatycznych – weryfikacja ręczna W1–W7.
 - **SMS z AAPS 3.4.2.6, po polsku, bez znaków diakrytycznych.** Każda odpowiedź to jeden SMS. Odpowiedź na kod: `<6 cyfr><PIN>` bez spacji.
 - **Brak odpowiedzi AAPS:** na nieznane polecenie, z numeru spoza listy dozwolonych i po upływie czasu na kod AAPS nic nie wysyła.
 - **Sesja (spec 004):** pierwsza odpowiedź AAPS do 3 min (potem „AAPS nie odpowiada”); po kodzie czekanie na potwierdzenie do 6 min, potem „nieznany – sprawdź w AAPS”. Potwierdzenie CARBS przyjmowane tylko po wysłaniu naszego kodu, z tą samą ilością, pokazywane jako „AAPS potwierdził wprowadzenie X g” (AAPS wysyła je do wszystkich dozwolonych numerów); w innym momencie – wiadomość nieoczekiwana (bez zmiany fazy). Przed kodem każda inna wątpliwa odpowiedź kończy polecenie bez odsyłania kodu; po kodzie – „nieznany”, z wyjątkiem „zły kod” (błąd). Limity i anulowanie obejmują też fazy wysyłania (polecenia i kodu). Anulowanie przed rozpoczęciem wysyłania kodu zawsze możliwe; potem tylko kończy czekanie („nieznany”). Szczegóły: tabela przejść w [design 004](specs/004-sesja-polecenia/design.md).
