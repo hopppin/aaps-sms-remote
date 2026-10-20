@@ -216,8 +216,9 @@ class CommandSession(
 
     /**
      * Wiadomość po wysłaniu polecenia. Zwraca wynik, gdy sesja się kończy, inaczej null.
-     * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W AWAITING_CODE_REQUEST przyjmowana jest
-     * tylko prośba o kod; inne wyniki parsera i pozostałe fazy nie zmieniają stanu (kolejne zadania CARBS).
+     * Wiadomości sprzed chwili wysłania są ignorowane (SESSION-05). W AWAITING_CODE_REQUEST i PREPARING_CODE
+     * (SESSION-11): pierwsza zgodna prośba o kod uruchamia przygotowanie, CarbsDone trafia do unexpectedMessages
+     * (SESSION-18), każdy inny wynik kończy sesję. Fazy po wysłaniu kodu nie zmieniają stanu (kolejne zadanie CARBS).
      */
     private fun CoroutineScope.processMessage(sms: IncomingSms): SessionOutcome? {
         val sentAt = commandSentAt ?: return null
