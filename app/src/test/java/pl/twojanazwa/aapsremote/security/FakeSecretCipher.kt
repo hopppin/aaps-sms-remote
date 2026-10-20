@@ -18,6 +18,12 @@ class FakeSecretCipher : SecretCipher {
     /** Wynik [deleteKey]. */
     var deleteKeyResult = true
 
+    /** Gdy ustawiony, [deleteKey] go rzuca (po zliczeniu). */
+    var deleteKeyError: Exception? = null
+
+    /** Akcja wywoływana w [deleteKey] (np. odczyt licznika magazynu - kolejność wywołań). */
+    var onDeleteKey: (() -> Unit)? = null
+
     /** Referencje tablic przekazanych do [encrypt] (kolejno). */
     val encryptInputs = mutableListOf<ByteArray>()
 
@@ -51,6 +57,8 @@ class FakeSecretCipher : SecretCipher {
 
     override fun deleteKey(): Boolean {
         deleteKeyCount++
+        onDeleteKey?.invoke()
+        deleteKeyError?.let { throw it }
         return deleteKeyResult
     }
 
