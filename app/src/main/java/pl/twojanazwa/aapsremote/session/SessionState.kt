@@ -14,6 +14,10 @@ data class SessionState(
     val unexpectedMessages: List<IncomingSms>,
     val result: SessionResult?,
 ) {
+    init {
+        require((result != null) == (phase == SessionPhase.FINISHED)) { "result iff FINISHED" }
+    }
+
     override fun toString(): String =
         "SessionState(phase=$phase, unexpected=${unexpectedMessages.size}, result=$result)"
 }
