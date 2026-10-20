@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.session
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flow
@@ -12,6 +13,9 @@ class FakeIncomingSmsSource : IncomingSmsSource {
     /** Jeśli ustawione, strumień kończy się tym wyjątkiem po subskrypcji. */
     var failure: Throwable? = null
 
+    /** Z [failure]: wyjątek po tylu ms czasu korutyn od subskrypcji (0 = od razu). */
+    var failAfterMillis: Long = 0
+
     /** Jeśli true, strumień kończy się normalnie (bez wyjątku) tuż po subskrypcji. */
     var completeImmediately: Boolean = false
 
@@ -22,6 +26,9 @@ class FakeIncomingSmsSource : IncomingSmsSource {
     override fun messages(): Flow<IncomingSms> {
         if (completeImmediately) return flow { }
         val error = failure ?: return shared
-        return merge(shared, flow { throw error })
+        return merge(shared, flow {
+            if (failAfterMillis > 0) delay(failAfterMillis)
+            throw error
+        })
     }
 }

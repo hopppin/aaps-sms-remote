@@ -111,6 +111,27 @@ class CommandSessionIncomingTest {
     }
 
     @Test
+    fun `SESSION-05 wyjatek strumienia w chwili 1000 - AWAITING_REPLY do 180000 potem TimedOut`() = runTest {
+        source.failure = IllegalStateException("blad strumienia")
+        source.failAfterMillis = 1000
+        val session = session(Command.Bg)
+        val run = async { session.run() }
+        runCurrent()
+        assertEquals(1, source.subscriptionCount.value)
+        advanceTimeBy(1000)
+        runCurrent()
+        // Strumień już rzucił wyjątek w AWAITING_REPLY, a sesja dalej czeka.
+        assertEquals(SessionPhase.AWAITING_REPLY, session.state.value.phase)
+        assertEquals(0, source.subscriptionCount.value)
+        advanceTimeBy(178_999)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_REPLY, session.state.value.phase)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY), run.await().outcome)
+    }
+
+    @Test
     fun `SESSION-05 wyjatek strumienia odbioru nie konczy sesji - faza pozostaje AWAITING_REPLY`() = runTest {
         source.failure = IllegalStateException("blad strumienia")
         val session = session(Command.Bg)
