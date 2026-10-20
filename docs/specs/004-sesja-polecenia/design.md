@@ -280,7 +280,7 @@ Wiadomość przetwarzana: `if (sms.receivedAtEpochMillis < commandSentAt) ignore
 
 ### Zakończenie
 
-Każdy odczyt zegara przechodzi przez pomocnika, który zapamiętuje ostatnią poprawną wartość (`lastClockReading: Long?`). Jedna funkcja `finish(outcome)` (niezawieszająca): (1) `credentials?.pin?.clear()`, (2) jeden odczyt zegara jako `finishedAt` w `try`; wyjątek → `finishedAt = lastClockReading` (może być `null`), bez ponownego odczytu i bez zmiany `outcome`, (3) zbudowanie `SessionResult`, (4) wywołanie wewnętrznego `onFinished` (koordynator zwalnia `activeSession`), (5) publikacja `SessionState(FINISHED, …, result)`. Kolejność gwarantuje, że obserwator `FINISHED` widzi wyczyszczony PIN i pustą `activeSession` (SESSION-19, SESSION-22).
+Każdy odczyt zegara przechodzi przez pomocnika, który zapamiętuje ostatnią poprawną wartość (`lastClockReading: Long?`). Jedna funkcja `finish(outcome)` (niezawieszająca): (1) `credentials?.pin?.clear()`, (2) jeden odczyt zegara jako `finishedAt` w `try`; wyjątek → `finishedAt = lastClockReading` (może być `null`), bez ponownego odczytu i bez zmiany `outcome`, (3) zbudowanie `SessionResult`, (4) wywołanie wewnętrznego `onFinished` (koordynator zwalnia `activeSession`), (5) publikacja `SessionState(FINISHED, …, result)`, (6) `finishedResult.complete(result)`. Kolejność gwarantuje, że obserwator `FINISHED` widzi wyczyszczony PIN i pustą `activeSession` (SESSION-19, SESSION-22).
 
 Anulowanie z zewnątrz: `catch (e: CancellationException)` wokół pętli → `finish(Cancelled)` albo `finish(Unknown(CANCELLED_AFTER_CODE))` wg fazy → `throw e` (SESSION-17). Inny wyjątek (także z odczytu zegara w pętli, np. `startedAt`, `commandSentAt`, wiek prośby) → `finish(Failed(INTERNAL_ERROR))` albo `finish(Unknown(INTERNAL_ERROR))` wg fazy, `run()` zwraca wynik (SESSION-19). Ponieważ `finish()` sam nie rzuca przy błędzie zegara, ta ścieżka zawsze kończy się `FINISHED`.
 
@@ -288,8 +288,9 @@ Anulowanie z zewnątrz: `catch (e: CancellationException)` wokół pętli → `f
 
 `AtomicReference<Lifecycle>` z wartościami `NOT_STARTED`, `RUNNING`, `CANCELLED_BEFORE_START`, `RESULT_TAKEN`:
 
-- `cancel()`: `compareAndSet(NOT_STARTED, CANCELLED_BEFORE_START)` → od razu `finish(Cancelled)` w wątku wywołującego (pętla jeszcze nie istnieje, więc nie ma wyścigu). W przeciwnym razie `events.trySend(Cancel)`.
-- `run()`: `compareAndSet(NOT_STARTED, RUNNING)` → dopiero wtedy odczyt `startedAt`, start kolektora, termin limitu i wysyłka. Gdy CAS się nie uda: `compareAndSet(CANCELLED_BEFORE_START, RESULT_TAKEN)` → zwrot wyniku `Cancelled` bez subskrypcji, limitu i wysyłki; inaczej `IllegalStateException`.
+- `cancel()`: `compareAndSet(NOT_STARTED, CANCELLED_BEFORE_START)` → od razu `finish(Cancelled)` w wątku wywołującego (pętla jeszcze nie istnieje, więc nie ma wyścigu z pętlą). W przeciwnym razie `events.trySend(Cancel)`.
+- `finishedResult: CompletableDeferred<SessionResult>` jest uzupełniany jako ostatni krok `finish()` – po wyczyszczeniu PIN-u i publikacji `FINISHED` (dotyczy każdego zakończenia, nie tylko anulowania przed startem).
+- `run()`: `compareAndSet(NOT_STARTED, RUNNING)` → dopiero wtedy odczyt `startedAt`, start kolektora, termin limitu i wysyłka. Gdy CAS się nie uda: `compareAndSet(CANCELLED_BEFORE_START, RESULT_TAKEN)` → `finishedResult.await()` i zwrot tego wyniku (`Cancelled`) bez subskrypcji, limitu i wysyłki. Ponieważ `cancel()` ustawia `CANCELLED_BEFORE_START` przed `finish()`, `run()` może przejąć `RESULT_TAKEN`, zanim `finish()` się skończy; czekanie na `finishedResult` gwarantuje, że `run()` zwraca wynik dopiero, gdy PIN jest wyczyszczony, a stan `FINISHED` opublikowany; inaczej `IllegalStateException`.
 
 Jeden atomowy przełącznik rozstrzyga wyścig `cancel()` / `run()`: albo anulowanie przed startem (zero SMS-ów), albo zdarzenie `Cancel` w kanale obsłużone w `SENDING_COMMAND` (SESSION-17).
 
@@ -404,7 +405,7 @@ Testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremote/session/
 | SESSION-14 | `SessionUnknownInvariantTest` – jednostkowy: przegląd scenariuszy (lista z pozostałych testów) i asercja „`Unknown` ⇔ port dostał kod” |
 | SESSION-15 | `CarbsSessionConfirmationTimeoutTest` – jednostkowy, granice 419 999 / 420 000 ms; równość: `carbs-sukces.txt` i wynik portu kodu dokładnie w chwili 420 000 |
 | SESSION-16 | `CarbsSessionCodeSendFailureTest` – jednostkowy |
-| SESSION-17 | `SessionCancelTest` – jednostkowy, każda faza, anulowanie z zewnątrz, anulowanie przed `run()` (zero SMS-ów, `subscriptionCount` = 0); `SessionCancelRaceTest` – 1000 × równoczesne `cancel()`/`run()` na `Dispatchers.Default` |
+| SESSION-17 | `SessionCancelTest` – jednostkowy, każda faza, anulowanie z zewnątrz, anulowanie przed `run()` (zero SMS-ów, `subscriptionCount` = 0); `SessionCancelRaceTest` – 1000 × równoczesne `cancel()`/`run()` na `Dispatchers.Default` (PIN wyczyszczony i `FINISHED` w chwili powrotu z `run()`) oraz `run()` w trakcie wstrzymanego `finish()` po `cancel()` (zegar blokujący) |
 | SESSION-18 | `SessionUnexpectedMessagesTest` – jednostkowy |
 | SESSION-19 | `SessionPinClearingTest` – jednostkowy, parametryzowany wynikami; obserwator Turbine sprawdza `pin.isCleared` przy `FINISHED`; dostawca TOTP z MockK rzucający wyjątek; `SessionClockFailureTest` – zegar rzucający od wybranej chwili (przed kodem, od startu, przy zakończeniu po `CarbsConfirmed`) |
 | SESSION-20 | `SessionNoRetryTest` – jednostkowy: liczniki SMS-ów, `subscriptionCount == 0` po `FINISHED` |
