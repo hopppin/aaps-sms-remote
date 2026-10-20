@@ -18,10 +18,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * wewnątrz `withContext` zaraz po wywołaniu portu, które go przesądza (SECRET-13).
  *
  * Stan prac (łańcuch #70-#74):
- * - TODO(#71): wycofanie nieudanego zapisu (SECRET-05) i ponowienie po `KEY_INVALIDATED` z wyczyszczeniem
- *   (SECRET-08); do tego czasu `Failure(KEY_INVALIDATED)` w `save` daje `Failed(CRYPTO)` bez wyczyszczenia.
- * - TODO(#71): w `load` rekord nieprawidłowy, odszyfrowanie zakończone dowolnym `Failure` i pusty sekret
- *   dają tymczasowo `Unavailable` (bez usuwania i bez zmiany stanu); docelowo SECRET-08/09/10.
+ * - TODO(#72): wycofanie nieudanego zapisu (SECRET-05); do tego czasu `Failed(STORAGE)` bez wycofania.
  * - TODO(#73): `delete` (SECRET-11) i `refreshState` (SECRET-12) to zaślepki bez I/O.
  */
 @Singleton
@@ -38,13 +35,18 @@ class KeystoreTotpSecretStore @Inject constructor(
         withContext(dispatcher) {
             val plain = secret.copyBytes()
             try {
-                when (val r = cipher.encrypt(plain)) {
+                var r = cipher.encrypt(plain)
+                if (r is EncryptResult.Failure && r.reason == CryptoFailure.KEY_INVALIDATED) {
+                    wipe() // SECRET-08: jedno ponowne zaszyfrowanie po wyczyszczeniu, na tej samej kopii bajtów
+                    r = cipher.encrypt(plain)
+                }
+                when (r) {
                     is EncryptResult.Success -> {
                         if (safeWrite(SealedSecretFormat.encode(r.sealed))) {
                             _state.value = SecretState.PRESENT
                             SaveResult.Saved
                         } else {
-                            // TODO(#71): jedna próba wycofania do rekordu sprzed zapisu (SECRET-05).
+                            // TODO(#72): jedna próba wycofania do rekordu sprzed zapisu (SECRET-05).
                             updateStateFromStorage()
                             SaveResult.Failed(SaveFailure.STORAGE)
                         }
@@ -52,7 +54,7 @@ class KeystoreTotpSecretStore @Inject constructor(
                     is EncryptResult.Failure -> when (r.reason) {
                         CryptoFailure.LOCKED -> SaveResult.Locked
                         CryptoFailure.KEY_GENERATION_FAILED -> SaveResult.Failed(SaveFailure.KEY_GENERATION)
-                        // UNAVAILABLE, CORRUPTED, KEY_INVALIDATED (do czasu #71 bez wyczyszczenia)
+                        // UNAVAILABLE, CORRUPTED, drugie KEY_INVALIDATED
                         else -> SaveResult.Failed(SaveFailure.CRYPTO)
                     }
                 }
@@ -75,21 +77,22 @@ class KeystoreTotpSecretStore @Inject constructor(
                 if (_state.value != SecretState.INVALIDATED) _state.value = SecretState.ABSENT
                 return@withContext LoadResult.Absent
             }
-            // TODO(#71): rekord nieprawidłowy -> wyczyszczenie i Invalidated (SECRET-08).
-            val sealed = SealedSecretFormat.decode(record) ?: return@withContext LoadResult.Unavailable
+            val sealed = SealedSecretFormat.decode(record) ?: return@withContext wipeAndInvalidate()
             when (val r = cipher.decrypt(sealed)) {
                 is DecryptResult.Success -> try {
                     val secret = TotpSecret.fromBytes(r.plaintext) // kopiuje bajty
                     _state.value = SecretState.PRESENT
                     LoadResult.Loaded(secret)
                 } catch (_: IllegalArgumentException) {
-                    // TODO(#71): pusty sekret -> wyczyszczenie i Invalidated (SECRET-08).
-                    LoadResult.Unavailable
+                    wipeAndInvalidate() // pusty sekret (SECRET-08)
                 } finally {
                     r.plaintext.fill(0)
                 }
-                // TODO(#71): LOCKED -> Locked, KEY_INVALIDATED/CORRUPTED -> Invalidated (SECRET-08/09/10).
-                is DecryptResult.Failure -> LoadResult.Unavailable
+                is DecryptResult.Failure -> when (r.reason) {
+                    CryptoFailure.LOCKED -> LoadResult.Locked // SECRET-09: nic nie usuwamy
+                    CryptoFailure.KEY_INVALIDATED, CryptoFailure.CORRUPTED -> wipeAndInvalidate()
+                    else -> LoadResult.Unavailable // SECRET-10: UNAVAILABLE, KEY_GENERATION_FAILED
+                }
             }
         }
     }
@@ -99,6 +102,34 @@ class KeystoreTotpSecretStore @Inject constructor(
 
     /** TODO(#73): SECRET-12. Zaślepka: bez I/O, zwraca bieżący stan. */
     override suspend fun refreshState(): SecretState = _state.value
+
+    /**
+     * SECRET-08: usuwa rekord, potem klucz (wyniki i wyjątki ignorowane poza anulowaniem), stan INVALIDATED.
+     */
+    private fun wipe() {
+        safeClear()
+        try {
+            cipher.deleteKey()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            // wynik ignorowany
+        }
+        _state.value = SecretState.INVALIDATED
+    }
+
+    private fun wipeAndInvalidate(): LoadResult {
+        wipe()
+        return LoadResult.Invalidated
+    }
+
+    private fun safeClear(): Boolean = try {
+        storage.clear()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
+    }
 
     /** Wynik `write`; wyjątek (poza anulowaniem) to `false`. */
     private fun safeWrite(record: String): Boolean = try {
