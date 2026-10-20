@@ -11,8 +11,6 @@ import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import pl.twojanazwa.aapsremote.sms.SentResultsRegistration
 import pl.twojanazwa.aapsremote.sms.SmsSystemApi
@@ -53,23 +51,26 @@ class AndroidSmsSystemApi
         ) {
             val handle = registration as Registration
             val manager = smsManager()
-            val intents = ArrayList<PendingIntent?>(parts.size)
-            for (i in parts.indices) {
-                val intent = Intent(handle.action).setPackage(context.packageName).putExtra(EXTRA_PART_INDEX, i)
-                val pending =
-                    PendingIntent.getBroadcast(
-                        context,
-                        i,
-                        intent,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
-                    )
-                handle.track(pending)
-                intents.add(pending)
-            }
-            if (parts.size == 1) {
-                manager.sendTextMessage(destination, null, parts[0], intents[0], null)
-            } else {
-                manager.sendMultipartTextMessage(destination, null, ArrayList(parts), intents, null)
+            // Pod blokadą rejestracji: równoległe unregister() (anulowanie) nie przepuści wysyłki ani nowych PendingIntent.
+            handle.whileActive { track ->
+                val intents = ArrayList<PendingIntent?>(parts.size)
+                for (i in parts.indices) {
+                    val intent = Intent(handle.action).setPackage(context.packageName).putExtra(EXTRA_PART_INDEX, i)
+                    val pending =
+                        PendingIntent.getBroadcast(
+                            context,
+                            i,
+                            intent,
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_ONE_SHOT,
+                        )
+                    track(pending)
+                    intents.add(pending)
+                }
+                if (parts.size == 1) {
+                    manager.sendTextMessage(destination, null, parts[0], intents[0], null)
+                } else {
+                    manager.sendMultipartTextMessage(destination, null, ArrayList(parts), intents, null)
+                }
             }
         }
 
@@ -92,15 +93,24 @@ class AndroidSmsSystemApi
             private val receiver: BroadcastReceiver,
             val action: String,
         ) : SentResultsRegistration {
-            private val pendingIntents = CopyOnWriteArrayList<PendingIntent>()
-            private val done = AtomicBoolean(false)
+            private val pendingIntents = ArrayList<PendingIntent>()
+            private var done = false
 
-            fun track(pending: PendingIntent) {
-                pendingIntents.add(pending)
-            }
+            /** Wykonuje [block] pod blokadą rejestracji; null, gdy już wyrejestrowana (nic nie wysyłamy). */
+            fun <T> whileActive(block: (track: (PendingIntent) -> Unit) -> T): T? =
+                synchronized(this) {
+                    if (done) null else block { pendingIntents.add(it) }
+                }
 
             override fun unregister() {
-                if (!done.compareAndSet(false, true)) return
+                synchronized(this) {
+                    if (done) return
+                    done = true
+                    unregisterLocked()
+                }
+            }
+
+            private fun unregisterLocked() {
                 try {
                     context.unregisterReceiver(receiver)
                 } catch (e: IllegalArgumentException) {
