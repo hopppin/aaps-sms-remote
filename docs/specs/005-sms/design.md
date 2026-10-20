@@ -269,7 +269,7 @@ override fun messages(): Flow<IncomingSms> = flow {
 2. `number = AapsNumber.parse(numberProvider.currentNumber())`; `null` → koniec (SMS-04).
 3. `fresh = SmsAssembler.assemble(parts).filter { number.matchesSender(it.sender) }.filter { registry.markFirstDelivery(it) }` (SMS-03, SMS-04, SMS-06).
 4. `targets = synchronized(lock) { subscribers.toList() }`; dla każdej `m` z `fresh` po kolei: `IncomingSms(m.body, t)` → `trySend` do każdego kanału (nieograniczony – nie blokuje, SMS-07).
-5. Kroki 2–4 w `try { } catch (e: Exception) { }` – wyjątek pomija broadcast.
+5. Kroki 1–4 w `try { } catch (e: Exception) { }` – wyjątek (także zegara w kroku 1) pomija broadcast; `onBroadcast` nie propaguje wyjątków.
 
 `join`/`leave` i `register`/`unregister` pod blokadą: wywołania systemu nie wołają zwrotnie `onBroadcast` synchronicznie, więc blokada nie grozi zakleszczeniem; `onBroadcast` bierze blokadę tylko na kopię listy.
 
@@ -357,7 +357,7 @@ override suspend fun send(message: OutgoingSms): SendResult = try {
 
 ## Mapowanie wymagań na testy
 
-Testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremote/sms/`, `runTest` + Turbine, nazwy zawierają identyfikator wymagania. Wspólne pomocniki testowe:
+Testy jednostkowe JUnit 5 w `app/src/test/java/pl/twojanazwa/aapsremote/sms/`, `runTest` + Turbine. Nazwa każdej metody testowej zaczyna się od identyfikatora wymagania, np. `` `SMS-01 numer z mniej niż 9 cyframi to błędna konfiguracja` ``; klasy w tabeli niżej grupują te metody. Wspólne pomocniki testowe:
 
 - `FakeSmsBroadcastRegistrar` – liczniki `register`/`unregister`, przechwycona funkcja `onBroadcast`, opcjonalny wyjątek przy rejestracji/wyrejestrowaniu, `isRegistered`.
 - `FakeSmsPermissions` – przełączane `canSend`/`canReceive`.

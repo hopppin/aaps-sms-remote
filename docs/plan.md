@@ -4,7 +4,7 @@ Wersja z 17.10.2026
 
 ## Cel i zakres
 
-Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie, wpisując PIN AAPS, i nie musi przepisywać kodów z Authenticatora. PIN nie jest nigdzie zapisywany.
+Aplikacja na Androida wysyła gotowe polecenia SMS do telefonu z AndroidAPS i sama odpowiada kodem potwierdzającym (TOTP + PIN). Użytkownik zatwierdza wysłanie, wpisując PIN AAPS, i nie musi przepisywać kodów z Authenticatora. Aplikacja nigdzie nie zapisuje PIN-u (system Android zapisuje jednak wysłany SMS z kodem w skrzynce wysłanych wiadomości – spec 005).
 
 **Polecenia w wersji 1 (MVP):**
 
@@ -83,7 +83,7 @@ Katalog poleceń jest danymi, a nie kodem rozsianym po ekranach. Dodanie bolusa 
 Sekret TOTP jest szyfrowany kluczem z Android Keystore, którego nie da się wyciągnąć z telefonu. Klucz działa tylko przy odblokowanym telefonie (`setUnlockedDeviceRequired(true)`). Kradzież pliku z danymi aplikacji nic wtedy nie daje. PIN AAPS zna tylko użytkownik, więc potwierdzenie wymaga dwóch czynników: telefonu z sekretem i PIN-u.
 
 - **Sekret TOTP:** wczytany raz ze zeskanowanego QR (`otpauth://…`), zapisany zaszyfrowany. Nigdy nie jest pokazywany ani logowany.
-- **PIN AAPS:** wpisywany przy każdym poleceniu z potwierdzeniem. Nigdy nie jest zapisywany na dysku ani logowany; po zakończeniu polecenia jest czyszczony z pamięci. Aplikacja nie używa biometrii i nie ma własnego PIN-u.
+- **PIN AAPS:** wpisywany przy każdym poleceniu z potwierdzeniem. Aplikacja nigdy nie zapisuje go na dysku ani nie loguje (poza jej kontrolą system Android zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych wiadomości – spec 005); po zakończeniu polecenia jest czyszczony z pamięci. Aplikacja nie używa biometrii i nie ma własnego PIN-u.
 - **Brak kopii:** `allowBackup=false`, żeby sekret nie trafiał do kopii zapasowej Google.
 - **Ekran:** `FLAG_SECURE` na ekranach z danymi, czyli brak zrzutów i podglądu w ostatnich aplikacjach.
 - **Świadome ryzyko:** sekret TOTP i aplikacja są na jednym telefonie, więc kto ma odblokowany telefon, ma kod TOTP. Ochroną jest PIN AAPS w głowie użytkownika, blokada telefonu i to, że AAPS przyjmuje SMS tylko z dozwolonego numeru.

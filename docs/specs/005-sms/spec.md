@@ -83,7 +83,7 @@ Nadawca pasuje do poprawnego numeru AAPS wtedy i tylko wtedy, gdy nie jest `null
 
 ### SMS-03: Sklejanie części (K4)
 
-Części jednego broadcastu są grupowane po nadawcy (równość tekstu `originatingAddress`, `null` to osobna grupa). Każda grupa daje jedną wiadomość złożoną: treść = treści części tej grupy sklejone bez separatorów w kolejności z intentu (treść `null` = pusty tekst), znacznik centrum SMS = znacznik pierwszej części grupy. Wiadomości złożone są uporządkowane według pierwszego wystąpienia nadawcy w intencie. Części z różnych broadcastów nie są łączone (założenie: system dostarcza wszystkie części jednej wiadomości w jednym broadcaście – do weryfikacji W6).
+Części jednego broadcastu są grupowane po nadawcy (równość tekstu `originatingAddress`, `null` to osobna grupa). Każda grupa daje jedną wiadomość złożoną: treść = treści części tej grupy sklejone bez separatorów w kolejności z intentu (treść `null` = pusty tekst), znacznik centrum SMS = znacznik pierwszej części grupy. Wiadomości złożone są uporządkowane według pierwszego wystąpienia nadawcy w intencie. Części z różnych broadcastów nie są łączone (założenie: system dostarcza wszystkie części jednej wiadomości w jednym broadcaście – do weryfikacji W4).
 
 **Kryteria akceptacji:**
 
