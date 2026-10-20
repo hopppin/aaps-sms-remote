@@ -54,6 +54,20 @@ class SealedSecretFormatTest {
     }
 
     @Test
+    fun `SECRET-03 rekord bez dopelnienia Base64 jest nieprawidlowy`() {
+        // 31 bajtow (nie 30): 30 dzieli sie przez 3, wiec Base64 nie ma dopelnienia. 31 daje "==".
+        val withPadding = Base64.getEncoder().encodeToString(
+            ByteArray(1 + 12 + 18).also { bytes ->
+                bytes[0] = 0x01
+                for (i in 13 until bytes.size) bytes[i] = 0xAA.toByte()
+            },
+        )
+        assertTrue(withPadding.endsWith("="))
+        assertNotNull(SealedSecretFormat.decode(withPadding))
+        assertNull(SealedSecretFormat.decode(withPadding.trimEnd('=')))
+    }
+
+    @Test
     fun `SECRET-03 aad wersji 1 to jeden bajt 0x01`() {
         assertArrayEquals(byteArrayOf(0x01), SealedSecretFormat.aad(0x01))
     }

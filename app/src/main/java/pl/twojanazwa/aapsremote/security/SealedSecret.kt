@@ -36,6 +36,8 @@ object SealedSecretFormat {
         } catch (_: IllegalArgumentException) {
             return null
         }
+        // Dekoder Javy przyjmuje też brak dopełnienia '=' i inne warianty; odrzucamy zapis niekanoniczny (SECRET-03).
+        if (Base64.getEncoder().encodeToString(bytes) != record) return null
         if (bytes.size < MIN_RECORD_LENGTH) return null
         if (bytes[0] != VERSION_1) return null
         return SealedSecret(
