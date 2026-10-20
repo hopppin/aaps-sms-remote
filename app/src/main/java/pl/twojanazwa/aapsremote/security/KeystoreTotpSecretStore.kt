@@ -18,7 +18,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * wewnątrz `withContext` zaraz po wywołaniu portu, które go przesądza (SECRET-13).
  *
  * Stan prac (łańcuch #70-#74):
- * - TODO(#72): wycofanie nieudanego zapisu (SECRET-05); do tego czasu `Failed(STORAGE)` bez wycofania.
  * - TODO(#73): `delete` (SECRET-11) i `refreshState` (SECRET-12) to zaślepki bez I/O.
  */
 @Singleton
@@ -42,11 +41,17 @@ class KeystoreTotpSecretStore @Inject constructor(
                 }
                 when (r) {
                     is EncryptResult.Success -> {
+                        // Rekord sprzed zapisu (po ewentualnym wipe() - wtedy brak) albo Unknown, gdy odczyt rzucił.
+                        val previous = readForRollback()
                         if (safeWrite(SealedSecretFormat.encode(r.sealed))) {
                             _state.value = SecretState.PRESENT
                             SaveResult.Saved
                         } else {
-                            // TODO(#72): jedna próba wycofania do rekordu sprzed zapisu (SECRET-05).
+                            // commit() == false mógł już zmienić stan w pamięci SharedPreferences:
+                            // jedna próba wycofania (SECRET-05), tylko gdy znamy poprzednią zawartość.
+                            if (previous is PreviousRecord.Known) {
+                                if (previous.record != null) safeWrite(previous.record) else safeClear()
+                            }
                             updateStateFromStorage()
                             SaveResult.Failed(SaveFailure.STORAGE)
                         }
@@ -129,6 +134,27 @@ class KeystoreTotpSecretStore @Inject constructor(
         throw e
     } catch (_: Exception) {
         false
+    }
+
+    /** Zawartość magazynu sprzed zapisu, potrzebna do wycofania (SECRET-05). */
+    private sealed interface PreviousRecord {
+        /** [record] == null: magazyn był pusty (albo zawierał rekord nieprawidłowy - nigdy go nie przywracamy). */
+        class Known(val record: String?) : PreviousRecord {
+            override fun toString(): String = "Known(***)"
+        }
+
+        data object Unknown : PreviousRecord
+    }
+
+    private fun readForRollback(): PreviousRecord {
+        val record = try {
+            storage.read()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return PreviousRecord.Unknown
+        }
+        return PreviousRecord.Known(record?.takeIf { SealedSecretFormat.decode(it) != null })
     }
 
     /** Wynik `write`; wyjątek (poza anulowaniem) to `false`. */
