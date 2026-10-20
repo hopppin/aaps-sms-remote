@@ -377,15 +377,24 @@ Atrapa `InMemoryHistoryStorage` (testy): lista wierszy, licznik `nextId` (nigdy 
 private val lock = Any()
 /** Klucze słabe, równość tożsamościowa (MutableStateFlow nie nadpisuje equals). */
 private val tracked = WeakHashMap<StateFlow<SessionState>, Unit>()
+/** Sprawiedliwy (FIFO): zapisy w kolejności wywołań track. */
+private val recordMutex = Mutex()
 
 fun track(state: StateFlow<SessionState>) {
-    synchronized(lock) { if (tracked.put(state, Unit) != null) return }
-    scope.launch {
-        val result = state.first { it.phase == SessionPhase.FINISHED }.result ?: return@launch
-        try { history.record(result) } catch (e: CancellationException) { throw e } catch (e: Exception) { }
+    synchronized(lock) {
+        if (tracked.put(state, Unit) != null) return
+        // UNDISPATCHED: kolejka do Mutexu ustalana jeszcze w wywołaniu track, pod lock.
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            recordMutex.withLock {
+                val result = state.first { it.phase == SessionPhase.FINISHED }.result ?: return@launch
+                try { history.record(result) } catch (e: CancellationException) { throw e } catch (e: Exception) { }
+            }
+        }
     }
 }
 ```
+
+- Kolejność (DATA-13): `track` jest wołane zaraz po `StartResult.Started`, a koordynator (SESSION-22) wyklucza równoległe sesje, więc kolejność wywołań `track` = kolejność zakończenia. Oczekiwanie na `FINISHED` jest pod `Mutex`, więc zapis sesji B nie wyprzedzi zapisu A, nawet gdy wznowienie korutyny A się opóźni. Sesja z koordynatora zawsze dochodzi do `FINISHED` (limity czasu, `cancel()` po zakończeniu zadania sesji), więc kolejka nie zawiesza się na stałe.
 
 - `StateFlow` zawsze oddaje bieżącą wartość, a `FINISHED` jest stanem końcowym sesji (Spec 004), więc `first` widzi zakończenie także, gdy stan przekazano po nim; nie ma utraty przez łączenie wartości.
 - `result != null` iff `FINISHED` (niezmiennik `SessionState`); `?: return` tylko dla bezpieczeństwa typów.
