@@ -381,7 +381,7 @@ Sesja udostępnia stan jako `StateFlow`: fazę, listę wiadomości nieoczekiwany
 
 ### SESSION-22: Jedno aktywne polecenie
 
-Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesję. Sesja jest aktywna od udanego startu przez koordynatora do przejścia do `FINISHED`. Start najpierw atomowo rezerwuje miejsce na aktywną sesję, a dopiero potem tworzy sesję. Gdy miejsce jest zajęte (aktywna sesja albo trwający start), start zwraca „zajęte” bez sprawdzania danych wejściowych (także dla niepoprawnego zestawu polecenie/dane do kodu nie rzuca wyjątku), nie tworzy sesji, niczego nie wysyła i czyści przekazany PIN. Gdy utworzenie sesji po rezerwacji rzuci `IllegalArgumentException` (SESSION-02), rezerwacja jest zwalniana, PIN jest wyczyszczony, a wyjątek trafia do wywołującego. Z dowolnej liczby równoczesnych startów co najwyżej jeden się udaje. Koordynator udostępnia aktywną sesję jako `StateFlow` (pusta, gdy brak), żeby `ui` blokowało przyciski. `ui` uruchamia polecenia wyłącznie przez koordynatora.
+Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesję. Sesja jest aktywna od udanego startu przez koordynatora do zwolnienia miejsca, które następuje po opublikowaniu fazy `FINISHED` i przed powrotem z uruchomienia sesji; start w tym oknie zwraca „zajęte”. Start najpierw atomowo rezerwuje miejsce na aktywną sesję, a dopiero potem tworzy sesję. Gdy miejsce jest zajęte (aktywna sesja albo trwający start), start zwraca „zajęte” bez sprawdzania danych wejściowych (także dla niepoprawnego zestawu polecenie/dane do kodu nie rzuca wyjątku), nie tworzy sesji, niczego nie wysyła i czyści przekazany PIN. Gdy utworzenie sesji po rezerwacji rzuci `IllegalArgumentException` (SESSION-02), rezerwacja jest zwalniana, PIN jest wyczyszczony, a wyjątek trafia do wywołującego. Z dowolnej liczby równoczesnych startów co najwyżej jeden się udaje. Koordynator udostępnia aktywną sesję jako `StateFlow` (pusta, gdy brak), żeby `ui` blokowało przyciski. `ui` uruchamia polecenia wyłącznie przez koordynatora.
 
 **Kryteria akceptacji:**
 
@@ -389,7 +389,8 @@ Koordynator sesji (jeden na aplikację) dopuszcza najwyżej jedną aktywną sesj
 - **Zakładając** aktywną sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** wystartowano `CARBS 2` z PIN-em `4321`, **wtedy** wynik to „zajęte”, port wysyłania nie otrzymał `CARBS 2`, a przekazany PIN jest wyczyszczony.
 - **Zakładając** aktywną sesję `CARBS 1`, **gdy** wystartowano `BG` z danymi do kodu (PIN `4321`) albo `CARBS 2` bez danych do kodu, **wtedy** w obu przypadkach wynik to „zajęte” bez wyjątku, a przekazany PIN `4321` jest wyczyszczony.
 - **Zakładając** brak aktywnej sesji, **gdy** wystartowano `BG` z danymi do kodu (PIN `4321`), **wtedy** rzucany jest `IllegalArgumentException`, PIN jest wyczyszczony, aktywna sesja jest pusta, a kolejny start `BG` bez danych do kodu zwraca „wystartowano”.
-- **Zakładając** aktywną sesję, która właśnie przeszła do `FINISHED`, **gdy** odczytano aktywną sesję, **wtedy** jest pusta, a kolejny start `BG` się udaje.
+- **Zakładając** aktywną sesję, której uruchomienie zwróciło wynik, **gdy** odczytano aktywną sesję, **wtedy** jest pusta, a kolejny start `BG` się udaje.
+- **Zakładając** sesję wstrzymaną po opublikowaniu `FINISHED`, a przed zwolnieniem miejsca, **gdy** wystartowano `BG`, **wtedy** wynik to „zajęte” i istnieje najwyżej jedna sesja bez `FINISHED`.
 - **Zakładając** 100 równoczesnych startów `BG` na `Dispatchers.Default` przy braku aktywnej sesji, **gdy** wszystkie się zakończyły, **wtedy** dokładnie jeden zwrócił „wystartowano”.
 - **Zakładając** aktywną sesję anulowaną z zewnątrz (zakres zamknięty), **gdy** odczytano aktywną sesję, **wtedy** jest pusta.
 
