@@ -122,6 +122,16 @@ class CryptoFailureClassifierTest {
     }
 
     @Test
+    fun `SECRET-17 classify przepuszcza CancellationException`() {
+        assertThrows(CancellationException::class.java) {
+            CryptoFailureClassifier.classify(CancellationException("x"), FakeKeystoreEnvironment(locked = false))
+        }
+        assertThrows(CancellationException::class.java) {
+            CryptoFailureClassifier.classify(CancellationException("x"), FakeKeystoreEnvironment(locked = true))
+        }
+    }
+
+    @Test
     fun `SECRET-17 CancellationException z rozpoznawania typu jest przepuszczany`() {
         val env = FakeKeystoreEnvironment(predicateError = CancellationException("x"))
         assertThrows(CancellationException::class.java) { CryptoFailureClassifier.classify(AEADBadTagException(), env) }

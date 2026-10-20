@@ -10,7 +10,9 @@ import kotlin.coroutines.cancellation.CancellationException
 object CryptoFailureClassifier {
     const val MAX_CHAIN: Int = 8
 
+    /** Rzuca `CancellationException`, gdy sam błąd nim jest (SECRET-17); inaczej klasyfikuje wg SECRET-07. */
     fun classify(error: Throwable, environment: KeystoreEnvironment): CryptoFailure {
+        if (error is CancellationException) throw error
         lockedFailure(environment)?.let { return it }
         val chain = causeChain(error, MAX_CHAIN)
         return when {
