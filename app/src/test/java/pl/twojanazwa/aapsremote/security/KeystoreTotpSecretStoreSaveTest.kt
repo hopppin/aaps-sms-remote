@@ -169,10 +169,11 @@ class KeystoreTotpSecretStoreSaveTest {
 
     @Test
     fun `SECRET-04 zapis zmieniajacy wartosc i zwracajacy false daje stan PRESENT`() = runTest {
+        val s = store(fakeCipher)
+        assertEquals(SaveResult.Saved, s.save(secret(s1Bytes)))
         storage.writeResult = false
         storage.writeChangesValueButReturnsFalse = true
-        val s = store(fakeCipher)
-        assertEquals(SaveResult.Failed(SaveFailure.STORAGE), s.save(secret(s1Bytes)))
+        assertEquals(SaveResult.Failed(SaveFailure.STORAGE), s.save(secret(s2Bytes)))
         assertEquals(SecretState.PRESENT, s.state.value)
     }
 

@@ -23,16 +23,41 @@ class InMemorySecretRecordStorage(var record: String? = null) : SecretRecordStor
     /** Akcja wywoływana na początku [write] (np. anulowanie korutyny). */
     var onWrite: (() -> Unit)? = null
 
+    /** Numery wywołań [read] (1 = pierwsze od początku życia atrapy), przy których [read] rzuca [readErrorOnCall]. */
+    var readErrorOnCalls: Set<Int> = emptySet()
+    var readErrorOnCall: Exception = IllegalStateException("test")
+
+    /** Tryb „pierwsze N zapisów zmienia wartość i zwraca false, kolejne działają normalnie”. */
+    var failFirstWritesWithChange = 0
+
+    /** Tryb „pierwsze N zapisów zmienia wartość i rzuca RuntimeException” (wyjątek po zmianie stanu). */
+    var failFirstWritesWithChangeAndThrow = 0
+
+    /** Rejestr wartości przekazanych do [write] (kolejno). */
+    val writes = mutableListOf<String>()
+
     override fun read(): String? {
         readCount++
         readError?.let { throw it }
+        if (readCount in readErrorOnCalls) throw readErrorOnCall
         return record
     }
 
     override fun write(record: String): Boolean {
         writeCount++
+        writes += record
         onWrite?.invoke()
         writeError?.let { throw it }
+        if (failFirstWritesWithChangeAndThrow > 0) {
+            failFirstWritesWithChangeAndThrow--
+            this.record = record
+            throw RuntimeException("test: zapis zmienił wartość i rzucił")
+        }
+        if (failFirstWritesWithChange > 0) {
+            failFirstWritesWithChange--
+            this.record = record
+            return false
+        }
         if (writeResult || writeChangesValueButReturnsFalse) this.record = record
         return writeResult
     }
