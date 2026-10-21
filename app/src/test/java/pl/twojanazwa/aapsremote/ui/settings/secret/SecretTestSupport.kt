@@ -17,8 +17,9 @@ class SecretFixture(
 ) {
     val store = FakeTotpSecretStore(initial)
     val session = SessionDoubles()
+    val camera = FakeCameraPermission()
     val clipboard = FakeSecretClipboard()
-    val viewModel = TotpSecretViewModel(store, session.coordinator, FakeCameraPermission(), clipboard)
+    val viewModel = TotpSecretViewModel(store, session.coordinator, camera, clipboard)
 
     fun idle() = dispatcher.scheduler.advanceUntilIdle()
 }
