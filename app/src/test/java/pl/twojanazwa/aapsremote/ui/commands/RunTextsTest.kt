@@ -1,0 +1,79 @@
+package pl.twojanazwa.aapsremote.ui.commands
+
+import java.io.File
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+class RunTextsTest {
+    private val strings: Map<String, String> by lazy {
+        val xml = File("src/main/res/values/strings.xml").readText()
+        Regex("""<string name="([^"]+)"[^>]*>([^<]*)</string>""")
+            .findAll(xml)
+            .associate { it.groupValues[1] to it.groupValues[2] }
+    }
+
+    private fun assertDistinctNonZero(ids: List<Int>) {
+        ids.forEach { assertNotEquals(0, it) }
+        assertEquals(ids.size, ids.toSet().size, "identyfikatory muszą być różne")
+    }
+
+    @Test
+    fun `CMDUI-25 kazda wartosc ResultKind ma niezerowy rozny identyfikator`() {
+        assertDistinctNonZero(ResultKind.entries.map { it.titleRes() })
+    }
+
+    @Test
+    fun `CMDUI-25 kazda wartosc ResultMessage ma niezerowy rozny identyfikator`() {
+        assertDistinctNonZero(ResultMessage.entries.map { it.textRes() })
+    }
+
+    @Test
+    fun `CMDUI-25 kazda wartosc ProgressStepId ma niezerowy rozny identyfikator`() {
+        assertDistinctNonZero(ProgressStepId.entries.map { it.textRes() })
+    }
+
+    @Test
+    fun `CMDUI-25 klucze run i result sa niepuste`() {
+        val keys = listOf(
+            "run_title_bg", "run_title_pump", "run_title_carbs",
+            "run_step_send_command", "run_step_await_reply", "run_step_await_code_request",
+            "run_step_prepare_code", "run_step_send_code", "run_step_await_confirmation",
+            "run_foreground_hint", "run_unexpected", "run_cancel", "run_stop_waiting",
+            "run_stop_title", "run_stop_text", "run_stop_dismiss",
+            "run_exit_title", "run_exit_text", "run_exit_stay", "run_exit_leave",
+            "result_kind_success", "result_kind_failure", "result_kind_no_response",
+            "result_kind_unknown", "result_kind_cancelled",
+            "result_bg_reply", "result_pump_reply", "result_carbs_confirmed", "result_send_failed",
+            "result_unrecognized_reply", "result_amount_mismatch", "result_unexpected_reply",
+            "result_wrong_code", "result_code_request_expired", "result_code_preparation_timeout",
+            "result_internal_error", "result_no_response", "result_send_timeout",
+            "result_unknown_confirmation_timeout", "result_unknown_cancelled_after_code",
+            "result_unknown_code_send_failed", "result_unknown_unrecognized_reply",
+            "result_unknown_amount_mismatch", "result_unknown_unexpected_reply",
+            "result_unknown_internal_error", "result_cancelled", "result_reply_label",
+            "result_code_not_sent", "result_unknown_warning", "result_close",
+        )
+        keys.forEach { assertTrue(!strings[it].isNullOrBlank(), "Brak niepustego tekstu: $it") }
+    }
+
+    @Test
+    fun `CMDUI-25 klucze z argumentem zawieraja procent 1 d`() {
+        listOf(
+            "run_title_carbs", "run_step_await_reply", "run_step_await_code_request",
+            "run_step_await_confirmation", "run_unexpected", "result_carbs_confirmed",
+            "result_no_response", "result_send_timeout", "result_unknown_confirmation_timeout",
+        ).forEach { assertTrue(strings[it]!!.contains("%1\$d"), "Brak %1\$d: $it") }
+    }
+
+    @Test
+    fun `CMDUI-25 tresci wiazace ze spec`() {
+        assertEquals("AAPS potwierdził wprowadzenie %1\$d g", strings["result_carbs_confirmed"])
+        assertEquals("Nieznany – sprawdź w AAPS", strings["result_kind_unknown"])
+        assertEquals(
+            "Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.",
+            strings["result_unknown_warning"],
+        )
+    }
+}
