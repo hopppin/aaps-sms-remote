@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.ui.commands.CommandRunScope
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlin.coroutines.ContinuationInterceptor
 
 class CommandsModuleTest {
 
@@ -43,6 +45,17 @@ class CommandsModuleTest {
             withTimeout(5_000) { done.await() }
         } finally {
             job.cancel()
+        }
+    }
+
+    @Test
+    fun `CMDUI-13 zakres ma SupervisorJob i dyspozytor Default`() {
+        val scope = CommandsModule.commandRunScope()
+        try {
+            assertEquals(Dispatchers.Default, scope.coroutineContext[ContinuationInterceptor])
+            assertNotNull(scope.coroutineContext[Job])
+        } finally {
+            scope.coroutineContext[Job]!!.cancel()
         }
     }
 }
