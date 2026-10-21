@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -56,6 +57,17 @@ class AapsNumberViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AapsNumberUiState())
 
+    init {
+        // UI-15: start polecenia zamyka okno usunięcia; edycja zostaje, trwająca operacja jest dokańczana.
+        viewModelScope.launch {
+            coordinator.activeSession.map { it != null }.distinctUntilChanged().collect { active ->
+                if (active) local.update { it.copy(confirmingClear = false) }
+            }
+        }
+    }
+
+    private fun commandActive(): Boolean = coordinator.activeSession.value != null
+
     /** „Ustaw numer” i „Zmień”. */
     fun onEditClicked() {
         val initial = when (val state = store.state.value) {
@@ -72,7 +84,11 @@ class AapsNumberViewModel @Inject constructor(
 
     fun onSaveClicked() {
         val current = local.value
-        if (!current.editing) return
+        if (!current.editing || current.busy) return // UI-16
+        if (commandActive()) { // UI-15: sprawdzenie w chwili akcji
+            local.update { it.copy(message = NumberMessage.COMMAND_ACTIVE) }
+            return
+        }
         local.update { it.copy(busy = true) }
         viewModelScope.launch {
             val result = try {
@@ -98,12 +114,22 @@ class AapsNumberViewModel @Inject constructor(
     }
 
     fun onClearClicked() {
-        if (store.state.value !is AapsNumberState.Configured) return
+        if (store.state.value !is AapsNumberState.Configured || local.value.busy) return
+        if (commandActive()) {
+            local.update { it.copy(message = NumberMessage.COMMAND_ACTIVE) }
+            return
+        }
         local.update { it.copy(confirmingClear = true) }
     }
 
     fun onClearConfirmed() {
-        if (!local.value.confirmingClear) return
+        val current = local.value
+        if (!current.confirmingClear) return
+        if (current.busy) return // UI-16
+        if (commandActive()) { // UI-15
+            local.update { it.copy(confirmingClear = false, message = NumberMessage.COMMAND_ACTIVE) }
+            return
+        }
         local.update { it.copy(confirmingClear = false, busy = true) }
         viewModelScope.launch {
             val result = try {
