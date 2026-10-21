@@ -142,7 +142,7 @@ interface SecretClipboard {
 internal fun clearClipboardIfPasted(clipboard: SecretClipboard, pasted: String)
 ```
 
-`ui.platform.AndroidSecretClipboard`: `ClipboardManager` z kontekstu aplikacji; `currentText()` = `primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()` w `try`/`catch (e: RuntimeException)` → `null`; `clear()` = `clearPrimaryClip()` (API 28+, minSdk 28) w `try`/`catch`. Wiązanie w `UiModule`. Uwagi platformowe (do W10): od API 29 aplikacja bez fokusu nie czyta schowka (`currentText()` = `null` przy `ON_STOP` → schowek bez zmian); od API 31 system może pokazać powiadomienie o odczycie schowka przez aplikację.
+`ui.platform.AndroidSecretClipboard`: `ClipboardManager` z kontekstu aplikacji; `currentText()` = `primaryClip?.takeIf { it.itemCount == 1 }?.getItemAt(0)?.text?.toString()` (klip z wieloma elementami → `null`, bo `clearPrimaryClip()` usuwa cały klip) w `try`/`catch (e: RuntimeException)` → `null`; `clear()` = `clearPrimaryClip()` (API 28+, minSdk 28) w `try`/`catch`. Wiązanie w `UiModule`. Uwagi platformowe (do W10): od API 29 aplikacja bez fokusu nie czyta schowka (`currentText()` = `null` przy `ON_STOP` → schowek bez zmian); od API 31 system może pokazać powiadomienie o odczycie schowka przez aplikację.
 
 ### Numer AAPS (UI-04 – UI-06, UI-15, UI-16)
 

@@ -427,7 +427,7 @@ Kompozycje, nawigacja, kamera, okna uprawnień i wiązania Hilt nie mają testó
 | W7 | Uprawnienia SMS na aplikacji instalowanej z APK: prośba, odmowa, trwała odmowa, przycisk ustawień, powrót i odświeżenie; zanotować, czy Android wymagał „ustawień z ograniczeniami” (to samo co W6 w Spec 005) | UI-17, UI-18 |
 | W8 | Uprawnienia w zbudowanym APK debug (`aapt2 dump permissions` albo „Merged Manifest”): są `SEND_SMS`, `RECEIVE_SMS`, `CAMERA`; brak `INTERNET` i `ACCESS_NETWORK_STATE` (połączony manifest bez uprawnień sieciowych); w ustawieniach systemu „Informacje o aplikacji” nie pokazują dostępu do sieci | UI-22 |
 | W9 | `FLAG_SECURE` przy otwartym skanerze i oknie wklejania: zrzut ekranu zablokowany, podgląd w ostatnich aplikacjach pusty; po zamknięciu zrzut działa | UI-23 |
-| W10 | Schowek: skopiowanie `URI_RFC`, wklejenie i „Zapisz” → schowek pusty; skopiowanie innego tekstu, otwarcie i „Anuluj” z pustym polem → schowek bez zmian; przejście w tło z otwartym oknem → zanotować, czy schowek wyczyszczono (API 29+ może nie dać dostępu); zanotować powiadomienie systemu o odczycie schowka (API 31+) | UI-24 |
+| W10 | Schowek: skopiowanie `URI_RFC`, wklejenie i „Zapisz” → schowek pusty; skopiowanie innego tekstu, otwarcie i „Anuluj” z pustym polem → schowek bez zmian; przejście w tło z otwartym oknem → zanotować, czy schowek wyczyszczono (API 29+ może nie dać dostępu); klip z dwoma elementami (np. z aplikacji udostępniającej wiele tekstów), z których pierwszy to wklejony URI → schowek bez zmian; zanotować powiadomienie systemu o odczycie schowka (API 31+) | UI-24 |
 
 Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekranu Polecenia – ich sprawdzenie ręczne opisuje pierwszy PR 009, który uruchamia polecenie.
 
