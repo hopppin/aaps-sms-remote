@@ -21,6 +21,8 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
 import pl.twojanazwa.aapsremote.ui.permissions.CameraPermission
+import pl.twojanazwa.aapsremote.ui.permissions.PermissionDenial
+import pl.twojanazwa.aapsremote.ui.permissions.PermissionDenialClassifier
 
 /**
  * Sekcja „Sekret TOTP” (UI-07, UI-08, UI-11). Sekret i wejście (URI) są wyłącznie zmiennymi
@@ -31,7 +33,7 @@ import pl.twojanazwa.aapsremote.ui.permissions.CameraPermission
 class TotpSecretViewModel @Inject constructor(
     private val store: TotpSecretStore,
     private val coordinator: SessionCoordinator,
-    @Suppress("unused") private val cameraPermission: CameraPermission,
+    private val cameraPermission: CameraPermission,
     @Suppress("unused") private val clipboard: SecretClipboard,
 ) : ViewModel() {
     /** Część stanu własna ViewModelu; `display` i `commandActive` dokłada `combine`. */
@@ -86,7 +88,82 @@ class TotpSecretViewModel @Inject constructor(
 
     fun onReplaceConfirmed() {
         val state = compose()
-        if (state.confirmingReplace == PendingSecretInput.PASTE && state.canPaste) openPaste()
+        when (state.confirmingReplace) {
+            PendingSecretInput.PASTE -> if (state.canPaste) openPaste()
+            PendingSecretInput.SCAN -> if (state.canScan) openScannerOrRequestCamera()
+            null -> Unit
+        }
+    }
+
+    fun onScanClicked() {
+        val state = compose()
+        if (!state.canScan) return
+        when (state.display) {
+            SecretDisplay.CHECKING, SecretDisplay.PRESENT ->
+                local.update { it.copy(confirmingReplace = PendingSecretInput.SCAN) }
+            SecretDisplay.ABSENT, SecretDisplay.INVALIDATED -> openScannerOrRequestCamera()
+        }
+    }
+
+    private fun openScannerOrRequestCamera() {
+        if (cameraPermission.isGranted()) {
+            local.update {
+                it.copy(confirmingReplace = null, mode = SecretInputMode.SCANNER, cameraDenial = PermissionDenial.NONE)
+            }
+        } else {
+            local.update { it.copy(confirmingReplace = null, cameraPermissionRequest = true) }
+        }
+    }
+
+    fun onCameraPermissionRequestLaunched() {
+        local.update { it.copy(cameraPermissionRequest = false) }
+    }
+
+    fun onCameraPermissionResult(shouldShowRationale: Boolean) {
+        if (cameraPermission.isGranted()) {
+            // Skaner tylko, gdy akcja jest nadal dozwolona (UI-15, UI-16); odmowę zapisujemy niezależnie.
+            val open = compose().canScan
+            local.update {
+                it.copy(
+                    mode = if (open) SecretInputMode.SCANNER else it.mode,
+                    cameraDenial = PermissionDenial.NONE,
+                )
+            }
+        } else {
+            val denial = PermissionDenialClassifier.classify(listOf(CameraPermission.CAMERA)) { shouldShowRationale }
+            local.update { it.copy(cameraDenial = denial) }
+        }
+    }
+
+    /** UI-09: tylko pierwsza wartość z otwartego skanera; kolejne i wartości przy zamkniętym skanerze są ignorowane. */
+    fun onQrScanned(raw: String) {
+        var accepted = false
+        local.update {
+            accepted = it.mode == SecretInputMode.SCANNER
+            if (accepted) it.copy(mode = SecretInputMode.NONE) else it
+        }
+        if (accepted) accept(raw)
+    }
+
+    fun onCameraFailed() {
+        local.update {
+            if (it.mode == SecretInputMode.SCANNER) {
+                it.copy(mode = SecretInputMode.NONE, message = SecretMessage.CAMERA_UNAVAILABLE)
+            } else {
+                it
+            }
+        }
+    }
+
+    fun onScannerClosed() {
+        local.update { if (it.mode == SecretInputMode.SCANNER) it.copy(mode = SecretInputMode.NONE) else it }
+    }
+
+    /** UI-10: po powrocie z ustawień systemu odmowa znika, gdy CAMERA jest już przyznane. */
+    fun onResume() {
+        if (local.value.cameraDenial != PermissionDenial.NONE && cameraPermission.isGranted()) {
+            local.update { it.copy(cameraDenial = PermissionDenial.NONE) }
+        }
     }
 
     fun onReplaceDismissed() {
