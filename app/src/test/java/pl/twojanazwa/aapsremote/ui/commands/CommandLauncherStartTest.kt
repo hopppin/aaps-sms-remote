@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
@@ -17,6 +18,7 @@ import pl.twojanazwa.aapsremote.security.LoadResult
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
 import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionPhase
+import pl.twojanazwa.aapsremote.session.SessionState
 import pl.twojanazwa.aapsremote.session.SessionTestFixtures
 import pl.twojanazwa.aapsremote.session.StartResult
 import pl.twojanazwa.aapsremote.session.deliverAt
@@ -103,5 +105,47 @@ class CommandLauncherStartTest {
         assertEquals(0, env.secrets.loadCount)
         assertEquals(0, env.sender.sendCount)
         assertEquals(null, env.coordinator.activeSession.value)
+    }
+
+    @Test
+    fun `CMDUI-16 po Started CurrentRun zawiera polecenie i stan sesji ustawione przed powrotem z launch`() = runTest {
+        val env = CommandTestEnv(this)
+
+        assertEquals(LaunchResult.Started, env.launcher().launch(Command.Bg, null))
+
+        val published = checkNotNull(env.currentRun.state.value)
+        val session = checkNotNull(env.coordinator.activeSession.value)
+        assertEquals(Command.Bg, published.command)
+        assertSame(session.state, published.state)
+        session.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `CMDUI-16 po Rejected CurrentRun pozostaje bez zmian`() = runTest {
+        val env = CommandTestEnv(this)
+        val earlier = CurrentRunData(
+            Command.Pump,
+            MutableStateFlow(SessionState(SessionPhase.AWAITING_REPLY, emptyList(), null)),
+        )
+        env.currentRun.publish(earlier)
+        env.permissions.receive = false
+
+        env.launcher().launch(Command.Bg, null)
+
+        assertSame(earlier, env.currentRun.state.value)
+    }
+
+    @Test
+    fun `CMDUI-16 startAndPublish publikuje uruchomienie w CurrentRun`() = runTest {
+        val env = CommandTestEnv(this)
+
+        val session = env.startAndPublish(Command.Pump)
+
+        val published = checkNotNull(env.currentRun.state.value)
+        assertEquals(Command.Pump, published.command)
+        assertSame(session.state, published.state)
+        session.cancel()
+        runCurrent()
     }
 }

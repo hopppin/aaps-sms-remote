@@ -21,10 +21,8 @@ import javax.inject.Inject
  * Sprawdzenia przed startem, odczyt sekretu tuż przed startem i start sesji w zakresie aplikacji
  * (CMDUI-12, CMDUI-13). Bez stanu: pola wyłącznie z zależnościami (CMDUI-15).
  *
- * `recorder` i `currentRun` są w konstruktorze zgodnie z design; ich użycie (historia, publikacja
- * uruchomienia) dochodzi w zadaniu 1c.
+ * Po starcie zapisuje sesję do historii (CMDUI-14) i publikuje uruchomienie w `CurrentRun` (CMDUI-16).
  */
-@Suppress("UnusedPrivateProperty")
 class CommandLauncher @Inject constructor(
     private val coordinator: SessionCoordinator,
     private val numbers: AapsNumberSettingsStore,
@@ -69,17 +67,24 @@ class CommandLauncher @Inject constructor(
             }
             // Anulowanie po load() (lub w ścieżce bez kodu) nie może wystartować sesji; PIN czyści finally.
             currentCoroutineContext().ensureActive()
-            val result = try {
-                coordinator.start(scope, command, credentials)
-            } catch (e: IllegalArgumentException) {
-                return LaunchResult.Rejected(LaunchRejection.START_FAILED)
-            }
-            return when (result) {
-                is StartResult.Started -> {
-                    started = true
-                    LaunchResult.Started
+            // Odcinek start -> track -> publish jest nierozdzielny i bez zawieszania: sesja, która zdąży się
+            // zakończyć po start, nie może po cudzym kolejnym uruchomieniu nadpisać CurrentRun (monitor `this`,
+            // bez pola, bo CMDUI-15).
+            return synchronized(this) {
+                val result = try {
+                    coordinator.start(scope, command, credentials)
+                } catch (e: IllegalArgumentException) {
+                    return@synchronized LaunchResult.Rejected(LaunchRejection.START_FAILED)
                 }
-                StartResult.Busy -> LaunchResult.Rejected(LaunchRejection.COMMAND_ACTIVE)
+                when (result) {
+                    is StartResult.Started -> {
+                        started = true
+                        recorder.track(result.session.state)
+                        currentRun.publish(CurrentRunData(command, result.session.state))
+                        LaunchResult.Started
+                    }
+                    StartResult.Busy -> LaunchResult.Rejected(LaunchRejection.COMMAND_ACTIVE)
+                }
             }
         } finally {
             if (!started) pin?.clear()
