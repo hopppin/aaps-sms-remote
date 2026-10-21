@@ -13,7 +13,7 @@ Aplikacja na Androida, która wysyła polecenia SMS do telefonu z AndroidAPS (AA
 - Kotlin, Jetpack Compose, Material 3
 - minSdk 28, compileSdk/targetSdk 37, JDK 17
 - Hilt (DI), Kotlin Coroutines + Flow, MVVM
-- Room (historia), Android Keystore + szyfrowane DataStore/SharedPreferences (bez biometrii)
+- Room (historia), `SharedPreferences` (ustawienia, spec 007); sekret TOTP szyfrowany kluczem Android Keystore (spec 006, bez biometrii)
 - Testy: JUnit 5, MockK, Turbine, `kotlinx-coroutines-test`
 - Wersje zależności: `gradle/libs.versions.toml`
 - Pakiet bazowy: `pl.twojanazwa.aapsremote`
