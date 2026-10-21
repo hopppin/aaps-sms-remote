@@ -109,6 +109,8 @@ Wynik wpisu jest wyliczany jedną czystą funkcją z wyczerpującym `when` po `H
 | `Cancelled` | anulowane | „Polecenie anulowane.” |
 | `Unrecognized` | nierozpoznany → nagłówek „Nierozpoznany wynik” | „Brak szczegółów wyniku …” |
 
+`Completed` dla `CARBS` ma odpowiednik na ekranie wyniku Spec 009 (CMDUI-19, korekta 2026-10-21): ten sam rodzaj (sukces) i komunikat „brak szczegółów” (`ResultMessage.DETAILS_MISSING`, „Brak szczegółów wyniku.”). Historia zostawia dla tego wiersza własny tekst z wyjaśnieniem o wpisie z innej wersji aplikacji; HISTUI-04 i jego kryteria się nie zmieniają.
+
 Dodatki (w szczegółach, P5) – reguły jak w CMDUI-19, z ograniczeniem do danych pewnych:
 
 - „Kod nie został wysłany.” – polecenie `CARBS` i wynik `Failed` z powodem innym niż `WRONG_CODE` i różnym od `null`, `TimedOut` albo `Cancelled`.

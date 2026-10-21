@@ -9,7 +9,7 @@ Druga część pakietu `ui` z [AGENTS.md](../../../AGENTS.md#architektura), budo
 | Klasa | Odpowiedzialność | Zależności |
 | --- | --- | --- |
 | `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track`, `CurrentRun.publish` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `CurrentRun`, `@CommandRunScope CoroutineScope` |
-| `ui.commands.CommandsViewModel` | panel: gotowość, `BG`/`PUMP`, pole `CARBS`, okno „Na pewno”, podsumowanie z PIN-em, komunikaty | `CommandLauncher`, `SessionCoordinator`, `AapsNumberSettingsStore`, `TotpSecretStore`, `SmsPermissions` |
+| `ui.commands.CommandsViewModel` | panel: gotowość, `BG`/`PUMP`, pole `CARBS`, okno „Na pewno”, podsumowanie z PIN-em, komunikaty, znacznik przekazania `FLAG_SECURE` do przebiegu (`runHandoff`) | `CommandLauncher`, `SessionCoordinator`, `CurrentRun`, `AapsNumberSettingsStore`, `TotpSecretStore`, `SmsPermissions` |
 | `ui.commands.CommandRunViewModel` | przebieg i wynik bieżącego uruchomienia (z `CurrentRun`), anulowanie, ekran włączony, Wstecz w trakcie polecenia | `CurrentRun`, `SessionCoordinator` |
 | `ui.commands.CurrentRun` (singleton Hilt) | publikuje `CurrentRunData` (polecenie + `StateFlow<SessionState>`) ostatnio uruchomionej sesji do czasu zamknięcia wyniku (CMDUI-16, CMDUI-21); bez referencji do `CommandSession` | – |
 | `ui.commands.ProgressSteps`, `ResultMapper` | czyste odwzorowania faza → kroki, `SessionResult` → `ResultView` | – (`session`, `commands`) |
@@ -20,7 +20,7 @@ Układ plików:
 
 ```
 ui/
-  commands/CommandRunScope.kt, LaunchResult.kt, CommandLauncher.kt
+  commands/CommandRunScope.kt, CurrentRun.kt, LaunchResult.kt, CommandLauncher.kt
   commands/Readiness.kt, CommandMessage.kt, CommandsUiState.kt, CommandsViewModel.kt
   commands/ProgressSteps.kt, ResultView.kt, ResultMapper.kt
   commands/RunUiState.kt, CommandRunViewModel.kt
@@ -160,6 +160,11 @@ data class CommandsUiState(
     val summaryGrams: Int? = null,
     val pinText: String = "",
     val message: CommandMessage? = null,
+    /**
+     * Przekazanie ochrony okna do przebiegu (CMDUI-23): true od `LaunchResult.Started` (ta sama zmiana
+     * stanu co `summaryGrams = null`), false dopiero, gdy kolektor zobaczy pusty `CurrentRun`.
+     */
+    val runHandoff: Boolean = false,
 ) {
     val quickValues: List<Int> get() = CarbsLimits.QUICK_VALUES
     private val ready: Boolean get() =
@@ -168,8 +173,8 @@ data class CommandsUiState(
     val canStartCarbs: Boolean get() =
         ready && secret != SecretReadiness.ABSENT && secret != SecretReadiness.INVALIDATED
     val canSubmitPin: Boolean get() = summaryGrams != null && pinText.isNotEmpty() && !launching
-    /** CMDUI-23. */
-    val secureWindow: Boolean get() = summaryGrams != null
+    /** CMDUI-23: podsumowanie albo przekazanie do przebiegu. */
+    val secureWindow: Boolean get() = summaryGrams != null || runHandoff
     /** CMDUI-24: Wstecz obsługuje ten ViewModel. */
     val interceptsBack: Boolean get() = confirmingLargeGrams != null || summaryGrams != null
     override fun toString(): String   // bez pinText, carbsInput, gramów (CMDUI-26)
@@ -179,6 +184,7 @@ data class CommandsUiState(
 class CommandsViewModel @Inject constructor(
     private val launcher: CommandLauncher,
     private val coordinator: SessionCoordinator,
+    private val currentRun: CurrentRun,
     private val numbers: AapsNumberSettingsStore,
     private val secrets: TotpSecretStore,
     private val permissions: SmsPermissions,
@@ -219,7 +225,7 @@ enum class StepStatus { DONE, CURRENT, PENDING }
 data class ProgressStep(val id: ProgressStepId, val status: StepStatus)
 
 object ProgressSteps {
-    /** CMDUI-17. Faza niemożliwa dla polecenia albo FINISHED → wszystkie PENDING. */
+    /** CMDUI-17. Krok bieżący z tabeli faz poza listą kroków polecenia albo FINISHED → wszystkie PENDING. */
     fun of(command: CommandId, phase: SessionPhase): List<ProgressStep>
 
     /** Argument minut kroku (AWAIT_REPLY, AWAIT_CODE_REQUEST → reply; AWAIT_CONFIRMATION → confirmation; inne → null). */
@@ -235,6 +241,8 @@ enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
 
 enum class ResultMessage {
     BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED,
+    /** Completed dla CARBS (nie występuje, Spec 004); jak „brak szczegółów” w HISTUI-04 (Spec 010). */
+    DETAILS_MISSING,
     SEND_FAILED, UNRECOGNIZED_REPLY, AMOUNT_MISMATCH, UNEXPECTED_REPLY, WRONG_CODE,
     CODE_REQUEST_EXPIRED, CODE_PREPARATION_TIMEOUT, INTERNAL_ERROR,
     NO_RESPONSE, SEND_TIMEOUT,
@@ -284,8 +292,6 @@ sealed interface RunView {
 
 data class RunUiState(
     val view: RunView? = null,
-    /** `CurrentRun` ma uruchomienie, także zanim kolektor ustawi `view` (ciągłość FLAG_SECURE, CMDUI-23). */
-    val runPublished: Boolean = false,
     val commandActive: Boolean = false,
     val confirmingStopWaiting: Boolean = false,
     val confirmingExit: Boolean = false,
@@ -294,13 +300,16 @@ data class RunUiState(
 ) {
     /** CMDUI-22. */
     val keepScreenOn: Boolean get() = commandActive
-    /** CMDUI-23: przebieg i wynik. */
-    val secureWindow: Boolean get() = view != null || runPublished   // runPublished = CurrentRun.state.value != null
+    /** CMDUI-23: przebieg i wynik; to samo pole wybiera treść RunScreen, więc treść nigdy nie jest bez flagi. */
+    val secureWindow: Boolean get() = view != null
     val interceptsBack: Boolean get() = view != null
 }
 
 @HiltViewModel
 class CommandRunViewModel @Inject constructor(
+    /** Źródło przebiegu i wyniku (CMDUI-16, CMDUI-21). */
+    private val currentRun: CurrentRun,
+    /** Tylko `activeSession`: ekran włączony (CMDUI-22) i anulowanie (CMDUI-18). */
     private val coordinator: SessionCoordinator,
 ) : ViewModel() {
     val uiState: StateFlow<RunUiState>
@@ -357,7 +366,8 @@ fun CommandsScreen(
 - `LifecycleEventEffect(ON_RESUME)` → `commandsViewModel.refreshPermissions()`, `smsPermissionsViewModel.onResume()`; `LifecycleEventEffect(ON_STOP)` → `commandsViewModel.onStop()`.
 - Kolejność treści: `run.view != null` → `RunScreen`; inaczej `summaryGrams != null` → `CarbsSummary`; inaczej `CommandsPanel`.
 - `BackHandler(enabled = run.interceptsBack) { runViewModel.onBack() }`, `BackHandler(enabled = !run.interceptsBack && commands.interceptsBack) { commandsViewModel.onBack() }`.
-- `SecureWindowEffect(commands.secureWindow || run.secureWindow)` (CMDUI-23: podsumowanie z PIN-em, przebieg i wynik; jedno wywołanie, więc licznik dostaje jedno żądanie). Ochrona jest ciągła: `CommandLauncher` publikuje `CurrentRun` przed powrotem z `launch`, a `summaryGrams` jest czyszczone dopiero po powrocie, więc `RunUiState.secureWindow = view != null || currentRun.state.value != null` (ViewModel łączy `currentRun.state.map { it != null }` z `view`) i flaga nie spada między zamknięciem podsumowania a pierwszym `view`; `exitRequested` → `LocalActivity.current?.finish()` i `onExitHandled()`.
+- `SecureWindowEffect(commands.secureWindow || run.secureWindow)` (CMDUI-23: podsumowanie z PIN-em, przebieg i wynik; jedno wywołanie, więc licznik dostaje jedno żądanie). Ciągłość nie zależy od kolejności kolektorów: `CommandsViewModel` w tej samej zmianie `local`, w której po `Started` czyści `summaryGrams`, ustawia `runHandoff = true`, więc `commands.uiState` nie ma emisji z zamkniętym podsumowaniem i bez znacznika; `runHandoff` gaśnie dopiero po zamknięciu wyniku (pusty `CurrentRun`), a `run.secureWindow` włącza się razem z `view`. Niezmiennik: treść chroniona (`CarbsSummary` z `summaryGrams`, `RunScreen` z `run.view`) jest wybierana z tych samych pól, z których liczona jest flaga.
+- `exitRequested` → `LocalActivity.current?.finish()` i `onExitHandled()`.
 - `SnackbarHost`: `message` → tekst; `opensSettings` → akcja „Ustawienia” wołająca `onOpenSettings`; po pokazaniu `onMessageShown()`.
 - Pole ilości: `KeyboardOptions(keyboardType = KeyboardType.Number)`. Pole PIN-u: `singleLine = true`, `PasswordVisualTransformation()`, `KeyboardOptions(keyboardType = KeyboardType.NumberPassword, autoCorrectEnabled = false)`; wartość wyłącznie z `uiState.pinText`.
 
@@ -375,9 +385,9 @@ fun CommandsScreen(
 
 ### `CommandsViewModel`
 
-`uiState` = `combine(numbers.state, secrets.state, coordinator.activeSession.map { it != null }, local)` → `stateIn(viewModelScope, SharingStarted.Eagerly, CommandsUiState())`; `local` to `MutableStateFlow` z polami panelu, `smsGranted` i `message`. `init`: odczyt uprawnień, `viewModelScope.launch { secrets.refreshState() }`. Odwzorowania: `AapsNumberState` → `NumberReadiness` 1:1; `SecretState` → `SecretReadiness` 1:1.
+`uiState` = `combine(numbers.state, secrets.state, coordinator.activeSession.map { it != null }, local)` → `stateIn(viewModelScope, SharingStarted.Eagerly, CommandsUiState())`; `local` to `MutableStateFlow` z polami panelu, `smsGranted` i `message`. `init`: odczyt uprawnień, `viewModelScope.launch { secrets.refreshState() }`, `viewModelScope.launch { currentRun.state.collect { run -> if (run == null && currentRun.state.value == null) local.update { it.copy(runHandoff = false) } } }` (kolektor tylko wyłącza przekazanie; drugi warunek chroni przed spóźnioną wartością `null`). Odwzorowania: `AapsNumberState` → `NumberReadiness` 1:1; `SecretState` → `SecretReadiness` 1:1.
 
-Procedura `startCommand(command, pin)` (wspólna dla `BG`, `PUMP`, „Wyślij”): (1) `launching` → `pin?.clear()`, koniec; (2) `activeSession.value != null` → `pin?.clear()`, `message = COMMAND_ACTIVE`, koniec; (3) `launching = true`; (4) `launcher.launch(command, pin)`; (5) `launching = false`; `Started` → `summaryGrams = null`, `carbsInput = ""`, `carbsError = null`; `Rejected(r)` → `summaryGrams = null`, `message = r.toMessage()`.
+Procedura `startCommand(command, pin)` (wspólna dla `BG`, `PUMP`, „Wyślij”): (1) `launching` → `pin?.clear()`, koniec; (2) `activeSession.value != null` → `pin?.clear()`, `message = COMMAND_ACTIVE`, koniec; (3) `launching = true`; (4) `launcher.launch(command, pin)`; (5) jedna zmiana `local`: `launching = false` oraz `Started` → `summaryGrams = null`, `carbsInput = ""`, `carbsError = null`, `runHandoff = true` (CMDUI-23; `CurrentRun` jest już opublikowany); `Rejected(r)` → `summaryGrams = null`, `message = r.toMessage()` (bez `runHandoff`).
 
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
@@ -396,6 +406,7 @@ Procedura `startCommand(command, pin)` (wspólna dla `BG`, `PUMP`, „Wyślij”
 | `summaryGrams ≠ null` | `onSummaryDismissed` / `onBack` | `summaryGrams = null`, `pinText = ""` | – | CMDUI-10, CMDUI-24 |
 | dowolny | `onStop` | `pinText = ""`, `summaryGrams = null`, `confirmingLargeGrams = null` | – | CMDUI-11 |
 | dowolny | `refreshPermissions` | `smsGranted = canSend() && canReceive()` | – | CMDUI-03 |
+| `runHandoff` | kolektor widzi pusty `CurrentRun` (zamknięty wynik) | `runHandoff = false` | – | CMDUI-23 |
 
 Stała `PIN_MAX_LENGTH = 12` (decyzja użytkownika, P2 w spec). `Command.Carbs.of(summaryGrams)` przy „Wyślij” zawsze daje `Valid` (ilość pochodzi z wcześniejszego `parse`/`of`); `Invalid` → `summaryGrams = null` bez startu (gałąź obronna, bez wymagania).
 
@@ -406,7 +417,7 @@ Stała `PIN_MAX_LENGTH = 12` (decyzja użytkownika, P2 w spec). `Command.Carbs.o
 class CurrentRun @Inject constructor() {
     val state: StateFlow<CurrentRunData?>   // null = brak przebiegu ani wyniku do pokazania
     fun publish(run: CurrentRunData)        // zastępuje poprzedni
-    fun clear()                             // zamknięcie wyniku (CMDUI-21)
+    fun clear()                             // zamknięcie wyniku (CMDUI-21); bez warunku – patrz „Decyzje”
 }
 
 /** Polecenie potrzebne do nagłówka i kroków (ilość z `Command.Carbs.grams`); stan sesji bez `CommandSession`. */
@@ -415,7 +426,7 @@ class CurrentRunData(val command: Command, val state: StateFlow<SessionState>) {
 }
 ```
 
-`CommandLauncher` po `StartResult.Started`, przed powrotem z `launch` (obok `track`), woła `currentRun.publish(CurrentRunData(command, session.state))`. Źródłem przebiegu i wyniku jest `CurrentRun`, nie `activeSession`: `activeSession` może przejść `sesja` → `null`, zanim kolektor ViewModelu odbierze sesję (np. natychmiastowy `SEND_FAILED`), więc wynik mógłby się nie pokazać. `CurrentRun` trzyma polecenie i `StateFlow` stanu (ostatnia wartość, w tym `FINISHED`, zostaje), a nie `CommandSession`. Blokady przycisków i anulowanie nadal korzystają z `activeSession`.
+`CommandLauncher` po `StartResult.Started`, przed powrotem z `launch` (obok `track`), woła `currentRun.publish(CurrentRunData(command, session.state))`. Źródłem przebiegu i wyniku jest `CurrentRun`, nie `activeSession`: `activeSession` może przejść `sesja` → `null`, zanim kolektor ViewModelu odbierze sesję (np. natychmiastowy `SEND_FAILED`), więc wynik mógłby się nie pokazać. `CurrentRun` trzyma polecenie i `StateFlow` stanu (ostatnia wartość, w tym `FINISHED`, zostaje), a nie `CommandSession`; `CommandSession.state` to samodzielny `MutableStateFlow` bez referencji do sesji i `CodeCredentials`, więc trzymanie go do zamknięcia wyniku nie zatrzymuje sekretu (CMDUI-21). Blokady przycisków, ekran włączony i anulowanie nadal korzystają z `activeSession`. „Wyjdź” (CMDUI-24) nie czyści `CurrentRun`: po ponownym otwarciu `Activity` przy żyjącym procesie nowy `CommandRunViewModel` pokazuje przebieg albo wynik (P7).
 
 `CommandRunViewModel` dostaje `CurrentRun` i `SessionCoordinator` w konstruktorze. `init`: `viewModelScope.launch { currentRun.state.collectLatest { run -> if (run != null) observe(run) } }`. `observe(run)` zbiera `run.state` (stan sesji) do fazy `FINISHED` włącznie (`transformWhile`); w każdej fazie przed `FINISHED` ustawia `view = Active(run.command, ProgressSteps.of(run.command, phase), commandGrams = (run.command as? Command.Carbs)?.grams, ...)` (z `phase.cancelMode()` i liczbą nieoczekiwanych wiadomości), a przy `FINISHED` – `view = Finished(ResultMapper.map(state.result!!))`, `confirmingStopWaiting = false`, `confirmingExit = false`. `run` jest tylko parametrem tej funkcji (ramka korutyny), nie polem; po powrocie z `observe` referencja znika (CMDUI-21). Ponieważ `StateFlow` zachowuje ostatnią wartość, `observe` zawsze dochodzi do `FINISHED`, także gdy sesja zakończyła się, zanim ViewModel odebrał `CurrentRun` (CMDUI-16). „Zamknij” wynik (CMDUI-21) wywołuje `currentRun.clear()`; widok wraca do panelu. Drugi kolektor: `commandActive = activeSession.value != null`.
 
@@ -440,14 +451,17 @@ class CurrentRunData(val command: Command, val state: StateFlow<SessionState>) {
 | `SessionOutcome` | `kind` | `message` | `messageArg` | `replyText` |
 | --- | --- | --- | --- | --- |
 | `Completed` (`BG` / `PUMP`) | `SUCCESS` | `BG_REPLY` / `PUMP_REPLY` | – | `text` |
-| `CarbsConfirmed(g, text)` | `SUCCESS` | `CARBS_CONFIRMED` | `g` | `text` |
+| `Completed` (`CARBS`, nie występuje) | `SUCCESS` | `DETAILS_MISSING` | – | `text` |
+| `CarbsConfirmed(g, text)` | `SUCCESS` | `CARBS_CONFIRMED` | `g` (z wyniku) | `text` |
 | `Failed(r, text)` | `FAILURE` | `FailureReason` → wartość o tej samej nazwie | – | `text` |
 | `TimedOut(SENDING_COMMAND)` | `NO_RESPONSE` | `SEND_TIMEOUT` | `reply` w min | – |
 | `TimedOut(inna faza)` | `NO_RESPONSE` | `NO_RESPONSE` | `reply` w min | – |
 | `Unknown(r, text)` | `UNKNOWN` | `UNKNOWN_<r>` | `confirmation` w min dla `CONFIRMATION_TIMEOUT` | `text` |
 | `Cancelled` | `CANCELLED` | `CANCELLED` | – | – |
 
-`codeNotSent` = `command.definition.requiresCode && (outcome is Failed && reason != WRONG_CODE || outcome is TimedOut || outcome is Cancelled)`; `unknownWarning` = `outcome is Unknown`; `unexpectedCount` = `result.unexpectedMessages.size`; `commandGrams` = `(command as? Command.Carbs)?.grams`. Minuty: `timeouts.reply.inWholeMinutes.toInt()` (3), `timeouts.confirmation.inWholeMinutes.toInt()` (6).
+`codeNotSent` = `command.definition.requiresCode && (outcome is Failed && reason != WRONG_CODE || outcome is TimedOut || outcome is Cancelled)`; `unknownWarning` = `outcome is Unknown`; `unexpectedCount` = `result.unexpectedMessages.size`; `commandGrams` = `(command as? Command.Carbs)?.grams`. Minuty: `timeouts.reply.inWholeMinutes.toInt()` (3), `timeouts.confirmation.inWholeMinutes.toInt()` (6). `messageArg != null` dokładnie dla `CARBS_CONFIRMED`, `NO_RESPONSE`, `SEND_TIMEOUT`, `UNKNOWN_CONFIRMATION_TIMEOUT` – tych samych komunikatów, których klucze mają w tabeli tekstów argument `d`.
+
+Zmiana po korekcie spójności (2026-10-21): kod zadania 2 (scalony w #160) mapuje `Completed` dla `Command.Carbs` na `CARBS_CONFIRMED` bez argumentu (tekst z `%1$d` bez wartości i fałszywe twierdzenie o potwierdzeniu). Wymaga drobnej zmiany w osobnym issue: wartość `DETAILS_MISSING`, gałąź w `ResultMapper`, `ResultMessage.textRes()` w `RunTexts.kt`, klucz `result_details_missing` i testy z „Mapowania wymagań na testy”.
 
 ### Teksty (`strings.xml`, CMDUI-25)
 
@@ -502,7 +516,7 @@ Klucze są wiążące; treści – jak w spec. Każde zadanie dodaje swój blok 
 | `run_cancel` | Anuluj polecenie | |
 | `run_stop_waiting` | Przestań czekać | |
 | `run_stop_title` | Przestać czekać? | |
-| `run_stop_text` | Kod został już wysłany. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS. | |
+| `run_stop_text` | Kod mógł już dotrzeć do AAPS. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS. | |
 | `run_stop_dismiss` | Czekaj dalej | |
 | `run_exit_title` | Trwa polecenie | |
 | `run_exit_text` | Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane. | |
@@ -516,6 +530,7 @@ Klucze są wiążące; treści – jak w spec. Każde zadanie dodaje swój blok 
 | `result_bg_reply` | Odpowiedź AAPS na BG | |
 | `result_pump_reply` | Odpowiedź AAPS na PUMP | |
 | `result_carbs_confirmed` | AAPS potwierdził wprowadzenie %1$d g | d |
+| `result_details_missing` | Brak szczegółów wyniku. | |
 | `result_send_failed` | Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS. | |
 | `result_unrecognized_reply` | Nierozpoznana odpowiedź AAPS. | |
 | `result_amount_mismatch` | AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS). | |
@@ -526,8 +541,8 @@ Klucze są wiążące; treści – jak w spec. Każde zadanie dodaje swój blok 
 | `result_internal_error` | Błąd wewnętrzny aplikacji. | |
 | `result_no_response` | Brak odpowiedzi AAPS w ciągu %1$d min. | d |
 | `result_send_timeout` | Telefon nie potwierdził wysłania SMS w ciągu %1$d min. | d |
-| `result_unknown_confirmation_timeout` | Kod wysłany, ale AAPS nie potwierdził w ciągu %1$d min. | d |
-| `result_unknown_cancelled_after_code` | Przestano czekać po wysłaniu kodu. | |
+| `result_unknown_confirmation_timeout` | Kod przekazany do wysłania, ale AAPS nie potwierdził w ciągu %1$d min. | d |
+| `result_unknown_cancelled_after_code` | Przestano czekać po przekazaniu kodu do wysłania. | |
 | `result_unknown_code_send_failed` | Wysyłanie kodu zgłosiło błąd, ale SMS mógł dotrzeć do AAPS. | |
 | `result_unknown_unrecognized_reply` | Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS (np. o kolejce pompy). | |
 | `result_unknown_amount_mismatch` | Po wysłaniu kodu AAPS podał inną ilość niż wysłana. | |
@@ -546,10 +561,13 @@ Przycisk potwierdzenia w oknie „Przestać czekać?” używa `run_stop_waiting
 | Decyzja | Alternatywy | Powód |
 | --- | --- | --- |
 | ViewModele zakładki Polecenia w zakresie `Activity` (tworzone w `AppScaffold`) | ViewModel wpisu nawigacji | przebieg i tekst pola przeżywają zmianę zakładki niezależnie od `saveState`/`restoreState`; `keepScreenOn` zależy od stanu sesji na każdej zakładce (CMDUI-22) |
-| Dwa ViewModele: panel (`CommandsViewModel`) i przebieg (`CommandRunViewModel`) | jeden ViewModel | rozłączne odpowiedzialności i testy, zadania równoległe; przebieg zależy tylko od koordynatora i pokazuje też sesję sprzed utworzenia ViewModelu |
+| Dwa ViewModele: panel (`CommandsViewModel`) i przebieg (`CommandRunViewModel`) | jeden ViewModel | rozłączne odpowiedzialności i testy, zadania równoległe; przebieg i wynik pochodzą tylko z `CurrentRun` (`SessionCoordinator.activeSession` – do ekranu włączonego i anulowania), więc ViewModel pokazuje też uruchomienie sprzed swojego utworzenia (P7) |
+| `CurrentRun` (singleton) jako źródło przebiegu i wyniku | `activeSession` koordynatora | `activeSession` może przejść `sesja` → `null`, zanim kolektor ją odbierze (natychmiastowy `SEND_FAILED`), i nie trzyma wyniku po zakończeniu; `CurrentRun` jest publikowany przed powrotem z `launch` i trzyma wynik do „Zamknij” |
+| `CurrentRun.clear()` bez warunku | `clear(expected)` (compare-and-set) | „Zamknij” jest dostępne tylko przy pokazanym wyniku, a wtedy panel jest niewidoczny i nowe uruchomienie z UI niemożliwe (CMDUI-21), więc spóźnione „Zamknij” nie trafi na nowsze uruchomienie; prostszy kod i brak pola z uruchomieniem w ViewModelu |
+| Ciągłość `FLAG_SECURE` przez `runHandoff` w `CommandsViewModel` | `runPublished` w `RunUiState` ustawiane kolektorem; zbieranie `CurrentRun` w kompozycji | znacznik ustawiany synchronicznie w tej samej zmianie stanu co zamknięcie podsumowania nie zależy od kolejności wznowień korutyn; sprawdzalny testem JVM przy `StandardTestDispatcher` bez `CommandRunViewModel` (CMDUI-23); kompozycja nie ma testów automatycznych |
 | `CommandLauncher` jako osobna klasa bez stanu | logika startu w ViewModelu | sprawdzenia, odczyt sekretu, czyszczenie PIN-u i `track` testowalne bez ViewModelu; jedno miejsce z sekretem w pamięci (zmienna lokalna) – łatwy test retencji (CMDUI-15) |
 | Zakres `@CommandRunScope` (`SupervisorJob` + `Dispatchers.Default`) w `ui.platform.CommandsModule` | `viewModelScope`; `@DataScope`; zakres w `session.platform` | sesja musi przeżyć ViewModel i `Activity` (CMDUI-13); `@DataScope` należy do `data` (IO, inne przeznaczenie); `session` nie zmieniamy (decyzja zakresu). Sesja nie blokuje wątków, więc `Default` |
-| `LaunchResult.Started` bez referencji do sesji | `Started(session)` | ViewModel nie ma okazji zatrzymać sesji (z `CodeCredentials`) w polu; widok bierze sesję z `activeSession` (jedno źródło prawdy) |
+| `LaunchResult.Started` bez referencji do sesji | `Started(session)` | ViewModel nie ma okazji zatrzymać sesji (z `CodeCredentials`) w polu; widok bierze polecenie i stan z `CurrentRun` (jedno źródło przebiegu i wyniku), a `activeSession` służy tylko blokadom, ekranowi włączonemu i anulowaniu |
 | Kolejność: sprawdzenia przed `load()` | odczyt sekretu na początku | sekret jest odszyfrowywany tylko, gdy start jest możliwy – krócej w pamięci, brak zbędnych operacji Keystore (SECRET-14) |
 | `pin.clear()` w `finally` launchera na każdej ścieżce bez startu | polegać tylko na koordynatorze | koordynator nie widzi PIN-u przy odrzuceniu przed startem i przy anulowaniu w trakcie `load()`; czyszczenie jest idempotentne |
 | PIN jako tekst w stanie ViewModelu, czyszczony przy „Wyślij” przed `load()` i przy `ON_STOP` | `rememberSaveable`; `TextFieldState` w kompozycji | `rememberSaveable` trafia do stanu instancji; stan ViewModelu daje testy JVM czyszczenia (jak UI-14). `String` nie da się wyzerować – ograniczenie opisane |
@@ -565,7 +583,7 @@ Przycisk potwierdzenia w oknie „Przestać czekać?” używa `run_stop_waiting
 
 ## Mapowanie wymagań na testy
 
-Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikator wymagania jest w nazwie każdej metody testowej (np. `` `CMDUI-12 brak sekretu daje SECRET_ABSENT i czysci PIN` ``). Pomocnicze ze Spec 004/005/007/008: `session/FakeSmsSender`, `session/FakeIncomingSmsSource`, `sms/FakeSmsPermissions`, `data/FakeCommandHistory`, `ui/MainDispatcherExtension`, `ui/SessionDoubles`, `ui/settings/number/FakeAapsNumberSettingsStore`, `ui/settings/secret/FakeTotpSecretStore` (rozszerzana o kolejkę wyników `load()` i bramkę `CompletableDeferred`). Nowe: `ui/commands/CommandTestFixtures.kt` (koordynator z atrapami i zegarem `T0`, rejestrator z `FakeCommandHistory`, launcher).
+Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikator wymagania jest w nazwie każdej metody testowej (np. `` `CMDUI-12 brak sekretu daje SECRET_ABSENT i czysci PIN` ``). Pomocnicze ze Spec 004/005/007/008: `session/FakeSmsSender`, `session/FakeIncomingSmsSource`, `sms/FakeSmsPermissions`, `data/FakeCommandHistory`, `ui/MainDispatcherExtension`, `ui/SessionDoubles`, `ui/settings/number/FakeAapsNumberSettingsStore`, `ui/settings/secret/FakeTotpSecretStore` (rozszerzana o kolejkę wyników `load()` i bramkę `CompletableDeferred`). Nowe: `ui/commands/CommandTestFixtures.kt` (koordynator z atrapami i zegarem `T0`, rejestrator z `FakeCommandHistory`, wspólny `CurrentRun`, launcher; pomocnik `startAndPublish(command, credentials)` = `coordinator.start(scope, …)` + `currentRun.publish(CurrentRunData(command, session.state))` dla testów `CommandRunViewModel`, które nie potrzebują launchera). Testy przebiegu, wyniku, ekranu włączonego i ochrony uruchamiają sesję przez launcher albo `startAndPublish`, nigdy samym `coordinator.start` ani atrapą `activeSession` (wtedy `CurrentRun` jest pusty).
 
 | Wymaganie | Test (klasa / rodzaj) |
 | --- | --- |
@@ -581,21 +599,21 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikat
 | CMDUI-10 | `ui/commands/CommandsViewModelSummaryTest`; W6 |
 | CMDUI-11 | `ui/commands/CommandsViewModelPinRetentionTest` – bramka `load()`, `onStop`, refleksja; `CommandsSourcesTest` (bez `rememberSaveable`/`SavedStateHandle`); W6 |
 | CMDUI-12 | `ui/commands/CommandLauncherChecksTest` – launcher; `CommandsViewModelSummaryTest` (zamknięcie podsumowania, komunikat); `ui/commands/CommandMessageTest` (odwzorowanie powodów) |
-| CMDUI-13 | `ui/commands/CommandLauncherStartTest` – launcher (CARBS 1 z kodem `0504714321`, `Busy`, niepoprawny zestaw); `CommandsViewModelNoCodeTest` (czyszczenie ViewModelu); `ui/platform/CommandsModuleTest` |
+| CMDUI-13 | `ui/commands/CommandLauncherStartTest` – launcher (CARBS 1 z kodem `0504714321`, `Busy`, niepoprawny zestaw); `CommandsViewModelNoCodeTest` (czyszczenie ViewModelu); `ui/platform/CommandsModuleTest` (adnotacje, `SupervisorJob`, `Dispatchers.Default`) |
 | CMDUI-14 | `ui/commands/CommandLauncherHistoryTest` – MockK rejestratora i prawdziwy rejestrator z `FakeCommandHistory` |
 | CMDUI-15 | `ui/commands/CommandLauncherRetentionTest` – refleksja; `CommandsViewModelPinRetentionTest` |
-| CMDUI-16 | `ui/commands/CommandRunViewModelObserveTest` (w tym sesja kończąca się natychmiast), `CommandLauncherStartTest` (publikacja w `CurrentRun`); W8 |
+| CMDUI-16 | `ui/commands/CommandRunViewModelObserveTest` (w tym sesja kończąca się natychmiast i wynik sprzed utworzenia ViewModelu), `CommandLauncherStartTest` (publikacja w `CurrentRun`); W8 |
 | CMDUI-17 | `ui/commands/ProgressStepsTest` – czysta funkcja (wszystkie fazy × 3 polecenia); W5 |
 | CMDUI-18 | `ui/commands/CommandRunViewModelCancelTest`; W8 |
-| CMDUI-19 | `ui/commands/ResultMapperTest` – wszystkie wiersze tabeli; W4, W5, W12 |
-| CMDUI-20 | `ResultMapperTest` (treść), `CommandRunViewModelObserveTest` (liczba nieoczekiwanych w przebiegu) |
-| CMDUI-21 | `ui/commands/CommandRunViewModelResultTest` – zamknięcie, refleksja; W8 |
-| CMDUI-22 | `ui/commands/CommandRunViewModelKeepScreenOnTest`; W9 |
-| CMDUI-23 | `CommandsViewModelSummaryTest` (znacznik podsumowania), `CommandRunViewModelKeepScreenOnTest` (znacznik przebiegu i wyniku), `ui/platform/SecureWindowCounterTest`; W10 |
-| CMDUI-24 | `CommandsViewModelSummaryTest` (`onBack`), `ui/commands/CommandRunViewModelBackTest`; W11 |
+| CMDUI-19 | `ui/commands/ResultMapperTest` – wszystkie wiersze tabeli, w tym `Completed` dla `CARBS` (`DETAILS_MISSING`, bez argumentu); wymagane: pętla po wszystkich 8 `FailureReason` z oczekiwanym `codeNotSent` (`true` poza `WRONG_CODE`), pętla po wszystkich 7 `UnknownReason` (`codeNotSent = false`, `unknownWarning = true`), `TimedOut` z trzema fazami i `Cancelled` (`codeNotSent = true` dla `CARBS`), `BG` z każdym wynikiem (`false`), `CarbsConfirmed(37)` dla `CARBS 1` (argument 37), `messageArg != null` ⇔ komunikat z argumentem; `ui/commands/RunTextsTest` – dla każdego `ResultMessage`: zasób ma `%1$d` ⇔ `ResultMapper` podaje `messageArg` (zbiór komunikatów z argumentem wspólny z `ResultMapperTest`); W4, W5, W12 |
+| CMDUI-20 | `ResultMapperTest` (treść; wymagane: `Completed`, `CarbsConfirmed`, `Failed(UNRECOGNIZED_REPLY)`, `Failed(WRONG_CODE)` i `Unknown(UNRECOGNIZED_REPLY)` z treścią → `replyText` = ta treść; `TimedOut`, `Cancelled`, `Failed(SEND_FAILED)`, `Unknown(CONFIRMATION_TIMEOUT)` → `null`), `CommandRunViewModelObserveTest` (liczba nieoczekiwanych w przebiegu) |
+| CMDUI-21 | `ui/commands/CommandRunViewModelResultTest` – zamknięcie (`CurrentRun` pusty), refleksja typów pól i referencji; W8 |
+| CMDUI-22 | `ui/commands/CommandRunViewModelKeepScreenOnTest` (start przez launcher albo `startAndPublish`); W9 |
+| CMDUI-23 | `CommandsViewModelSummaryTest` (znacznik podsumowania i `runHandoff`: sekwencja `true, false, true, true, false`, brak emisji `false` po „Wyślij”, odrzucenie bez przekazania, `runHandoff` bez `CommandRunViewModel`), `CommandRunViewModelKeepScreenOnTest` (znacznik przebiegu i wyniku = `view != null`), `ui/commands/CommandsSecureHandoffTest` (oba ViewModele, odczyt po każdym kroku dyspozytora, `CARBS 1`), `ui/platform/SecureWindowCounterTest`; W10 |
+| CMDUI-24 | `CommandsViewModelSummaryTest` (`onBack`, panel bez przechwytywania), `ui/commands/CommandRunViewModelBackTest` (w tym „Wyjdź” bez czyszczenia `CurrentRun` i wynik w nowym ViewModelu); W11 |
 | CMDUI-25 | `ui/commands/CommandTextsTest`, `ui/commands/RunTextsTest` – odwzorowania i klucze w `strings.xml` |
 | CMDUI-26 | `UiNoLoggingTest` (Spec 008, obejmuje `ui/`), `ui/commands/CommandsRedactionTest`, `ui/commands/ResultRedactionTest` – `toString()` |
-| CMDUI-27 | `CommandsModuleTest` – refleksja; `assembleDebug` |
+| CMDUI-27 | `CommandsModuleTest` – refleksja zakresu; `ui/commands/CurrentRunBindingTest` – refleksja `CurrentRun` i konstruktorów; `assembleDebug` (graf) |
 
 ## Podział na zadania
 
@@ -603,14 +621,17 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Wymagania częściowe
 
 **Warunek wstępny:** zaimplementowane zadania 1, 2, 3, 8 i 10 z [design 008](../008-ui-ustawienia/design.md#podział-na-zadania) (fundament, nawigacja, ViewModel i sekcja uprawnień SMS, `SecureWindowEffect`). Zadania 1–5 tej spec wymagają tylko zadania 1 ze Spec 008 (`SessionModule`, `MainDispatcherExtension`, `SessionDoubles`) i atrap z zadań 4–5 ze Spec 008.
 
-**Zależności i równoległość:** {1, 2} równolegle; 3 ← 1; 4 ← 3; 5 ← 1, 2 (`CurrentRun` z 1; równolegle z 3 i 4); 6 ← 4 (+ Spec 008: 2, 3, 8, 10); 7 ← 5, 6.
+**Zależności i równoległość:** {1, 2} równolegle; 3 ← 1; 4 ← 3; 5a ← 1, 2 (`CurrentRun` z 1; równolegle z 3 i 4); 5b ← 5a, 4 (kryteria łączące oba ViewModele); 6 ← 4 (+ Spec 008: 2, 3, 8, 10); 7 ← 5b, 6; 8 ← 2 i część tekstów z 7 (obie już scalone: #160, #163; równolegle z 3–6).
 
-**Pliki wspólne:** `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` – 3, potem 4; `ui/navigation/AppScaffold.kt` – 6, potem 7; `strings.xml` – 6 i 7 (każde dopisuje własny blok `<!-- 009: … -->`, bez zmian cudzych kluczy; 6 usuwa `placeholder_commands_text`); `ui/settings/secret/SecureWindowEffect.kt` (Spec 008) – tylko 6; `ui/settings/secret/FakeTotpSecretStore.kt` (test, Spec 008) – rozszerza 1, używają 3 i 4; `ui/commands/CommandTestFixtures.kt` – tworzy 1, rozszerzają 3–5.
+**Pliki wspólne:** `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` – 3, potem 4; `ui/commands/CommandRunViewModel.kt` i `RunUiState.kt` – 5a, potem 5b; `ui/navigation/AppScaffold.kt` – 6, potem 7; `strings.xml` – 6 i 7 (każde dopisuje własny blok `<!-- 009: … -->`, bez zmian cudzych kluczy; 6 usuwa `placeholder_commands_text`), 8 zmienia trzy klucze bloku `run_*`/`result_*` i dodaje `result_details_missing`; `ui/commands/ResultMapper.kt`, `ResultView.kt`, `RunTexts.kt` – 8 (po 2 i 7; zadanie 1 Spec 010 zmienia `ResultMapper.kt` – kto później, ten scala); `ui/settings/secret/SecureWindowEffect.kt` (Spec 008) – tylko 6; `ui/settings/secret/FakeTotpSecretStore.kt` (test, Spec 008) – rozszerza 1, używają 3 i 4; `ui/commands/CommandTestFixtures.kt` – tworzy 1, rozszerzają 3–5 (`startAndPublish` – 5a, jeśli nie dodało go 1).
 
-1. **Uruchamianie: `CommandLauncher` i zakres aplikacji** – `ui/commands/CommandRunScope.kt`, `CurrentRun.kt`, `LaunchResult.kt`, `CommandLauncher.kt`, `ui/platform/CommandsModule.kt`; testy `CommandTestFixtures`, `CommandLauncherChecksTest`, `CommandLauncherStartTest` (także publikacja w `CurrentRun`), `CommandLauncherHistoryTest`, `CommandLauncherRetentionTest`, `CommandsModuleTest`. Wymagania: CMDUI-12 (launcher), CMDUI-13, CMDUI-14, CMDUI-15 (launcher), CMDUI-16 (publikacja `CurrentRun`), CMDUI-27. Równolegle z 2.
+1. **Uruchamianie: `CommandLauncher` i zakres aplikacji** – `ui/commands/CommandRunScope.kt`, `CurrentRun.kt`, `LaunchResult.kt`, `CommandLauncher.kt`, `ui/platform/CommandsModule.kt`; testy `CommandTestFixtures`, `CommandLauncherChecksTest`, `CommandLauncherStartTest` (także publikacja w `CurrentRun`), `CommandLauncherHistoryTest`, `CommandLauncherRetentionTest`, `CommandsModuleTest` (z `Dispatchers.Default`), `CurrentRunBindingTest` (część: `CurrentRun` i konstruktor launchera). Wymagania: CMDUI-12 (launcher), CMDUI-13, CMDUI-14, CMDUI-15 (launcher), CMDUI-16 (publikacja `CurrentRun`), CMDUI-27 (refleksja: moduł, `CurrentRun`, launcher). Równolegle z 2.
 2. **Odwzorowania przebiegu i wyniku** – `ui/commands/ProgressSteps.kt` (z `CancelMode`), `ResultView.kt`, `ResultMapper.kt`; testy `ProgressStepsTest`, `ResultMapperTest`, `ResultRedactionTest`. Wymagania: CMDUI-17, CMDUI-18 (`cancelMode`), CMDUI-19, CMDUI-20 (treść), CMDUI-26 (`toString` wyniku). Bez zależności; równolegle z 1.
 3. **`CommandsViewModel`: gotowość, `BG`/`PUMP`, blokady, komunikaty** – `ui/commands/Readiness.kt`, `CommandMessage.kt` (z `toMessage`), `CommandsUiState.kt`, `CommandsViewModel.kt` (bez `CARBS`); testy `CommandsViewModelReadinessTest`, `CommandsViewModelLockTest` (`BG`/`PUMP`), `CommandsViewModelNoCodeTest`, `CommandMessageTest`. Wymagania: CMDUI-02, CMDUI-03, CMDUI-04, CMDUI-05 (część), CMDUI-06, CMDUI-12 (komunikaty), CMDUI-13 (czyszczenie ViewModelu). Zależy od 1.
-4. **`CommandsViewModel`: `CARBS`, podsumowanie i PIN** – `CommandsViewModel.kt`, `CommandsUiState.kt`; testy `CommandsViewModelCarbsInputTest`, `CommandsViewModelLargeAmountTest`, `CommandsViewModelSummaryTest`, `CommandsViewModelPinRetentionTest`, `CommandsViewModelLockTest` („Wyślij” w trakcie uruchamiania), `CommandsRedactionTest`. Wymagania: CMDUI-05 (część), CMDUI-07 – CMDUI-11, CMDUI-12 (ViewModel), CMDUI-15 (ViewModel), CMDUI-23 (znacznik), CMDUI-24 (panel), CMDUI-26 (`toString` panelu). Zależy od 3.
-5. **`CommandRunViewModel`: przebieg, anulowanie, wynik** – `ui/commands/RunUiState.kt`, `CommandRunViewModel.kt`; testy `CommandRunViewModelObserveTest`, `…CancelTest`, `…ResultTest`, `…KeepScreenOnTest`, `…BackTest`. Wymagania: CMDUI-16, CMDUI-18, CMDUI-20 (liczba w przebiegu), CMDUI-21, CMDUI-22 (znacznik), CMDUI-23 (znacznik przebiegu i wyniku), CMDUI-24 (przebieg), CMDUI-26 (`toString` przebiegu). Zależy od 1 (`CurrentRun`) i 2; równolegle z 3 i 4.
+4. **`CommandsViewModel`: `CARBS`, podsumowanie i PIN** – `CommandsViewModel.kt` (także parametr `CurrentRun`, `runHandoff` w `startCommand` i kolektor `CurrentRun`), `CommandsUiState.kt`; testy `CommandsViewModelCarbsInputTest`, `CommandsViewModelLargeAmountTest`, `CommandsViewModelSummaryTest`, `CommandsViewModelPinRetentionTest`, `CommandsViewModelLockTest` („Wyślij” w trakcie uruchamiania), `CommandsRedactionTest`, `CurrentRunBindingTest` (część: konstruktor `CommandsViewModel`). Wymagania: CMDUI-05 (część), CMDUI-07 – CMDUI-11, CMDUI-12 (ViewModel), CMDUI-15 (ViewModel), CMDUI-23 (znacznik podsumowania i przekazania; kryteria 1, 2, 5), CMDUI-24 (panel), CMDUI-26 (`toString` panelu), CMDUI-27 (konstruktor). Zależy od 3.
+5. **`CommandRunViewModel`: przebieg, anulowanie, wynik** – dwie części (dwa PR):
+   - **5a. Przebieg i wynik z `CurrentRun`** – `ui/commands/RunUiState.kt`, `CommandRunViewModel.kt` (konstruktor `(currentRun, coordinator)`, `observe`, `onResultDismissed`); testy `CommandRunViewModelObserveTest`, `…ResultTest`, `CurrentRunBindingTest` (część: konstruktor `CommandRunViewModel`). Wymagania: CMDUI-16, CMDUI-20 (liczba w przebiegu), CMDUI-21, CMDUI-26 (`toString` przebiegu), CMDUI-27 (konstruktor). Zależy od 1 (`CurrentRun`) i 2; równolegle z 3 i 4.
+   - **5b. Anulowanie, ekran włączony, ochrona, Wstecz** – `CommandRunViewModel.kt`, `RunUiState.kt`; testy `…CancelTest`, `…KeepScreenOnTest`, `…BackTest`, `CommandsSecureHandoffTest`. Wymagania: CMDUI-18, CMDUI-22 (znacznik), CMDUI-23 (znacznik przebiegu i wyniku – kryterium 3; ciągłość z oboma ViewModelami – kryterium 4), CMDUI-24 (przebieg, wynik, „Wyjdź” i nowy ViewModel). Zależy od 5a i 4 (kryterium 4 CMDUI-23 potrzebuje „Wyślij” i `runHandoff` z `CommandsViewModel`).
 6. **Ekran: panel, podsumowanie, okna, `FLAG_SECURE`** – `ui/commands/CommandsScreen.kt` (panel i podsumowanie, bez przebiegu), `CommandsPanel.kt`, `CarbsSummary.kt`, `CommandDialogs.kt` (okno „Na pewno”), `CommandTexts.kt`; `ui/platform/SecureWindowCounter.kt`, zmiana `SecureWindowEffect.kt`; `AppScaffold.kt` (ViewModele w zakresie `Activity`, `onOpenSettings`, `LocalSecureWindow`); usunięcie `CommandsPlaceholderScreen.kt` i `placeholder_commands_text` (aktualizacja `NavigationStringsTest`); `strings.xml` (blok `commands_*`); testy `CommandTextsTest`, `CommandsSourcesTest`, `SecureWindowCounterTest`. Wymagania: CMDUI-01, CMDUI-02 – CMDUI-04 (widok), CMDUI-07 – CMDUI-10 (widok), CMDUI-23 (podsumowanie), CMDUI-25 (część). PR opisuje W1, W2, W3, W6, W10 (podsumowanie; oraz ponowne W9 ze Spec 008 – skaner nadal chroniony). Zależy od 4 i zadań 2, 3, 8, 10 ze Spec 008.
-7. **Ekran przebiegu i wyniku, ekran włączony, Wstecz** – `ui/commands/RunScreen.kt`, `ResultCard.kt`, `RunTexts.kt`, okna „Przestać czekać?” i „Trwa polecenie” w `CommandDialogs.kt`; `ui/platform/KeepScreenOnEffect.kt`; `CommandsScreen.kt` (tryb przebiegu, `BackHandler`, `exitRequested`); `AppScaffold.kt` (`KeepScreenOnEffect`); `strings.xml` (bloki `run_*`, `result_*`); test `RunTextsTest`. Wymagania: CMDUI-16 – CMDUI-22 (widok), CMDUI-23 (przebieg i wynik w `SecureWindowEffect`), CMDUI-24, CMDUI-25 (część). PR opisuje W4, W5, W7, W8, W9, W10 (przebieg i wynik), W11, W12 oraz punkty z wcześniejszych spec (sekcja „Punkty weryfikacji z wcześniejszych specyfikacji” w spec): Spec 005 W1–W5, W7; Spec 006 W1 (odczyt), W3, W4, W9, W10 (W2 ze Spec 006 – nie w 009, P4 w spec); Spec 007 W1 (`BG`), W7; Spec 008 UI-15. Zależy od 5 i 6.
+7. **Ekran przebiegu i wyniku, ekran włączony, Wstecz** – `ui/commands/RunScreen.kt`, `ResultCard.kt`, `RunTexts.kt`, okna „Przestać czekać?” i „Trwa polecenie” w `CommandDialogs.kt`; `ui/platform/KeepScreenOnEffect.kt`; `CommandsScreen.kt` (tryb przebiegu, `BackHandler`, `exitRequested`); `AppScaffold.kt` (`KeepScreenOnEffect`); `strings.xml` (bloki `run_*`, `result_*`); test `RunTextsTest`. Wymagania: CMDUI-16 – CMDUI-22 (widok), CMDUI-23 (przebieg i wynik w `SecureWindowEffect`), CMDUI-24, CMDUI-25 (część), CMDUI-27 (graf Hilt: ten sam `SessionCoordinator` w czterech ViewModelach i ten sam `CurrentRun` – `assembleDebug` po spięciu `AppScaffold`). PR opisuje W4, W5, W7, W8, W9, W10 (przebieg i wynik), W11, W12 oraz punkty z wcześniejszych spec (sekcja „Punkty weryfikacji z wcześniejszych specyfikacji” w spec): Spec 005 W1–W5, W7; Spec 006 W1 (odczyt), W3, W4, W9, W10 (W2 ze Spec 006 – nie w 009, P4 w spec); Spec 007 W1 (`BG`), W7; Spec 008 UI-15. Zależy od 5b i 6.
+8. **Korekta wyniku po zmianie spec (2026-10-21)** – zadania 2 i część tekstów z 7 są już scalone (#160, #163), więc zmiany z korekty spójności trafiają do osobnego PR: `ResultMessage.DETAILS_MISSING`, gałąź `Completed` dla `Command.Carbs` w `ResultMapper.kt`, `ResultMessage.textRes()` w `RunTexts.kt`, klucz `result_details_missing` i nowe treści `run_stop_text`, `result_unknown_confirmation_timeout`, `result_unknown_cancelled_after_code` w `strings.xml`; uzupełnienie `ResultMapperTest` (przypadki wymagane w „Mapowaniu wymagań na testy”: wszystkie `FailureReason`/`UnknownReason` dla `codeNotSent`, treść `Failed(WRONG_CODE)` i `Unknown`, `CarbsConfirmed(37)` dla `CARBS 1`, `Completed` dla `CARBS`, argument ⇔ komunikat) i `RunTextsTest` (spójność `%1$d` z `messageArg`). Wymagania: CMDUI-19, CMDUI-20 (treść), CMDUI-25 (część). Ok. 100–200 linii. Zależy od 2 i części tekstów z 7.
