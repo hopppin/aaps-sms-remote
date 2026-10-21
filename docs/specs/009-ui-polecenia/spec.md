@@ -278,7 +278,7 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-16: Pokazanie przebiegu aktywnej sesji
 
-`CommandRunViewModel` obserwuje `CurrentRun` (stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku, zanim ViewModel powstał (np. po ponownym otwarciu aplikacji). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
+`CommandRunViewModel` obserwuje `CurrentRun` (polecenie i stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku, zanim ViewModel powstał (np. po ponownym otwarciu aplikacji). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
 
 **Kryteria akceptacji:**
 
@@ -410,6 +410,7 @@ Gdy na zakładce Polecenia otwarte jest podsumowanie z polem PIN-u albo ekran pr
 
 - **Zakładając** `CommandsViewModel`, **gdy** otwarto podsumowanie, zamknięto je „Anuluj”, otwarto ponownie i wywołano „Wyślij” (start udany), **wtedy** znacznik „ekran chroniony” ma kolejno wartości `true`, `false`, `true`, `false`.
 - **Zakładając** `CommandRunViewModel`, **gdy** `activeSession` zmienia się kolejno: `null` → sesja `BG` → (po `bg.txt`) `null`, a potem wynik zostaje zamknięty, **wtedy** znacznik „ekran chroniony” ma kolejno wartości `false`, `true`, `true` (wynik widoczny), `false` (po zamknięciu wyniku).
+- **Zakładając** `CommandsViewModel` i `CommandRunViewModel` ze wspólnym `CurrentRun`, **gdy** w podsumowaniu wywołano „Wyślij” (start udany) i `CurrentRun` ma uruchomienie, ale kolektor `CommandRunViewModel` nie ustawił jeszcze `view`, **wtedy** `commands.secureWindow || run.secureWindow` pozostaje `true` w każdym kroku aż do zamknięcia wyniku (brak chwili bez ochrony).
 - **Zakładając** licznik ochrony okna, **gdy** ochronę włączyły dwa źródła, a wyłączyło jedno, **wtedy** flaga jest nadal włączona; po wyłączeniu przez drugie – wyłączona.
 - **Zakładając** otwarte podsumowanie na telefonie (W10), **gdy** wykonano zrzut ekranu i otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd jest pusty; po zamknięciu podsumowania zrzut działa.
 

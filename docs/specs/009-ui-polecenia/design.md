@@ -11,7 +11,7 @@ Druga część pakietu `ui` z [AGENTS.md](../../../AGENTS.md#architektura), budo
 | `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track`, `CurrentRun.publish` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `CurrentRun`, `@CommandRunScope CoroutineScope` |
 | `ui.commands.CommandsViewModel` | panel: gotowość, `BG`/`PUMP`, pole `CARBS`, okno „Na pewno”, podsumowanie z PIN-em, komunikaty | `CommandLauncher`, `SessionCoordinator`, `AapsNumberSettingsStore`, `TotpSecretStore`, `SmsPermissions` |
 | `ui.commands.CommandRunViewModel` | przebieg i wynik bieżącego uruchomienia (z `CurrentRun`), anulowanie, ekran włączony, Wstecz w trakcie polecenia | `CurrentRun`, `SessionCoordinator` |
-| `ui.commands.CurrentRun` (singleton Hilt) | publikuje `StateFlow<SessionState>` ostatnio uruchomionej sesji do czasu zamknięcia wyniku (CMDUI-16, CMDUI-21); bez referencji do `CommandSession` | – |
+| `ui.commands.CurrentRun` (singleton Hilt) | publikuje `CurrentRunData` (polecenie + `StateFlow<SessionState>`) ostatnio uruchomionej sesji do czasu zamknięcia wyniku (CMDUI-16, CMDUI-21); bez referencji do `CommandSession` | – |
 | `ui.commands.ProgressSteps`, `ResultMapper` | czyste odwzorowania faza → kroki, `SessionResult` → `ResultView` | – (`session`, `commands`) |
 
 ViewModele są czystą logiką testowaną w JVM. Kompozycje (`CommandsScreen`, `CommandsPanel`, `CarbsSummary`, `RunScreen`, `ResultCard`, okna) są cienką warstwą: zbierają `StateFlow` (`collectAsStateWithLifecycle`), wołają metody ViewModeli i robią to, co wymaga `Activity`/okna (`FLAG_SECURE`, `keepScreenOn`, `finish()`, nawigacja do Ustawień, prośba o uprawnienia przez `SmsPermissionsSection` ze Spec 008). Podsumowanie i przebieg nie są trasami nawigacji – są trybami zakładki Polecenia (jak skaner w Spec 008), żeby PIN nie przechodził przez argumenty ani `SavedStateHandle`.
@@ -102,7 +102,7 @@ try {
         is StartResult.Started -> {
             started = true
             recorder.track(result.session.state)   // CMDUI-14: przed powrotem
-            currentRun.publish(result.session.state)   // CMDUI-16: przed powrotem, obok track
+            currentRun.publish(CurrentRunData(command, result.session.state))   // CMDUI-16: przed powrotem, obok track
             LaunchResult.Started
         }
         StartResult.Busy -> Rejected(COMMAND_ACTIVE)
@@ -284,6 +284,8 @@ sealed interface RunView {
 
 data class RunUiState(
     val view: RunView? = null,
+    /** `CurrentRun` ma uruchomienie, także zanim kolektor ustawi `view` (ciągłość FLAG_SECURE, CMDUI-23). */
+    val runPublished: Boolean = false,
     val commandActive: Boolean = false,
     val confirmingStopWaiting: Boolean = false,
     val confirmingExit: Boolean = false,
@@ -293,7 +295,7 @@ data class RunUiState(
     /** CMDUI-22. */
     val keepScreenOn: Boolean get() = commandActive
     /** CMDUI-23: przebieg i wynik. */
-    val secureWindow: Boolean get() = view != null
+    val secureWindow: Boolean get() = view != null || runPublished   // runPublished = CurrentRun.state.value != null
     val interceptsBack: Boolean get() = view != null
 }
 
@@ -355,7 +357,7 @@ fun CommandsScreen(
 - `LifecycleEventEffect(ON_RESUME)` → `commandsViewModel.refreshPermissions()`, `smsPermissionsViewModel.onResume()`; `LifecycleEventEffect(ON_STOP)` → `commandsViewModel.onStop()`.
 - Kolejność treści: `run.view != null` → `RunScreen`; inaczej `summaryGrams != null` → `CarbsSummary`; inaczej `CommandsPanel`.
 - `BackHandler(enabled = run.interceptsBack) { runViewModel.onBack() }`, `BackHandler(enabled = !run.interceptsBack && commands.interceptsBack) { commandsViewModel.onBack() }`.
-- `SecureWindowEffect(commands.secureWindow || run.secureWindow)` (CMDUI-23: podsumowanie z PIN-em, przebieg i wynik; jedno wywołanie, więc licznik dostaje jedno żądanie); `exitRequested` → `LocalActivity.current?.finish()` i `onExitHandled()`.
+- `SecureWindowEffect(commands.secureWindow || run.secureWindow)` (CMDUI-23: podsumowanie z PIN-em, przebieg i wynik; jedno wywołanie, więc licznik dostaje jedno żądanie). Ochrona jest ciągła: `CommandLauncher` publikuje `CurrentRun` przed powrotem z `launch`, a `summaryGrams` jest czyszczone dopiero po powrocie, więc `RunUiState.secureWindow = view != null || currentRun.state.value != null` (ViewModel łączy `currentRun.state.map { it != null }` z `view`) i flaga nie spada między zamknięciem podsumowania a pierwszym `view`; `exitRequested` → `LocalActivity.current?.finish()` i `onExitHandled()`.
 - `SnackbarHost`: `message` → tekst; `opensSettings` → akcja „Ustawienia” wołająca `onOpenSettings`; po pokazaniu `onMessageShown()`.
 - Pole ilości: `KeyboardOptions(keyboardType = KeyboardType.Number)`. Pole PIN-u: `singleLine = true`, `PasswordVisualTransformation()`, `KeyboardOptions(keyboardType = KeyboardType.NumberPassword, autoCorrectEnabled = false)`; wartość wyłącznie z `uiState.pinText`.
 
@@ -402,15 +404,20 @@ Stała `PIN_MAX_LENGTH = 12` (decyzja użytkownika, P2 w spec). `Command.Carbs.o
 ```kotlin
 @Singleton
 class CurrentRun @Inject constructor() {
-    val state: StateFlow<StateFlow<SessionState>?>   // null = brak przebiegu ani wyniku do pokazania
-    fun publish(sessionState: StateFlow<SessionState>)  // zastępuje poprzedni
-    fun clear()                                          // zamknięcie wyniku (CMDUI-21)
+    val state: StateFlow<CurrentRunData?>   // null = brak przebiegu ani wyniku do pokazania
+    fun publish(run: CurrentRunData)        // zastępuje poprzedni
+    fun clear()                             // zamknięcie wyniku (CMDUI-21)
+}
+
+/** Polecenie potrzebne do nagłówka i kroków (ilość z `Command.Carbs.grams`); stan sesji bez `CommandSession`. */
+class CurrentRunData(val command: Command, val state: StateFlow<SessionState>) {
+    override fun toString(): String = "CurrentRunData(command=$command)"   // `Command.toString()` jest zredagowane (CMD-09), bez ilości
 }
 ```
 
-`CommandLauncher` po `StartResult.Started`, przed powrotem z `launch` (obok `track`), woła `currentRun.publish(session.state)`. Źródłem przebiegu i wyniku jest `CurrentRun`, nie `activeSession`: `activeSession` może przejść `sesja` → `null`, zanim kolektor ViewModelu odbierze sesję (np. natychmiastowy `SEND_FAILED`), więc wynik mógłby się nie pokazać. `CurrentRun` trzyma `StateFlow` stanu (ostatnia wartość, w tym `FINISHED`, zostaje), a nie `CommandSession`. Blokady przycisków i anulowanie nadal korzystają z `activeSession`.
+`CommandLauncher` po `StartResult.Started`, przed powrotem z `launch` (obok `track`), woła `currentRun.publish(CurrentRunData(command, session.state))`. Źródłem przebiegu i wyniku jest `CurrentRun`, nie `activeSession`: `activeSession` może przejść `sesja` → `null`, zanim kolektor ViewModelu odbierze sesję (np. natychmiastowy `SEND_FAILED`), więc wynik mógłby się nie pokazać. `CurrentRun` trzyma polecenie i `StateFlow` stanu (ostatnia wartość, w tym `FINISHED`, zostaje), a nie `CommandSession`. Blokady przycisków i anulowanie nadal korzystają z `activeSession`.
 
-`init`: `viewModelScope.launch { currentRun.state.collectLatest { flow -> if (flow != null) observe(flow) } }`. `observe(flow)` zbiera `flow` (stan sesji) do fazy `FINISHED` włącznie (`transformWhile`); w każdej fazie przed `FINISHED` ustawia `view = Active(command, ProgressSteps.of(...), phase.cancelMode(), unexpectedMessages.size)`, a przy `FINISHED` – `view = Finished(ResultMapper.map(state.result!!))`, `confirmingStopWaiting = false`, `confirmingExit = false`. `flow` jest tylko parametrem tej funkcji (ramka korutyny), nie polem; po powrocie z `observe` referencja znika (CMDUI-21). Ponieważ `StateFlow` zachowuje ostatnią wartość, `observe` zawsze dochodzi do `FINISHED`, także gdy sesja zakończyła się, zanim ViewModel odebrał `CurrentRun` (CMDUI-16). „Zamknij” wynik (CMDUI-21) wywołuje `currentRun.clear()`; widok wraca do panelu. Drugi kolektor: `commandActive = activeSession.value != null`.
+`CommandRunViewModel` dostaje `CurrentRun` i `SessionCoordinator` w konstruktorze. `init`: `viewModelScope.launch { currentRun.state.collectLatest { run -> if (run != null) observe(run) } }`. `observe(run)` zbiera `run.state` (stan sesji) do fazy `FINISHED` włącznie (`transformWhile`); w każdej fazie przed `FINISHED` ustawia `view = Active(run.command, ProgressSteps.of(run.command, phase), commandGrams = (run.command as? Command.Carbs)?.grams, ...)` (z `phase.cancelMode()` i liczbą nieoczekiwanych wiadomości), a przy `FINISHED` – `view = Finished(ResultMapper.map(state.result!!))`, `confirmingStopWaiting = false`, `confirmingExit = false`. `run` jest tylko parametrem tej funkcji (ramka korutyny), nie polem; po powrocie z `observe` referencja znika (CMDUI-21). Ponieważ `StateFlow` zachowuje ostatnią wartość, `observe` zawsze dochodzi do `FINISHED`, także gdy sesja zakończyła się, zanim ViewModel odebrał `CurrentRun` (CMDUI-16). „Zamknij” wynik (CMDUI-21) wywołuje `currentRun.clear()`; widok wraca do panelu. Drugi kolektor: `commandActive = activeSession.value != null`.
 
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
