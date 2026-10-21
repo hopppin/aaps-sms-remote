@@ -7,7 +7,12 @@ import java.io.File
 /** Katalog roboczy testów to moduł `app`. */
 class DataNoLoggingTest {
 
-    private val forbidden = listOf("android.util.Log", "println(", "System.out", "System.err")
+    private val forbidden = listOf(
+        Regex("""\bandroid\s*\.\s*util\s*\.\s*Log\b"""),
+        Regex("""\bLog\s*\.\s*[a-z]+\s*\("""),
+        Regex("""\b(?:print|println)\s*\("""),
+        Regex("""\bSystem\s*\.\s*(?:out|err)\b"""),
+    )
 
     @Test
     fun `DATA-17 zrodla data i data-platform nie wywoluja API logowania`() {
@@ -20,7 +25,7 @@ class DataNoLoggingTest {
         )
         val violations = sources.flatMap { file ->
             val text = file.readText()
-            forbidden.filter { text.contains(it) }.map { "${file.name}: $it" }
+            forbidden.filter { it.containsMatchIn(text) }.map { "${file.name}: ${it.pattern}" }
         }
         assertTrue(violations.isEmpty(), "Użycie API logowania: $violations")
     }
