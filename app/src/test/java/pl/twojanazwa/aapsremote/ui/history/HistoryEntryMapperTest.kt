@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.io.File
 import pl.twojanazwa.aapsremote.data.HistoryCommand
 import pl.twojanazwa.aapsremote.data.HistoryOutcome
 import pl.twojanazwa.aapsremote.session.FailureReason
@@ -25,7 +26,66 @@ class HistoryEntryMapperTest {
     }
 
     @Test
-    fun `HISTUI-04 BG PUMP i CARBS 1 oraz Cancelled daja rodzaj i komunikat jak w CMDUI-19`() {
+    fun `HISTUI-03 etykiety polecenia`() {
+        fun item(command: HistoryCommand, grams: Int?) =
+            HistoryEntryMapper.item(historyEntry(HistoryOutcome.Cancelled, command, grams))
+        assertEquals(HistoryCommandLabel.BG, item(HistoryCommand.BG, null).command)
+        assertEquals(HistoryCommandLabel.PUMP, item(HistoryCommand.PUMP, null).command)
+        val carbs = item(HistoryCommand.CARBS, 20)
+        assertEquals(HistoryCommandLabel.CARBS, carbs.command)
+        assertEquals(20, carbs.grams)
+        val noAmount = item(HistoryCommand.CARBS, null)
+        assertEquals(HistoryCommandLabel.CARBS_NO_AMOUNT, noAmount.command)
+        assertNull(noAmount.grams)
+        assertEquals(HistoryCommandLabel.UNRECOGNIZED, item(HistoryCommand.UNRECOGNIZED, null).command)
+    }
+
+    @Test
+    fun `HISTUI-05 czas wiersza to rozpoczecie albo zakonczenie albo brak`() {
+        val fallback = historyEntry(HistoryOutcome.Cancelled, startedAt = null, finishedAt = T0 + 5000)
+        assertEquals(T0 + 5000, HistoryEntryMapper.item(fallback).listTimeEpochMillis)
+        val none = historyEntry(
+            HistoryOutcome.Cancelled, startedAt = null, commandSentAt = null, finishedAt = null,
+        )
+        assertNull(HistoryEntryMapper.item(none).listTimeEpochMillis)
+        assertEquals(T0, HistoryEntryMapper.item(historyEntry(HistoryOutcome.Cancelled)).listTimeEpochMillis)
+    }
+
+    @Test
+    fun `HISTUI-05 szczegoly maja cztery czasy w kolejnosci`() {
+        val entry = historyEntry(
+            HistoryOutcome.Completed, HistoryCommand.BG, startedAt = T0, commandSentAt = T0 + 1000,
+            codeSentAt = null, finishedAt = T0 + 5000,
+        )
+        assertEquals(
+            listOf(
+                HistoryTimeLabel.STARTED to T0,
+                HistoryTimeLabel.COMMAND_SENT to T0 + 1000,
+                HistoryTimeLabel.CODE_SENT to null,
+                HistoryTimeLabel.FINISHED to T0 + 5000,
+            ),
+            HistoryEntryMapper.details(entry).times,
+        )
+    }
+
+    @Test
+    fun `HISTUI-06 tresc odpowiedzi znak w znak i brak tresci`() {
+        val bg = File("src/test/resources/parser/aaps-3.4.2.6-pl/bg.txt").readText()
+        fun details(text: String?, outcome: HistoryOutcome = HistoryOutcome.Completed) =
+            HistoryEntryMapper.details(historyEntry(outcome, HistoryCommand.BG, replyText = text))
+        assertEquals(bg, details(bg).replyText)
+        assertEquals(2000, details("a".repeat(2000)).replyText!!.length)
+        assertNull(details(null, HistoryOutcome.TimedOut(SessionPhase.AWAITING_REPLY)).replyText)
+    }
+
+    @Test
+    fun `HISTUI-06 liczba nieoczekiwanych wiadomosci null przy zerze`() {
+        assertNull(HistoryEntryMapper.details(historyEntry(HistoryOutcome.Cancelled, unexpected = 0)).unexpectedCount)
+        assertEquals(2, HistoryEntryMapper.details(historyEntry(HistoryOutcome.Cancelled, unexpected = 2)).unexpectedCount)
+    }
+
+    @Test
+    fun `HISTUI-04 BG PUMP i CARBS 1oraz Cancelled daja rodzaj i komunikat jak w CMDUI-19`() {
         assertView(
             result(HistoryOutcome.Completed, HistoryCommand.BG, null),
             ResultKind.SUCCESS, ResultMessage.BG_REPLY,
