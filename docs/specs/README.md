@@ -56,3 +56,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 005 | [SMS (wysyłanie i odbiór)](005-sms/spec.md) | `SMS` | zatwierdzona |
 | 006 | [Przechowywanie sekretu TOTP (Keystore)](006-sekret-totp/spec.md) | `SECRET` | zatwierdzona |
 | 007 | [Dane – ustawienia i historia poleceń](007-dane/spec.md) | `DATA` | zatwierdzona |
+| 008 | [UI – ustawienia, sekret TOTP i uprawnienia](008-ui-ustawienia/spec.md) | `UI` | zatwierdzona |
