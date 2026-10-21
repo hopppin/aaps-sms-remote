@@ -27,4 +27,19 @@ class HistoryRedactionTest {
                 listOf("37", "Pomyslnie", "1111111").forEach { assertFalse(text.contains(it), text) }
             }
     }
+
+    @Test
+    fun `HISTUI-15 toString stanu z lista i szczegolami nie zawiera ilosci tresci ani czasow`() {
+        val entry = historyEntry(
+            HistoryOutcome.CarbsConfirmed,
+            HistoryCommand.CARBS,
+            carbsGrams = 37,
+            replyText = "Pomyslnie wprowadzono 37 g weglowodanow",
+        )
+        val state = HistoryUiState(
+            content = HistoryContent.Entries(listOf(HistoryEntryMapper.item(entry))),
+            details = HistoryEntryMapper.details(entry),
+        )
+        listOf("37", "Pomyslnie", "1111111").forEach { assertFalse(state.toString().contains(it), state.toString()) }
+    }
 }

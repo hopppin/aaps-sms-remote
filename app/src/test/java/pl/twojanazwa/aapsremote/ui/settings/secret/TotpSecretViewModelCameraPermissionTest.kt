@@ -11,11 +11,9 @@ import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 import pl.twojanazwa.aapsremote.ui.permissions.PermissionDenial
 
 class TotpSecretViewModelCameraPermissionTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private fun fixture(): SecretFixture =
         SecretFixture(main.dispatcher, SecretState.ABSENT).also { it.idle() }

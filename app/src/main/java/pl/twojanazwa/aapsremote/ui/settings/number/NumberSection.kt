@@ -45,6 +45,7 @@ fun NumberSection(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.number_field_label)) },
                 singleLine = true,
+                enabled = !state.busy,
                 isError = state.inputError != null,
                 supportingText = state.inputError?.let { { Text(stringResource(R.string.number_error_invalid)) } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -53,7 +54,7 @@ fun NumberSection(
                 Button(onClick = onSaveClicked, enabled = state.canSave) {
                     Text(stringResource(R.string.action_save))
                 }
-                TextButton(onClick = onEditCancelled) { Text(stringResource(R.string.action_cancel)) }
+                TextButton(onClick = onEditCancelled, enabled = !state.busy) { Text(stringResource(R.string.action_cancel)) }
             }
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

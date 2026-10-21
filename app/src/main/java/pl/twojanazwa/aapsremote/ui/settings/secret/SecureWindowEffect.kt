@@ -1,19 +1,19 @@
 package pl.twojanazwa.aapsremote.ui.settings.secret
 
-import android.view.WindowManager
-import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import pl.twojanazwa.aapsremote.ui.platform.LocalSecureWindow
 
 /**
- * UI-23: dodaje FLAG_SECURE do okna Activity, gdy [secure] = true; zdejmuje przy false
- * i przy usunięciu z kompozycji. Okno wklejania zabezpiecza się osobno (`SecureFlagPolicy.SecureOn`).
+ * UI-23, CMDUI-23: zgłasza do licznika okna żądanie FLAG_SECURE, gdy [secure] = true; zdejmuje je przy false
+ * i przy usunięciu z kompozycji. Flagę ustawia licznik w `AppScaffold`, gdy chroni ją choć jedno źródło.
+ * Okno wklejania zabezpiecza się osobno (`SecureFlagPolicy.SecureOn`).
  */
 @Composable
 fun SecureWindowEffect(secure: Boolean) {
-    val window = LocalActivity.current?.window
-    DisposableEffect(window, secure) {
-        if (secure) window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose { if (secure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    val counter = LocalSecureWindow.current
+    DisposableEffect(counter, secure) {
+        if (secure) counter.acquire()
+        onDispose { if (secure) counter.release() }
     }
 }
