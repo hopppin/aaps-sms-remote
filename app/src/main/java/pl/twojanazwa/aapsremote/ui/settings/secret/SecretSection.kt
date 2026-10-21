@@ -14,10 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.ui.permissions.PermissionDenial
 
 /**
- * Sekcja „Sekret TOTP” (UI-07, UI-08, UI-13); logika w [TotpSecretViewModel].
- * [scanAvailable] jest fałszem do czasu dodania skanera (zad. 10): bez widoku skanera przycisk byłby martwy.
+ * Sekcja „Sekret TOTP” (UI-07, UI-08, UI-10, UI-13); logika w [TotpSecretViewModel].
  */
 @Composable
 fun SecretSection(
@@ -29,7 +29,7 @@ fun SecretSection(
     onReplaceDismissed: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onDeleteDismissed: () -> Unit,
-    scanAvailable: Boolean,
+    onOpenAppSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -39,11 +39,22 @@ fun SecretSection(
         )
         Text(text = stringResource(state.display.textRes()))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onScanClicked, enabled = scanAvailable && state.canScan) {
+            OutlinedButton(onClick = onScanClicked, enabled = state.canScan) {
                 Text(stringResource(R.string.secret_action_scan))
             }
             OutlinedButton(onClick = onPasteClicked, enabled = state.canPaste) {
                 Text(stringResource(R.string.secret_action_paste))
+            }
+        }
+        if (state.cameraDenial != PermissionDenial.NONE) {
+            Text(
+                text = stringResource(R.string.secret_camera_denied),
+                color = MaterialTheme.colorScheme.error,
+            )
+            if (state.cameraDenial == PermissionDenial.PERMANENTLY_DENIED) {
+                OutlinedButton(onClick = onOpenAppSettings) {
+                    Text(stringResource(R.string.action_open_app_settings))
+                }
             }
         }
         if (state.display != SecretDisplay.ABSENT) {
