@@ -35,7 +35,7 @@ class TotpSecretViewModel @Inject constructor(
     private val store: TotpSecretStore,
     private val coordinator: SessionCoordinator,
     private val cameraPermission: CameraPermission,
-    @Suppress("unused") private val clipboard: SecretClipboard,
+    private val clipboard: SecretClipboard,
 ) : ViewModel() {
     /** Część stanu własna ViewModelu; `display` i `commandActive` dokłada `combine`. */
     private val local = MutableStateFlow(TotpSecretUiState())
@@ -186,6 +186,7 @@ class TotpSecretViewModel @Inject constructor(
         if (state.mode != SecretInputMode.PASTE || state.pasteText.isBlank()) return
         val raw = state.pasteText
         local.update { it.copy(pasteText = "", mode = SecretInputMode.NONE) }
+        clearClipboardIfPasted(clipboard, raw)
         accept(raw)
     }
 
@@ -234,9 +235,28 @@ class TotpSecretViewModel @Inject constructor(
     }
 
     fun onPasteDismissed() {
+        closePasteAndClearClipboard()
+    }
+
+    /** UI-14, UI-24: ekran niewidoczny – czyścimy pole, zamykamy okno wklejania i skaner. */
+    fun onStop() {
+        closePasteAndClearClipboard()
+        local.update { if (it.mode == SecretInputMode.SCANNER) it.copy(mode = SecretInputMode.NONE) else it }
+    }
+
+    /** Zamyka okno wklejania (jeśli otwarte), czyści pole i schowek, o ile zawiera dokładnie wklejony tekst. */
+    private fun closePasteAndClearClipboard() {
+        var text: String? = null
         local.update {
-            if (it.mode == SecretInputMode.PASTE) it.copy(pasteText = "", mode = SecretInputMode.NONE) else it
+            if (it.mode == SecretInputMode.PASTE) {
+                text = it.pasteText
+                it.copy(pasteText = "", mode = SecretInputMode.NONE)
+            } else {
+                text = null
+                it
+            }
         }
+        text?.let { clearClipboardIfPasted(clipboard, it) }
     }
 
     fun onMessageShown() {

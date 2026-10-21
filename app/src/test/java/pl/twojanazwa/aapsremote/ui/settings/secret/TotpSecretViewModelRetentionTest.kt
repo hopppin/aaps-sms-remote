@@ -75,6 +75,35 @@ class TotpSecretViewModelRetentionTest {
     }
 
     @Test
+    fun `UI-14 onStop czysci pole i zamyka okno wklejania bez save`() = runTest(main.dispatcher) {
+        val f = SecretFixture(main.dispatcher, SecretState.ABSENT)
+        f.idle()
+        f.viewModel.onPasteClicked()
+        f.viewModel.onPasteTextChanged(URI_RFC)
+        f.idle()
+        f.viewModel.onStop()
+        f.idle()
+        val s = f.viewModel.uiState.value
+        assertEquals("", s.pasteText)
+        assertEquals(SecretInputMode.NONE, s.mode)
+        assertEquals(0, f.store.saveCount)
+    }
+
+    @Test
+    fun `UI-14 onStop zamyka skaner bez save`() = runTest(main.dispatcher) {
+        val f = SecretFixture(main.dispatcher, SecretState.ABSENT)
+        f.camera.granted = true
+        f.idle()
+        f.viewModel.onScanClicked()
+        f.idle()
+        assertEquals(SecretInputMode.SCANNER, f.viewModel.uiState.value.mode)
+        f.viewModel.onStop()
+        f.idle()
+        assertEquals(SecretInputMode.NONE, f.viewModel.uiState.value.mode)
+        assertEquals(0, f.store.saveCount)
+    }
+
+    @Test
     fun `UI-14 pole puste przed zwolnieniem zawieszonego zapisu`() = runTest(main.dispatcher) {
         val f = SecretFixture(main.dispatcher, SecretState.ABSENT)
         f.idle()
