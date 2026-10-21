@@ -13,9 +13,12 @@ import pl.twojanazwa.aapsremote.data.SessionHistoryRecorder
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.security.AapsPin
+import pl.twojanazwa.aapsremote.session.CodeCredentials
+import pl.twojanazwa.aapsremote.session.CommandSession
 import pl.twojanazwa.aapsremote.session.FakeIncomingSmsSource
 import pl.twojanazwa.aapsremote.session.FakeSmsSender
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
+import pl.twojanazwa.aapsremote.session.StartResult
 import pl.twojanazwa.aapsremote.sms.FakeSmsPermissions
 import pl.twojanazwa.aapsremote.ui.settings.number.FakeAapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.ui.settings.secret.FakeTotpSecretStore
@@ -54,8 +57,18 @@ class CommandTestEnv(testScope: TestScope) {
     val appScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScope.testScheduler))
     val recorder = SessionHistoryRecorder(history, appScope)
 
-    fun launcher(coordinator: SessionCoordinator = this.coordinator) =
+    fun launcher(
+        coordinator: SessionCoordinator = this.coordinator,
+        recorder: SessionHistoryRecorder = this.recorder,
+    ) =
         CommandLauncher(coordinator, numbers, permissions, secrets, recorder, currentRun, appScope)
 
     fun setNumber(state: AapsNumberState) = numbers.setState(state)
+
+    /** Start sesji wprost w koordynatorze z publikacją w `CurrentRun`, bez launchera (testy widoku przebiegu). */
+    fun startAndPublish(command: Command, credentials: CodeCredentials? = null): CommandSession {
+        val started = coordinator.start(appScope, command, credentials) as StartResult.Started
+        currentRun.publish(CurrentRunData(command, started.session.state))
+        return started.session
+    }
 }
