@@ -55,7 +55,7 @@ Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `
 
 ## Wymagania
 
-Wspólne dane kryteriów (o ile kryterium nie mówi inaczej): numer AAPS w stanie `Configured(+447700900123)` (fikcyjny, zakres Ofcom), `SmsPermissions` zwraca `true` dla obu uprawnień, `SecretState.PRESENT`, `load()` zwraca `Loaded` z sekretem RFC 6238 (`12345678901234567890`), fikcyjny PIN `4321`, prawdziwy `SessionCoordinator` z atrapami `FakeSmsSender`/`FakeIncomingSmsSource` ze Spec 004 i zegarem `T0 = 1111111051000` + czas wirtualny (albo `activeSession` z MockK, gdy kryterium dotyczy tylko blokady), zakres uruchamiania sesji = `backgroundScope` testu, dyspozytor główny = `StandardTestDispatcher`. Treści wiadomości AAPS: pliki z [`../002-parser-odpowiedzi/dane/`](../002-parser-odpowiedzi/dane/README.md). „Brak startu” = `FakeSmsSender` nie dostał żadnego SMS-a i `activeSession.value == null`.
+Wspólne dane kryteriów (o ile kryterium nie mówi inaczej): numer AAPS w stanie `Configured(+447700900123)` (fikcyjny, zakres Ofcom), `SmsPermissions` zwraca `true` dla obu uprawnień, `SecretState.PRESENT`, `load()` zwraca `Loaded` z sekretem RFC 6238 (`12345678901234567890`), fikcyjny PIN `4321`, prawdziwy `SessionCoordinator` z atrapami `FakeSmsSender`/`FakeIncomingSmsSource` ze Spec 004 i zegarem `T0 = 1111111051000` + czas wirtualny (albo `activeSession` z MockK, gdy kryterium dotyczy tylko blokady), jeden wspólny `CurrentRun` dla launchera i obu ViewModeli, zakres uruchamiania sesji = `backgroundScope` testu, dyspozytor główny = `StandardTestDispatcher`. Treści wiadomości AAPS: pliki z [`../002-parser-odpowiedzi/dane/`](../002-parser-odpowiedzi/dane/README.md). „Brak startu” = `FakeSmsSender` nie dostał żadnego SMS-a i `activeSession.value == null`. „Uruchomiono przez launcher” = `CommandLauncher.launch` zakończone `Started` albo pomocnik testowy `startAndPublish` (`coordinator.start` + `currentRun.publish`, design – „Mapowanie wymagań na testy”). Samo `coordinator.start` albo samo ustawienie `activeSession` nie publikuje `CurrentRun`, więc nie daje przebiegu ani wyniku w `CommandRunViewModel`.
 
 ### Panel poleceń i gotowość
 
@@ -253,7 +253,7 @@ Po sprawdzeniach `CommandLauncher` wywołuje `SessionCoordinator.start(scope, co
 - **Zakładając** sesję `BG` uruchomioną przez `CommandsViewModel` (zakres uruchamiania = `backgroundScope`), **gdy** wyczyszczono ViewModel (`ViewModelStore.clear()`, zakres ViewModelu anulowany), a potem przyszedł `bg.txt`, **wtedy** sesja kończy się `Completed` (nie `Cancelled`).
 - **Zakładając** koordynator (MockK) z `activeSession.value == null` i `start` zwracającym `Busy` (wyścig: inna sesja wystartowała między sprawdzeniem a startem), **gdy** wywołano `launch(CARBS 20, PIN)`, **wtedy** wynik = `COMMAND_ACTIVE`, PIN wyczyszczony, a `track` nie był wywołany.
 - **Zakładając** `launch(BG, AapsPin 4321)` (osobno `launch(CARBS 20, null)`) – niepoprawny zestaw, **gdy** się zakończył, **wtedy** wynik = `START_FAILED`, PIN (jeśli był) wyczyszczony, `load()` nie był wywołany, brak startu, bez wyjątku na zewnątrz.
-- **Zakładając** moduł Hilt z zakresem uruchamiania, **gdy** test JVM sprawdził metodę dostarczającą refleksją, **wtedy** ma adnotacje `@Provides`, `@Singleton` i `@CommandRunScope`, a zwrócony zakres ma `SupervisorJob` (dziecko zakończone wyjątkiem nie anuluje zakresu).
+- **Zakładając** moduł Hilt z zakresem uruchamiania, **gdy** test JVM sprawdził metodę dostarczającą refleksją, **wtedy** ma adnotacje `@Provides`, `@Singleton` i `@CommandRunScope`, a zwrócony zakres ma `SupervisorJob` (dziecko zakończone wyjątkiem nie anuluje zakresu) i dyspozytor `Dispatchers.Default` (`coroutineContext[ContinuationInterceptor]`).
 
 ### CMDUI-14: Zapis do historii zaraz po starcie
 
@@ -267,7 +267,7 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-15: Sekret i PIN nie zostają w warstwie ui
 
-`CommandLauncher` ma wyłącznie pola niezmienne z zależnościami (koordynator, magazyny, uprawnienia, rejestrator, zakres) – żadne pole nie jest typu `TotpSecret`, `LoadResult`, `CodeCredentials`, `AapsPin`, `CharArray`, `ByteArray` ani `CommandSession`. Sekret istnieje tylko jako zmienna lokalna wywołania `launch` do zbudowania `CodeCredentials` przekazanego koordynatorowi (SECRET-14). ViewModele nie dostają `TotpSecret` ani `CodeCredentials`.
+`CommandLauncher` ma wyłącznie pola niezmienne z zależnościami (koordynator, magazyny, uprawnienia, rejestrator, `CurrentRun`, zakres) – żadne pole nie jest typu `TotpSecret`, `LoadResult`, `CodeCredentials`, `AapsPin`, `CharArray`, `ByteArray` ani `CommandSession`. Sekret istnieje tylko jako zmienna lokalna wywołania `launch` do zbudowania `CodeCredentials` przekazanego koordynatorowi (SECRET-14). ViewModele nie dostają `TotpSecret` ani `CodeCredentials`.
 
 **Kryteria akceptacji:**
 
@@ -278,12 +278,13 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-16: Pokazanie przebiegu aktywnej sesji
 
-`CommandRunViewModel` obserwuje `CurrentRun` (polecenie i stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku, zanim ViewModel powstał (np. po ponownym otwarciu aplikacji). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
+`CommandRunViewModel` obserwuje `CurrentRun` (polecenie i stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku albo już się zakończyła, zanim ViewModel powstał (np. po „Wyjdź” i ponownym otwarciu aplikacji, gdy proces żyje – P7, CMDUI-21). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wspólne dane, **gdy** uruchomiono `BG` (`coordinator.start` albo `CommandLauncher.launch`), **wtedy** stan `CommandRunViewModel` = przebieg polecenia `BG` w fazie `SENDING_COMMAND` albo `AWAITING_REPLY`; **gdy** przyszedł `bg.txt`, **wtedy** stan = wynik.
-- **Zakładając** sesję `CARBS 20` w `AWAITING_CODE_REQUEST` uruchomioną przed utworzeniem `CommandRunViewModel` (`CurrentRun` już ją zawiera), **gdy** utworzono ViewModel, **wtedy** stan = przebieg `CARBS` dla 20 g z bieżącym krokiem „czekanie na prośbę o kod”.
+- **Zakładając** wspólne dane, **gdy** uruchomiono `BG` przez launcher (`CommandLauncher.launch` albo `startAndPublish`), **wtedy** stan `CommandRunViewModel` = przebieg polecenia `BG` w fazie `SENDING_COMMAND` albo `AWAITING_REPLY`; **gdy** przyszedł `bg.txt`, **wtedy** stan = wynik.
+- **Zakładając** sesję `CARBS 20` w `AWAITING_CODE_REQUEST` uruchomioną przez launcher przed utworzeniem `CommandRunViewModel` (`CurrentRun` już ją zawiera), **gdy** utworzono ViewModel, **wtedy** stan = przebieg `CARBS` dla 20 g z bieżącym krokiem „czekanie na prośbę o kod”.
+- **Zakładając** sesję `BG` uruchomioną przez launcher i zakończoną `Completed` po `bg.txt` przed utworzeniem `CommandRunViewModel` (wynik niezamknięty, „Wyjdź” i ponowne otwarcie przy żyjącym procesie), **gdy** utworzono ViewModel, **wtedy** stan = wynik `Completed` polecenia `BG`.
 - **Zakładając** sesję kończącą się natychmiast (np. `SEND_FAILED`), której `activeSession` kolektor `CommandRunViewModel` nigdy nie zobaczył jako niepustej (CMDUI-19), **gdy** `CommandLauncher` opublikował jej stan w `CurrentRun`, **wtedy** ViewModel i tak pokazuje wynik tej sesji; **gdy** wynik zamknięto, `CurrentRun` jest pusty.
 - **Zakładając** telefon (W8), **gdy** w trakcie `CARBS` przełączono na Ustawienia i z powrotem oraz obrócono ekran, **wtedy** zakładka Polecenia pokazuje ten sam przebieg; w Ustawieniach widać baner „Trwa polecenie” (UI-15 ze Spec 008).
 
@@ -304,13 +305,14 @@ Przebieg pokazuje listę kroków zależną od polecenia; każdy krok ma status: 
 | `SENDING_CODE` | 4 |
 | `AWAITING_CONFIRMATION` | 5 |
 
-Liczby minut pochodzą z domyślnych `SessionTimeouts` (`reply`, `confirmation`). Faza niemożliwa dla polecenia (np. `AWAITING_CONFIRMATION` dla `BG`) albo `FINISHED` daje wszystkie kroki oczekujące (nie występuje w działaniu; przebieg w `FINISHED` jest zastąpiony wynikiem).
+Liczby minut pochodzą z domyślnych `SessionTimeouts` (`reply`, `confirmation`). Tabela faz jest wspólna dla wszystkich poleceń. Gdy krok bieżący z tabeli wykracza poza listę kroków polecenia (dla `BG`/`PUMP`: fazy `PREPARING_CODE`, `SENDING_CODE`, `AWAITING_CONFIRMATION`) albo faza to `FINISHED`, wszystkie kroki są oczekujące. Faza nietypowa dla polecenia, ale z krokiem bieżącym w zakresie jego listy (np. `AWAITING_CODE_REQUEST` dla `BG`, `AWAITING_REPLY` dla `CARBS`), daje krok bieżący z tabeli (krok 2). Takie fazy nie występują w działaniu; przebieg w `FINISHED` jest zastąpiony wynikiem.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** `CARBS` i każdą z faz `NOT_STARTED` … `AWAITING_CONFIRMATION`, **gdy** wyliczono kroki, **wtedy** jest 5 kroków, a statusy odpowiadają tabeli (np. dla `SENDING_CODE`: wykonany, wykonany, wykonany, bieżący, oczekujący).
 - **Zakładając** `BG` (osobno `PUMP`) i fazy `SENDING_COMMAND`, `AWAITING_REPLY`, **gdy** wyliczono kroki, **wtedy** są 2 kroki ze statusami kolejno (bieżący, oczekujący) i (wykonany, bieżący).
-- **Zakładając** `BG` w fazie `AWAITING_CONFIRMATION`, **gdy** wyliczono kroki, **wtedy** oba są oczekujące.
+- **Zakładając** `BG` w fazie `AWAITING_CONFIRMATION` (osobno `PREPARING_CODE`), **gdy** wyliczono kroki, **wtedy** oba są oczekujące.
+- **Zakładając** `BG` w fazie `AWAITING_CODE_REQUEST` i (osobno) `CARBS` w fazie `AWAITING_REPLY`, **gdy** wyliczono kroki, **wtedy** krok 2 jest bieżący: odpowiednio (wykonany, bieżący) i (wykonany, bieżący, oczekujący, oczekujący, oczekujący).
 - **Zakładając** domyślne `SessionTimeouts`, **gdy** odczytano argumenty minut kroków, **wtedy** to 3 i 6.
 
 ### CMDUI-18: Anulowanie
@@ -318,7 +320,7 @@ Liczby minut pochodzą z domyślnych `SessionTimeouts` (`reply`, `confirmation`)
 W przebiegu jest jeden przycisk anulowania, zależny od fazy (SESSION-17):
 
 - Fazy przed kodem: „Anuluj polecenie” – od razu wywołuje `cancel()` aktywnej sesji (bez okna).
-- Fazy po kodzie (`SENDING_CODE`, `AWAITING_CONFIRMATION`): „Przestań czekać” – najpierw okno „Przestać czekać?” z tekstem „Kod został już wysłany. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS.” i przyciskami „Przestań czekać” i „Czekaj dalej”; dopiero potwierdzenie wywołuje `cancel()`.
+- Fazy po kodzie (`SENDING_CODE`, `AWAITING_CONFIRMATION`): „Przestań czekać” – najpierw okno „Przestać czekać?” z tekstem „Kod mógł już dotrzeć do AAPS. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS.” i przyciskami „Przestań czekać” i „Czekaj dalej”; dopiero potwierdzenie wywołuje `cancel()`.
 
 `cancel()` jest wywoływane na `activeSession.value` w chwili akcji (ViewModel nie trzyma referencji do sesji w polu); brak aktywnej sesji → nic. Okno jest zamykane, gdy sesja się kończy. Wynik anulowania pokazuje CMDUI-19 (`Cancelled` albo `Unknown(CANCELLED_AFTER_CODE)` – zależnie od fazy w chwili przetworzenia przez sesję).
 
@@ -337,6 +339,7 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | --- | --- | --- |
 | `Completed` (`BG`) | sukces → „Gotowe” | „Odpowiedź AAPS na BG” |
 | `Completed` (`PUMP`) | sukces → „Gotowe” | „Odpowiedź AAPS na PUMP” |
+| `Completed` (`CARBS`; nie występuje – Spec 004 kończy `CARBS` wynikiem `CarbsConfirmed`) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
 | `CarbsConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził wprowadzenie X g” |
 | `Failed(SEND_FAILED)` | błąd → „Błąd” | „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” |
 | `Failed(UNRECOGNIZED_REPLY)` | błąd | „Nierozpoznana odpowiedź AAPS.” |
@@ -349,8 +352,8 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `TimedOut(AWAITING_REPLY \| AWAITING_CODE_REQUEST)` | brak odpowiedzi → „AAPS nie odpowiada” | „Brak odpowiedzi AAPS w ciągu 3 min.” |
 | `TimedOut(SENDING_COMMAND)` | brak odpowiedzi | „Telefon nie potwierdził wysłania SMS w ciągu 3 min.” |
 | `TimedOut` (inna faza) | brak odpowiedzi | „Brak odpowiedzi AAPS w ciągu 3 min.” |
-| `Unknown(CONFIRMATION_TIMEOUT)` | nieznany → „Nieznany – sprawdź w AAPS” | „Kod wysłany, ale AAPS nie potwierdził w ciągu 6 min.” |
-| `Unknown(CANCELLED_AFTER_CODE)` | nieznany | „Przestano czekać po wysłaniu kodu.” |
+| `Unknown(CONFIRMATION_TIMEOUT)` | nieznany → „Nieznany – sprawdź w AAPS” | „Kod przekazany do wysłania, ale AAPS nie potwierdził w ciągu 6 min.” |
+| `Unknown(CANCELLED_AFTER_CODE)` | nieznany | „Przestano czekać po przekazaniu kodu do wysłania.” |
 | `Unknown(CODE_SEND_FAILED)` | nieznany | „Wysyłanie kodu zgłosiło błąd, ale SMS mógł dotrzeć do AAPS.” |
 | `Unknown(UNRECOGNIZED_REPLY)` | nieznany | „Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS (np. o kolejce pompy).” |
 | `Unknown(AMOUNT_MISMATCH)` | nieznany | „Po wysłaniu kodu AAPS podał inną ilość niż wysłana.” |
@@ -364,12 +367,14 @@ Dodatki:
 - **Ostrzeżenie** „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – dla każdego `Unknown`.
 - Wynik sukcesu nie mówi, że wykonano polecenie z aplikacji, tylko co potwierdził AAPS (SESSION-12).
 
-Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams`.
+Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams` (nie z polecenia). Argument liczbowy mają tylko komunikaty z X albo z minutami. Wiersz `Completed` dla `CARBS` nie twierdzi, że AAPS potwierdził ilość, i ma ten sam rodzaj (sukces) i ten sam rodzaj komunikatu („brak szczegółów”, bez argumentu) co wpis historii z tym wynikiem (Spec 010, HISTUI-04); historia dodaje do tekstu wyjaśnienie o wpisie z innej wersji aplikacji.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 8 `FailureReason`, wszystkie 7 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG` i `PUMP`, `CarbsConfirmed(1)`, `Cancelled`), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1.
-- **Zakładając** polecenie `CARBS 20` i wyniki `Failed(AMOUNT_MISMATCH)`, `TimedOut(AWAITING_CODE_REQUEST)`, `Cancelled`, **gdy** odwzorowano, **wtedy** dodatek „Kod nie został wysłany” = `true`; dla `Failed(WRONG_CODE)`, `CarbsConfirmed`, `Unknown(CONFIRMATION_TIMEOUT)` = `false`; dla `BG` z `Cancelled` = `false`.
+- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 8 `FailureReason`, wszystkie 7 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG`, `PUMP` i `CARBS 20`, `CarbsConfirmed(1)`, `Cancelled`), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1; dla `Completed` z `CARBS 20` – sukces, „brak szczegółów”, argument pusty, bez wyjątku.
+- **Zakładając** polecenie `CARBS 1` i syntetyczny wynik `CarbsConfirmed(37)`, **gdy** odwzorowano, **wtedy** argument ilości = 37 (z wyniku, nie z polecenia).
+- **Zakładając** każdy wynik z pierwszego kryterium, **gdy** odwzorowano, **wtedy** argument komunikatu jest niepusty dokładnie wtedy, gdy klucz komunikatu w tabeli tekstów design jest oznaczony jako tekst z argumentem (`d`).
+- **Zakładając** polecenie `CARBS 20` i każdy z 8 `FailureReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST` oraz `Cancelled`, **gdy** odwzorowano, **wtedy** dodatek „Kod nie został wysłany” = `true` dla wszystkich poza `Failed(WRONG_CODE)` (= `false`); dla każdego z 7 `UnknownReason`, dla `CarbsConfirmed` i dla `Completed` = `false`; dla `BG` z każdym wynikiem z pierwszego kryterium = `false`.
 - **Zakładając** każdy `UnknownReason`, **gdy** odwzorowano, **wtedy** ostrzeżenie = `true`; dla wyników innych niż `Unknown` = `false`.
 - **Zakładając** telefon z AAPS (W4, W5), **gdy** `BG` i `CARBS 1` zakończyły się, **wtedy** widać nagłówek „Gotowe” i komunikaty z tabeli.
 
@@ -379,19 +384,20 @@ Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy w
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wynik `Completed` po `bg.txt`, **gdy** odwzorowano, **wtedy** treść = zawartość `bg.txt`; dla `Failed(UNRECOGNIZED_REPLY)` z treścią `Czesc, kupisz chleb?` – ta treść; dla `TimedOut`, `Cancelled`, `Failed(SEND_FAILED)` i `Unknown(CONFIRMATION_TIMEOUT)` – brak.
+- **Zakładając** wynik `Completed` po `bg.txt`, **gdy** odwzorowano, **wtedy** treść = zawartość `bg.txt`; dla `Failed(UNRECOGNIZED_REPLY)` z treścią `Czesc, kupisz chleb?` – ta treść; dla `Failed(WRONG_CODE)` z treścią `zly-kod.txt` i `Unknown(UNRECOGNIZED_REPLY)` z treścią `Czesc, kupisz chleb?` – te treści; dla `TimedOut`, `Cancelled`, `Failed(SEND_FAILED)` i `Unknown(CONFIRMATION_TIMEOUT)` – brak.
 - **Zakładając** przebieg `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** w chwilach 10 000 i 20 000 przyszedł `carbs-sukces.txt`, **wtedy** liczba nieoczekiwanych w przebiegu = 2; po `TimedOut` – w wyniku = 2.
 - **Zakładając** stan przebiegu i wyniku, **gdy** sprawdzono typy pól refleksją, **wtedy** nie ma listy `IncomingSms` (tylko liczba).
 
 ### CMDUI-21: Zamknięcie wyniku i brak referencji do sesji
 
-Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Po fazie `FINISHED` `CommandRunViewModel` trzyma tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez referencji do `CommandSession` ani jej `StateFlow` (sesja trzyma `CodeCredentials` z sekretem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Start nowego polecenia (CMDUI-06, CMDUI-13) zastępuje pokazany wynik przebiegiem nowej sesji.
+Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Stan ekranu `CommandRunViewModel` (`RunUiState`) po fazie `FINISHED` zawiera tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez `StateFlow`, bez `CommandSession` i bez `CodeCredentials` (sesja trzyma `CodeCredentials` z sekretem). `CommandRunViewModel` nie ma pola typu `CommandSession`. `CurrentRun` (singleton) trzyma polecenie i `StateFlow<SessionState>` sesji aż do zamknięcia wyniku; jest to dozwolone, bo ten `StateFlow` nie wskazuje na `CommandSession` ani na `CodeCredentials` (w Spec 004 `CommandSession.state` to samodzielny `MutableStateFlow` ze stanem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął – także po „Wyjdź” (CMDUI-24) i ponownym otwarciu aplikacji; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Gdy wynik jest pokazany, panel poleceń jest niewidoczny, więc nowe polecenie można uruchomić dopiero po zamknięciu wyniku.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wynik `Completed` na ekranie, **gdy** wywołano `onResultDismissed()`, **wtedy** stan `CommandRunViewModel` = brak przebiegu i wyniku.
+- **Zakładając** wynik `Completed` na ekranie, **gdy** wywołano `onResultDismissed()`, **wtedy** stan `CommandRunViewModel` = brak przebiegu i wyniku, a `CurrentRun.state.value == null`.
 - **Zakładając** przebieg, **gdy** wywołano `onResultDismissed()`, **wtedy** stan bez zmian (przebiegu nie da się zamknąć bez anulowania).
-- **Zakładając** sesję `BG` zakończoną `Completed`, **gdy** sprawdzono refleksją pola `CommandRunViewModel` i jego stanu (jeden poziom w głąb), **wtedy** żadne nie jest referencją do tej `CommandSession` ani jej `state`.
+- **Zakładając** sesję `BG` uruchomioną przez launcher i zakończoną `Completed` (wynik na ekranie), **gdy** sprawdzono refleksją pola `CommandRunViewModel` oraz pola jego stanu i `RunView` (rekurencyjnie po typach z `ui.commands`), **wtedy** żadne pole nie ma typu `CommandSession`, `CodeCredentials`, `TotpSecret` ani `AapsPin`, pola stanu i `RunView` nie mają typu `StateFlow` (ani `Flow`), a żadne pole stanu nie jest referencją do tej `CommandSession` ani jej `state`.
+- **Zakładając** ten sam wynik, **gdy** wywołano `onResultDismissed()` i sprawdzono refleksją pola `CommandRunViewModel`, jego stanu i `CurrentRun` (jeden poziom w głąb), **wtedy** żadne nie jest referencją do tej `CommandSession` ani jej `state`.
 
 ### CMDUI-22: Pierwszy plan i ekran włączony
 
@@ -399,18 +405,27 @@ Gdy polecenie jest w toku (`activeSession.value != null`), okno `Activity` ma w�
 
 **Kryteria akceptacji:**
 
-- **Zakładając** `CommandRunViewModel`, **gdy** `activeSession` zmienia się kolejno: `null` → sesja `BG` → (po `bg.txt`) `null`, **wtedy** znacznik „ekran włączony” ma kolejno wartości `false`, `true`, `false`, a po zakończeniu stan = wynik.
+- **Zakładając** `CommandRunViewModel` bez uruchomienia, **gdy** uruchomiono `BG` przez launcher (`activeSession`: `null` → sesja `BG`), a potem przyszedł `bg.txt` (`activeSession` → `null`), **wtedy** znacznik „ekran włączony” (z `activeSession`) ma kolejno wartości `false`, `true`, `false`, a po zakończeniu stan = wynik (z `CurrentRun`).
 - **Zakładając** telefon z czasem wygaszania ekranu 15 s (W9), **gdy** uruchomiono `CARBS 1` i czekano na prośbę o kod dłużej niż 15 s, **wtedy** ekran się nie wygasza, także po przełączeniu na zakładkę Ustawienia; po wyniku ekran wygasa po 15 s.
 
 ### CMDUI-23: Ochrona ekranu (podsumowanie, przebieg, wynik)
 
 Gdy na zakładce Polecenia otwarte jest podsumowanie z polem PIN-u albo ekran przebiegu lub wyniku polecenia, okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach), zgodnie z planem („FLAG_SECURE na ekranach z danymi”). Po zamknięciu podsumowania albo wyniku (panel Polecenia) flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania). Panel Polecenia bez podsumowania i bez przebiegu nie ma `FLAG_SECURE` (decyzja użytkownika, P3, zmieniona po recenzji).
 
+Okno ma flagę, gdy znacznik „ekran chroniony” jest włączony w `CommandsViewModel` albo w `CommandRunViewModel`:
+
+- `CommandRunViewModel`: znacznik = przebieg albo wynik jest w stanie ekranu (`view != null`). Ekran przebiegu i wyniku jest pokazywany z tego samego pola, więc nigdy bez flagi.
+- `CommandsViewModel`: znacznik = podsumowanie otwarte albo trwa przekazanie do przebiegu. Po `LaunchResult.Started` ViewModel w jednej zmianie stanu zamyka podsumowanie i włącza znacznik przekazania (`runHandoff`) – dla każdego polecenia. Znacznik przekazania wyłącza dopiero kolektor `CurrentRun` w `CommandsViewModel`, gdy zobaczy pusty `CurrentRun` (po zamknięciu wyniku, CMDUI-21). `CurrentRun` jest publikowany przed powrotem z `launch` (CMDUI-16), więc w chwili włączenia znacznika nie jest pusty. Przy `Rejected` znacznik przekazania nie jest włączany.
+
+Dzięki temu flaga nie spada między zamknięciem podsumowania a pokazaniem przebiegu, niezależnie od kolejności wykonania kolektorów obu ViewModeli; po zamknięciu wyniku może zostać chwilę dłużej (opóźnienie działa w bezpieczną stronę). Po ponownym otwarciu `Activity` z niezamkniętym wynikiem (P7) flaga włącza się razem z pokazaniem wyniku; wcześniej widoczny jest tylko panel, który nie wymaga ochrony (P3).
+
 **Kryteria akceptacji:**
 
-- **Zakładając** `CommandsViewModel`, **gdy** otwarto podsumowanie, zamknięto je „Anuluj”, otwarto ponownie i wywołano „Wyślij” (start udany), **wtedy** znacznik „ekran chroniony” ma kolejno wartości `true`, `false`, `true`, `false`.
-- **Zakładając** `CommandRunViewModel`, **gdy** `activeSession` zmienia się kolejno: `null` → sesja `BG` → (po `bg.txt`) `null`, a potem wynik zostaje zamknięty, **wtedy** znacznik „ekran chroniony” ma kolejno wartości `false`, `true`, `true` (wynik widoczny), `false` (po zamknięciu wyniku).
-- **Zakładając** `CommandsViewModel` i `CommandRunViewModel` ze wspólnym `CurrentRun`, **gdy** w podsumowaniu wywołano „Wyślij” (start udany) i `CurrentRun` ma uruchomienie, ale kolektor `CommandRunViewModel` nie ustawił jeszcze `view`, **wtedy** `commands.secureWindow || run.secureWindow` pozostaje `true` w każdym kroku aż do zamknięcia wyniku (brak chwili bez ochrony).
+- **Zakładając** `CommandsViewModel` ze wspólnym `CurrentRun` i launcherem, **gdy** otwarto podsumowanie, zamknięto je „Anuluj”, otwarto ponownie, wywołano „Wyślij” (start udany), a potem wywołano `currentRun.clear()` i wykonano zadania dyspozytora, **wtedy** znacznik „ekran chroniony” ma kolejno wartości `true`, `false`, `true`, `true` (podsumowanie zamknięte, przekazanie), `false`; żadna emisja `uiState` (Turbine) między „Wyślij” a `clear()` nie ma znacznika `false`, a pierwsza emisja z zamkniętym podsumowaniem po „Wyślij” ma znacznik `true`.
+- **Zakładając** podsumowanie z PIN-em `4321` i `load()` zwracający `Absent`, **gdy** wywołano „Wyślij”, **wtedy** po zamknięciu podsumowania znacznik „ekran chroniony” = `false` (bez przekazania).
+- **Zakładając** `CommandRunViewModel` bez uruchomienia, **gdy** uruchomiono `BG` przez launcher, przyszedł `bg.txt`, a potem wynik zamknięto, **wtedy** znacznik „ekran chroniony” ma kolejno wartości `false`, `true`, `true` (wynik widoczny), `false` (po zamknięciu wyniku), a w każdym stanie jest równy `view != null`.
+- **Zakładając** `CommandsViewModel` i `CommandRunViewModel` ze wspólnym `CurrentRun` i podsumowanie dla 1 g z PIN-em `4321`, **gdy** wywołano „Wyślij” (start udany), w chwili 60 000 przyszedł `carbs-prosba-o-kod.txt`, w chwili 120 000 `carbs-sukces.txt`, a potem wywołano `onResultDismissed()`, i od „Wyślij” do `onResultDismissed()` po każdym kroku dyspozytora (`runCurrent()`, `advanceTimeBy`, także przed pierwszym wykonaniem kolektora `CommandRunViewModel`) odczytano `commands.uiState.value.secureWindow || run.uiState.value.secureWindow`, **wtedy** każda odczytana wartość = `true`; po `onResultDismissed()` i wykonaniu zadań = `false`.
+- **Zakładając** `CommandsViewModel` ze wspólnym `CurrentRun` bez żadnego `CommandRunViewModel` (żaden kolektor nie ustawia `view`), **gdy** wywołano „Wyślij” (start udany) i wykonano wszystkie zadania dyspozytora, **wtedy** znacznik „ekran chroniony” `CommandsViewModel` = `true`, dopóki `CurrentRun` nie jest pusty.
 - **Zakładając** licznik ochrony okna, **gdy** ochronę włączyły dwa źródła, a wyłączyło jedno, **wtedy** flaga jest nadal włączona; po wyłączeniu przez drugie – wyłączona.
 - **Zakładając** otwarte podsumowanie na telefonie (W10), **gdy** wykonano zrzut ekranu i otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd jest pusty; po zamknięciu podsumowania zrzut działa.
 
@@ -423,18 +438,19 @@ Na zakładce Polecenia przycisk Wstecz:
 | okno „Na pewno” otwarte | zamyka okno („Nie”) |
 | podsumowanie otwarte | „Anuluj” podsumowania (CMDUI-10) |
 | wynik na ekranie | „Zamknij” (CMDUI-21) |
-| polecenie w toku | okno „Trwa polecenie” z tekstem „Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.” i przyciskami „Zostań” i „Wyjdź”; „Wyjdź” zamyka `Activity` (sesja trwa dalej w zakresie aplikacji, CMDUI-13), „Zostań” zamyka okno |
+| polecenie w toku | okno „Trwa polecenie” z tekstem „Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.” i przyciskami „Zostań” i „Wyjdź”; „Wyjdź” zamyka `Activity` (sesja trwa dalej w zakresie aplikacji, CMDUI-13; `CurrentRun` nie jest czyszczony), „Zostań” zamyka okno |
 | żadne z powyższych | jak UI-02 (zamyka aplikację) |
 
-(Okno „Trwa polecenie” – decyzja użytkownika, P8.)
+(Okno „Trwa polecenie” – decyzja użytkownika, P8.) Po „Wyjdź” i ponownym otwarciu aplikacji, gdy proces żyje, zakładka Polecenia pokazuje przebieg albo wynik z `CurrentRun` (P7, CMDUI-16, CMDUI-21); panel – dopiero po „Zamknij”. Panel bez wyniku widać po ponownym otwarciu tylko wtedy, gdy proces został w międzyczasie zabity (wynik jest wtedy tylko w Historii, Spec 010, W8).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** otwarte podsumowanie z PIN-em `4321`, **gdy** wywołano `onBack()` w `CommandsViewModel`, **wtedy** podsumowanie zamknięte, tekst PIN-u = `""`.
 - **Zakładając** wynik na ekranie, **gdy** wywołano `onBack()` w `CommandRunViewModel`, **wtedy** stan = brak wyniku.
-- **Zakładając** przebieg `BG`, **gdy** wywołano `onBack()`, **wtedy** okno „Trwa polecenie” jest otwarte, a sesja nadal aktywna; **gdy** wywołano „Zostań”, **wtedy** okno zamknięte; **gdy** wywołano „Wyjdź”, **wtedy** stan zawiera żądanie zamknięcia `Activity`, a `cancel()` sesji nie był wywołany.
-- **Zakładając** panel bez okien, przebiegu i wyniku, **gdy** odczytano stan obu ViewModeli, **wtedy** przechwytywanie Wstecz jest wyłączone w obu.
-- **Zakładając** telefon (W11), **gdy** w trakcie `BG` dotknięto Wstecz i wybrano „Wyjdź”, a po odpowiedzi AAPS otwarto aplikację, **wtedy** zakładka Polecenia pokazuje panel; Historia (010) zawiera wpis polecenia.
+- **Zakładając** przebieg `BG` uruchomiony przez launcher, **gdy** wywołano `onBack()`, **wtedy** okno „Trwa polecenie” jest otwarte, a sesja nadal aktywna; **gdy** wywołano „Zostań”, **wtedy** okno zamknięte; **gdy** wywołano „Wyjdź”, **wtedy** stan zawiera żądanie zamknięcia `Activity`, `cancel()` sesji nie był wywołany, a `CurrentRun` nadal zawiera uruchomienie.
+- **Zakładając** przebieg `BG` po „Wyjdź” i wyczyszczeniu `CommandRunViewModel` (`ViewModelStore.clear()`), **gdy** przyszedł `bg.txt` i utworzono nowy `CommandRunViewModel` z tym samym `CurrentRun`, **wtedy** stan = wynik `Completed` polecenia `BG`; **gdy** wywołano `onResultDismissed()`, **wtedy** stan = brak przebiegu i wyniku.
+- **Zakładając** panel bez okien, przebiegu i wyniku, **gdy** odczytano stan `CommandsViewModel` (osobno `CommandRunViewModel`), **wtedy** przechwytywanie Wstecz jest w nim wyłączone.
+- **Zakładając** telefon (W11), **gdy** w trakcie `BG` dotknięto Wstecz i wybrano „Wyjdź”, a po odpowiedzi AAPS otwarto aplikację (bez zabijania procesu), **wtedy** zakładka Polecenia pokazuje wynik polecenia `BG`; po „Zamknij” – panel; Historia (010) zawiera wpis polecenia.
 
 ### Reguły wspólne
 
@@ -460,12 +476,13 @@ Pakiet `ui` nie wywołuje API logowania (reguła UI-21 obejmuje też `ui.command
 
 ### CMDUI-27: Zakres uruchamiania sesji w Hilt
 
-Moduł Hilt `ui.platform.CommandsModule` (`SingletonComponent`) dostarcza dokładnie jeden `CoroutineScope` z kwalifikatorem `@CommandRunScope` (`CoroutineScope(SupervisorJob() + Dispatchers.Default)`, `@Singleton`). `CommandLauncher` wstrzykuje ten zakres oraz istniejące wiązania: `SessionCoordinator` (UI-19), `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`. Pakiety `session`, `data`, `security`, `sms` nie zmieniają się.
+Moduł Hilt `ui.platform.CommandsModule` (`SingletonComponent`) dostarcza dokładnie jeden `CoroutineScope` z kwalifikatorem `@CommandRunScope` (`CoroutineScope(SupervisorJob() + Dispatchers.Default)`, `@Singleton`). `ui.commands.CurrentRun` jest singletonem Hilt (`@Singleton` + `@Inject constructor()`, bez metody w module). `CommandLauncher` wstrzykuje ten zakres, `CurrentRun` oraz istniejące wiązania: `SessionCoordinator` (UI-19), `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`. `CommandsViewModel` i `CommandRunViewModel` wstrzykują ten sam `CurrentRun` (CMDUI-16, CMDUI-23). Pakiety `session`, `data`, `security`, `sms` nie zmieniają się.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** klasę `CommandsModule`, **gdy** test JVM sprawdził ją refleksją, **wtedy** ma dokładnie jedną metodę dostarczającą `CoroutineScope` z adnotacjami jak w CMDUI-13.
-- **Zakładając** zbudowaną aplikację (`assembleDebug`), **gdy** Hilt wygenerował graf, **wtedy** `CommandsViewModel`, `CommandRunViewModel`, `AapsNumberViewModel` i `TotpSecretViewModel` dostają ten sam `SessionCoordinator`.
+- **Zakładając** klasę `CurrentRun`, **gdy** test JVM sprawdził ją refleksją, **wtedy** ma adnotację `@Singleton` i jedyny konstruktor bez parametrów z `@Inject`; konstruktory `CommandLauncher`, `CommandsViewModel` i `CommandRunViewModel` mają parametr typu `CurrentRun`.
+- **Zakładając** zbudowaną aplikację (`assembleDebug`), **gdy** Hilt wygenerował graf, **wtedy** `CommandsViewModel`, `CommandRunViewModel`, `AapsNumberViewModel` i `TotpSecretViewModel` dostają ten sam `SessionCoordinator`, a `CommandLauncher`, `CommandsViewModel` i `CommandRunViewModel` – ten sam `CurrentRun`.
 
 ## Przypadki błędów
 
@@ -483,7 +500,7 @@ Moduł Hilt `ui.platform.CommandsModule` (`SingletonComponent`) dostarcza dokła
 | Niepoprawny zestaw polecenie/PIN | `START_FAILED`, PIN wyczyszczony, bez wyjątku | CMDUI-13 |
 | Anulowanie korutyny `launch` (np. zamknięcie ViewModelu w trakcie odczytu sekretu) | PIN wyczyszczony, brak startu | CMDUI-12 |
 | Przejście w tło / obrót z otwartym podsumowaniem | PIN wyczyszczony, podsumowanie zamknięte | CMDUI-11 |
-| Zamknięcie `Activity` w trakcie polecenia | sesja trwa dalej, wynik w Historii | CMDUI-13, CMDUI-21, CMDUI-24 |
+| Zamknięcie `Activity` w trakcie polecenia | sesja trwa dalej, wynik w Historii; po ponownym otwarciu przy żyjącym procesie – przebieg albo wynik na zakładce Polecenia (do „Zamknij”), po zabiciu procesu – panel | CMDUI-13, CMDUI-16, CMDUI-21, CMDUI-24 |
 | Anulowanie po wysłaniu kodu | okno potwierdzenia, wynik „nieznany” | CMDUI-18, CMDUI-19 |
 | Każdy wynik sesji (w tym błąd wysyłania, brak odpowiedzi, zły kod) | komunikat z tabeli, treść SMS, dodatki | CMDUI-19, CMDUI-20 |
 
@@ -493,7 +510,7 @@ Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo) i sposób ich spełnien
 
 - **Nigdy nie logujemy sekretu, kodów ani PIN-u.** `ui` nie wywołuje API logowania; `toString()` stanów nie zawiera PIN-u, ilości ani treści SMS (CMDUI-26). Komunikaty są stałymi wartościami wyliczeniowymi (CMDUI-12, CMDUI-25).
 - **PIN AAPS nigdy nie jest zapisywany.** Tekst PIN-u jest tylko w stanie ViewModelu w pamięci, bez `SavedStateHandle` i `rememberSaveable`, więc nie trafia do stanu instancji zapisywanego przez system; jest czyszczony przy „Wyślij” (przed odczytem sekretu), „Anuluj”, Wstecz i `ON_STOP` (CMDUI-11). `AapsPin` powstaje z tablicy, którą `fromChars` zeruje; na każdej ścieżce bez startu czyści go `CommandLauncher` albo koordynator, po starcie – sesja (CMDUI-12, CMDUI-13, SESSION-19). Pole jest maskowane, z klawiaturą typu hasło (CMDUI-10), a podsumowanie, przebieg i wynik mają `FLAG_SECURE` (CMDUI-23). Ograniczenie: `String` tekstu pola nie da się wyzerować w JVM. Wyjątek poza kontrolą aplikacji: system zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (Spec 005, W7 ze Spec 005 w W5 tej spec).
-- **Sekret tylko do zbudowania `CodeCredentials`.** Odczyt tuż przed startem polecenia z kodem, po wszystkich innych sprawdzeniach; sekret jest zmienną lokalną `launch`, `CommandLauncher` i ViewModele nie mają pól z sekretem (CMDUI-12, CMDUI-15, SECRET-14). Po zakończeniu sesji `CommandRunViewModel` nie trzyma referencji do sesji, która przechowuje `CodeCredentials` (CMDUI-21). Ograniczenie: `TotpSecret` nie ma czyszczenia („Przyszłe zmiany” w Spec 006).
+- **Sekret tylko do zbudowania `CodeCredentials`.** Odczyt tuż przed startem polecenia z kodem, po wszystkich innych sprawdzeniach; sekret jest zmienną lokalną `launch`, `CommandLauncher` i ViewModele nie mają pól z sekretem (CMDUI-12, CMDUI-15, SECRET-14). `CommandRunViewModel` i jego stan nie trzymają referencji do sesji, która przechowuje `CodeCredentials`; `CurrentRun` trzyma do zamknięcia wyniku tylko polecenie i `StateFlow` stanu sesji, który nie wskazuje na sesję ani na `CodeCredentials` (CMDUI-21). Ograniczenie: `TotpSecret` nie ma czyszczenia („Przyszłe zmiany” w Spec 006).
 - **Kod tylko po zgodnej odpowiedzi AAPS** – decyduje `session` (Spec 004); `ui` nie ma ścieżki wysłania kodu. Ilość jest zatwierdzana przez użytkownika dwa razy dla > 40 g (CMDUI-09) i widoczna w podsumowaniu (CMDUI-10).
 - **Bez automatycznego ponawiania.** `ui` nie ponawia startu ani polecenia po żadnym wyniku (CMDUI-13); wynik „nieznany” ma ostrzeżenie przed ponowieniem bez sprawdzenia AAPS (CMDUI-19), bo powtórzone `CARBS` mogłoby wprowadzić węglowodany dwa razy.
 - **Potwierdzenie CARBS nie dowodzi wykonania polecenia z aplikacji** (SESSION-12): komunikat „AAPS potwierdził wprowadzenie X g” (CMDUI-19).
@@ -525,8 +542,8 @@ Kompozycje, okna, `FLAG_SECURE`, utrzymanie ekranu, nawigacja i Hilt nie mają t
 | W7 | Sekret przy starcie `CARBS`: zmiana blokady ekranu i `CARBS` działa (W3 ze Spec 006); wyłączenie blokady ekranu → zanotować wynik (`Loaded` albo komunikat „zeskanuj ponownie”, W4 ze Spec 006); zabicie procesu zaraz po zamianie sekretu (kroki: zamienić sekret w Ustawieniach i od razu zabić proces – `adb shell am kill` albo wymuszone zatrzymanie; uruchomić aplikację ponownie i wykonać `CARBS 1` z poprawnym PIN-em) → polecenie startuje, a kod zgadza się ze starym albo nowym sekretem (W9 ze Spec 006); błąd (niezaliczone): komunikat „zeskanuj ponownie” (`Invalidated`) albo awaria aplikacji; Smart Lock → nigdy „zeskanuj ponownie” (W10 ze Spec 006); W2 ze Spec 006 nie jest sprawdzane w 009 (P4) | CMDUI-12 |
 | W8 | W trakcie `CARBS`: przełączenie zakładek i obrót → ten sam przebieg; w Ustawieniach baner „Trwa polecenie” i nieaktywne „Zmień”/„Usuń”/„Skanuj QR”/„Wklej URI” (ręczne sprawdzenie UI-15 ze Spec 008); „Anuluj polecenie” przed prośbą o kod → „Anulowano”, późniejsza prośba AAPS bez kodu; „Przestań czekać” po kodzie → okno, potwierdzenie → „Nieznany – sprawdź w AAPS” | CMDUI-16, CMDUI-18, CMDUI-21 |
 | W9 | Ekran włączony: czas wygaszania 15 s, `CARBS` czeka > 15 s → ekran nie gaśnie (także na zakładce Ustawienia); po wyniku gaśnie | CMDUI-22 |
-| W10 | `FLAG_SECURE`: zrzut ekranu zablokowany na podsumowaniu, na przebiegu i na wyniku, podgląd w ostatnich aplikacjach pusty; po zamknięciu wyniku na panelu Polecenia zrzut znów działa; skaner QR w Ustawieniach nadal chroniony (UI-23) | CMDUI-23 |
-| W11 | Wstecz: w podsumowaniu zamyka je; na wyniku zamyka wynik; w trakcie `BG` okno „Trwa polecenie”, „Wyjdź” → aplikacja zamknięta, po ponownym otwarciu panel; brak polecenia → Wstecz zamyka aplikację | CMDUI-24 |
+| W10 | `FLAG_SECURE`: zrzut ekranu zablokowany na podsumowaniu, na przebiegu i na wyniku (także zrzut wykonany zaraz po „Wyślij”), podgląd w ostatnich aplikacjach pusty; po zamknięciu wyniku na panelu Polecenia zrzut znów działa; skaner QR w Ustawieniach nadal chroniony (UI-23) | CMDUI-23 |
+| W11 | Wstecz: w podsumowaniu zamyka je; na wyniku zamyka wynik; w trakcie `BG` okno „Trwa polecenie”, „Wyjdź” → aplikacja zamknięta, po odpowiedzi AAPS i ponownym otwarciu (bez zabijania procesu) wynik `BG`, po „Zamknij” panel, w Historii wpis; brak polecenia → Wstecz zamyka aplikację | CMDUI-21, CMDUI-24 |
 | W12 | Brak zasięgu (tryb samolotowy) przy `BG` → „Nie udało się wysłać SMS…”; AAPS wyłączony / numer spoza listy AAPS → po 3 min „AAPS nie odpowiada” | CMDUI-19 |
 
 **Punkty weryfikacji z wcześniejszych specyfikacji** (podział P3 ze Spec 008):
@@ -557,3 +574,16 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 - **Przyczyna błędu wysyłania** w wyniku (`SendResult.Failed(reason)`, zmiana Spec 004 i 005) – osobne komunikaty dla braku zasięgu, SIM, uprawnień.
 - **`TotpSecret.clear()`** po zakończeniu polecenia (zmiana Spec 001 i 004, „Przyszłe zmiany” w Spec 006).
 - **Odliczanie czasu** do limitu w przebiegu (np. „zostało 2:15”), jeśli stały tekst „do 3 min” okaże się niewystarczający.
+- **`CommandSession.state` jako `asStateFlow()`** (zmiana Spec 004): dziś sesja wystawia swój `MutableStateFlow` z typem `StateFlow`, więc posiadacz referencji (np. `CurrentRun`) mógłby go rzutować i zmienić; opakowanie tylko do odczytu usunie tę możliwość.
+
+## Historia zmian
+
+- **2026-10-21 – korekta spójności po przeglądzie (bez zmian decyzji P1–P10).** Po wprowadzeniu `CurrentRun` ujednolicono spec i design:
+  - CMDUI-24, W11 i „Przypadki błędów”: po „Wyjdź” i ponownym otwarciu przy żyjącym procesie widać przebieg albo wynik, a panel dopiero po „Zamknij” (zgodnie z P7 i CMDUI-21).
+  - `CurrentRun` w CMDUI-15 i CMDUI-27 (z kryterium refleksji), w konstruktorach `CommandRunViewModel` i `CommandsViewModel`, w układzie plików i „Decyzjach” design.
+  - Kryteria CMDUI-16, CMDUI-22 – CMDUI-24 uruchamiają sesję przez launcher albo pomocnik `startAndPublish`, a nie samym `coordinator.start`/`activeSession`.
+  - CMDUI-23: ciągłość `FLAG_SECURE` przez znacznik przekazania `runHandoff` w `CommandsViewModel` zamiast pola `runPublished` ustawianego kolektorem (nie dawało się go sprawdzić testem).
+  - CMDUI-19: wiersz `Completed` dla `CARBS` („Brak szczegółów wyniku.”, jak HISTUI-04 w Spec 010) i pełniejsze kryteria („Kod nie został wysłany” dla każdego powodu, ilość z wyniku, argument komunikatu); CMDUI-20: treść `Failed(WRONG_CODE)` i `Unknown`.
+  - CMDUI-21: dozwolony `StateFlow` w `CurrentRun`, usunięte niewykonalne zdanie o zastępowaniu wyniku nowym poleceniem; CMDUI-17: doprecyzowane fazy spoza listy kroków; CMDUI-13: sprawdzenie `Dispatchers.Default`.
+  - Teksty `run_stop_text`, `result_unknown_confirmation_timeout`, `result_unknown_cancelled_after_code`: w fazie `SENDING_CODE` port mógł jeszcze nie potwierdzić wysłania kodu (limit potwierdzenia liczony od rozpoczęcia wysyłania, SESSION-15), więc teksty nie twierdzą, że kod został wysłany.
+  - Design: zależności zadań (części łączące oba ViewModele), wymagane przypadki w `ResultMapperTest` i `RunTextsTest`.
