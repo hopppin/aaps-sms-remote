@@ -142,7 +142,7 @@ data class HistoryUiState(
     val clearing: Boolean = false,
     val message: HistoryMessage? = null,
 ) {
-    val canClear: Boolean get() = content is HistoryContent.Entries && !clearing
+    val canClear: Boolean get() = content is HistoryContent.Entries && details == null && !clearing
     val interceptsBack: Boolean get() = confirmingClearCount != null || details != null
     override fun toString(): String   // bez gramów, treści i czasów (HISTUI-15)
 }
