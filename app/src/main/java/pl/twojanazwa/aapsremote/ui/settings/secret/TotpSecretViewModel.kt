@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.otp.OtpauthError
 import pl.twojanazwa.aapsremote.otp.OtpauthParser
 import pl.twojanazwa.aapsremote.otp.OtpauthResult
+import pl.twojanazwa.aapsremote.security.DeleteResult
 import pl.twojanazwa.aapsremote.security.SaveFailure
 import pl.twojanazwa.aapsremote.security.SaveResult
 import pl.twojanazwa.aapsremote.security.SecretState
@@ -180,11 +181,56 @@ class TotpSecretViewModel @Inject constructor(
 
     /** UI-11/UI-14: pole czyszczone i okno zamykane przed [accept]. */
     fun onPasteSubmitted() {
-        val state = compose()
-        if (state.mode != SecretInputMode.PASTE || !state.canSubmitPaste) return
+        // Bez canSubmitPaste: przy wyścigu z poleceniem `accept` zgłosi COMMAND_ACTIVE (UI-15).
+        val state = local.value
+        if (state.mode != SecretInputMode.PASTE || state.pasteText.isBlank()) return
         val raw = state.pasteText
         local.update { it.copy(pasteText = "", mode = SecretInputMode.NONE) }
         accept(raw)
+    }
+
+    fun onDeleteClicked() {
+        val state = compose()
+        if (state.busy || state.display == SecretDisplay.ABSENT) return
+        if (state.commandActive) {
+            local.update { it.copy(message = SecretMessage.COMMAND_ACTIVE) }
+        } else {
+            local.update { it.copy(confirmingDelete = true) }
+        }
+    }
+
+    fun onDeleteDismissed() {
+        local.update { it.copy(confirmingDelete = false) }
+    }
+
+    fun onDeleteConfirmed() {
+        if (!local.value.confirmingDelete) return
+        if (coordinator.activeSession.value != null) {
+            local.update { it.copy(confirmingDelete = false, message = SecretMessage.COMMAND_ACTIVE) }
+            return
+        }
+        var acquired = false
+        local.update {
+            acquired = !it.busy
+            if (acquired) it.copy(confirmingDelete = false, busy = true) else it
+        }
+        if (!acquired) return
+        viewModelScope.launch {
+            var message = SecretMessage.DELETE_FAILED
+            try {
+                message = when (store.delete()) {
+                    DeleteResult.Deleted -> SecretMessage.DELETED
+                    DeleteResult.Failed -> SecretMessage.DELETE_FAILED
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: RuntimeException) {
+                message = SecretMessage.DELETE_FAILED
+            } finally {
+                local.update { it.copy(busy = false) }
+            }
+            local.update { it.copy(message = message) }
+        }
     }
 
     fun onPasteDismissed() {
