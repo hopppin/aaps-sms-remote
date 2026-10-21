@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
+import pl.twojanazwa.aapsremote.data.ClearHistoryResult
 import pl.twojanazwa.aapsremote.data.CommandHistory
 import pl.twojanazwa.aapsremote.data.HistoryEntry
 import pl.twojanazwa.aapsremote.data.HistorySnapshot
@@ -100,9 +102,46 @@ class HistoryViewModel @Inject constructor(
         _uiState.update { it.copy(details = null) }
     }
 
-    /** HISTUI-12 (część: szczegóły). */
+    /** HISTUI-12: okno czyszczenia → zamknięcie okna; szczegóły → zamknięcie szczegółów. */
     fun onBack() {
-        if (_uiState.value.details != null) onDetailsClosed()
+        val state = _uiState.value
+        if (state.confirmingClearCount != null) {
+            onClearDismissed()
+        } else if (state.details != null) {
+            onDetailsClosed()
+        }
+    }
+
+    /** HISTUI-10: tylko gdy czyszczenie dostępne; N = liczba wierszy w chwili otwarcia. */
+    fun onClearClicked() {
+        val state = _uiState.value
+        val content = state.content as? HistoryContent.Entries ?: return
+        if (!state.canClear) return
+        _uiState.update { it.copy(confirmingClearCount = content.items.size) }
+    }
+
+    fun onClearDismissed() {
+        _uiState.update { it.copy(confirmingClearCount = null) }
+    }
+
+    /** HISTUI-10, HISTUI-11: dokładnie jedno clearAll() na otwarte okno; bez ponawiania. */
+    fun onClearConfirmed() {
+        val state = _uiState.value
+        if (state.confirmingClearCount == null || state.clearing) return
+        _uiState.update { it.copy(confirmingClearCount = null, clearing = true) }
+        viewModelScope.launch {
+            val message = try {
+                when (history.clearAll()) {
+                    ClearHistoryResult.Cleared -> HistoryMessage.CLEARED
+                    ClearHistoryResult.Failed -> HistoryMessage.CLEAR_FAILED
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                HistoryMessage.CLEAR_FAILED
+            }
+            _uiState.update { it.copy(message = message, clearing = false) }
+        }
     }
 
     fun onMessageShown() {
