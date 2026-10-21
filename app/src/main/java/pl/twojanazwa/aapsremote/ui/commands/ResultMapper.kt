@@ -4,18 +4,14 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
 import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionOutcome
-import pl.twojanazwa.aapsremote.session.SessionPhase
 import pl.twojanazwa.aapsremote.session.SessionResult
 import pl.twojanazwa.aapsremote.session.SessionTimeouts
-import pl.twojanazwa.aapsremote.session.UnknownReason
 
 object ResultMapper {
-    /** CMDUI-19, CMDUI-20. Wyczerpujący when po SessionOutcome, FailureReason, UnknownReason. */
+    /** CMDUI-19, CMDUI-20. Powody i fazy odwzorowuje ResultMessages.kt (wspólne z historią, HISTUI-04). */
     fun map(result: SessionResult, timeouts: SessionTimeouts = SessionTimeouts()): ResultView {
         val command = result.command
         val outcome = result.outcome
-        val replyMinutes = timeouts.reply.inWholeMinutes.toInt()
-        val confirmationMinutes = timeouts.confirmation.inWholeMinutes.toInt()
 
         val kind: ResultKind
         val message: ResultMessage
@@ -40,28 +36,18 @@ object ResultMapper {
             }
             is SessionOutcome.Failed -> {
                 kind = ResultKind.FAILURE
-                message = failureMessage(outcome.reason)
+                message = outcome.reason.toResultMessage()
                 text = outcome.text
             }
             is SessionOutcome.TimedOut -> {
                 kind = ResultKind.NO_RESPONSE
-                message = when (outcome.phase) {
-                    SessionPhase.SENDING_COMMAND -> ResultMessage.SEND_TIMEOUT
-                    SessionPhase.NOT_STARTED,
-                    SessionPhase.AWAITING_REPLY,
-                    SessionPhase.AWAITING_CODE_REQUEST,
-                    SessionPhase.PREPARING_CODE,
-                    SessionPhase.SENDING_CODE,
-                    SessionPhase.AWAITING_CONFIRMATION,
-                    SessionPhase.FINISHED,
-                    -> ResultMessage.NO_RESPONSE
-                }
-                arg = replyMinutes
+                message = timedOutResultMessage(outcome.phase)
+                arg = message.minutesArg(timeouts)
             }
             is SessionOutcome.Unknown -> {
                 kind = ResultKind.UNKNOWN
-                message = unknownMessage(outcome.reason)
-                if (outcome.reason == UnknownReason.CONFIRMATION_TIMEOUT) arg = confirmationMinutes
+                message = outcome.reason.toResultMessage()
+                arg = message.minutesArg(timeouts)
                 text = outcome.text
             }
             SessionOutcome.Cancelled -> {
@@ -88,26 +74,5 @@ object ResultMapper {
             unknownWarning = outcome is SessionOutcome.Unknown,
             unexpectedCount = result.unexpectedMessages.size,
         )
-    }
-
-    private fun failureMessage(reason: FailureReason): ResultMessage = when (reason) {
-        FailureReason.SEND_FAILED -> ResultMessage.SEND_FAILED
-        FailureReason.UNRECOGNIZED_REPLY -> ResultMessage.UNRECOGNIZED_REPLY
-        FailureReason.AMOUNT_MISMATCH -> ResultMessage.AMOUNT_MISMATCH
-        FailureReason.UNEXPECTED_REPLY -> ResultMessage.UNEXPECTED_REPLY
-        FailureReason.WRONG_CODE -> ResultMessage.WRONG_CODE
-        FailureReason.CODE_REQUEST_EXPIRED -> ResultMessage.CODE_REQUEST_EXPIRED
-        FailureReason.CODE_PREPARATION_TIMEOUT -> ResultMessage.CODE_PREPARATION_TIMEOUT
-        FailureReason.INTERNAL_ERROR -> ResultMessage.INTERNAL_ERROR
-    }
-
-    private fun unknownMessage(reason: UnknownReason): ResultMessage = when (reason) {
-        UnknownReason.CONFIRMATION_TIMEOUT -> ResultMessage.UNKNOWN_CONFIRMATION_TIMEOUT
-        UnknownReason.CANCELLED_AFTER_CODE -> ResultMessage.UNKNOWN_CANCELLED_AFTER_CODE
-        UnknownReason.CODE_SEND_FAILED -> ResultMessage.UNKNOWN_CODE_SEND_FAILED
-        UnknownReason.UNRECOGNIZED_REPLY -> ResultMessage.UNKNOWN_UNRECOGNIZED_REPLY
-        UnknownReason.AMOUNT_MISMATCH -> ResultMessage.UNKNOWN_AMOUNT_MISMATCH
-        UnknownReason.UNEXPECTED_REPLY -> ResultMessage.UNKNOWN_UNEXPECTED_REPLY
-        UnknownReason.INTERNAL_ERROR -> ResultMessage.UNKNOWN_INTERNAL_ERROR
     }
 }
