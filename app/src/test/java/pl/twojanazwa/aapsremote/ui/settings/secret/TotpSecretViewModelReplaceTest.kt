@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.ui.settings.secret
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -124,22 +125,33 @@ class TotpSecretViewModelReplaceTest {
     }
 
     @Test
-    fun `UI-15 zastap przy poleceniu w toku zamyka pytanie i nie otwiera pola`() = runTest(main.dispatcher) {
-        for (scan in listOf(false, true)) {
-            val f = fixture(SecretState.PRESENT)
-            if (scan) f.viewModel.onScanClicked() else f.viewModel.onPasteClicked()
-            f.idle()
-            assertEquals(
-                if (scan) PendingSecretInput.SCAN else PendingSecretInput.PASTE,
-                f.viewModel.uiState.value.confirmingReplace,
-            )
-            f.session.startCommand()
-            f.idle()
-            f.viewModel.onReplaceConfirmed()
-            f.idle()
-            val s = f.viewModel.uiState.value
-            assertNull(s.confirmingReplace)
-            assertEquals(SecretInputMode.NONE, s.mode)
+    fun `UI-16 zastap przy trwajacej operacji zamyka pytanie i nie otwiera pola ani skanera`() =
+        runTest(main.dispatcher) {
+            for (scan in listOf(false, true)) {
+                val f = fixture(SecretState.PRESENT)
+                f.camera.granted = true
+                if (scan) f.viewModel.onScanClicked() else f.viewModel.onPasteClicked()
+                f.idle()
+                assertEquals(
+                    if (scan) PendingSecretInput.SCAN else PendingSecretInput.PASTE,
+                    f.viewModel.uiState.value.confirmingReplace,
+                )
+                // Operacja w toku (busy) przy otwartym pytaniu; sesja polecenia nie bierze udzialu,
+                // wiec okno zamyka wylacznie galaz !canPaste/!canScan w onReplaceConfirmed.
+                f.store.gate = CompletableDeferred()
+                f.viewModel.onDeleteClicked()
+                f.viewModel.onDeleteConfirmed()
+                f.idle()
+                assertEquals(true, f.viewModel.uiState.value.busy)
+
+                f.viewModel.onReplaceConfirmed()
+                f.idle()
+                val s = f.viewModel.uiState.value
+                assertNull(s.confirmingReplace)
+                assertEquals(SecretInputMode.NONE, s.mode)
+
+                f.store.gate!!.complete(Unit)
+                f.idle()
+            }
         }
-    }
 }
