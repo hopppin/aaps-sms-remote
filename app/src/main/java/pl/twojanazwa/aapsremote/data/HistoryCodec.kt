@@ -44,6 +44,72 @@ object HistoryCodec {
         )
     }
 
+    /** Nigdy nie rzuca: nieznane kody daja UNRECOGNIZED / Unrecognized / powod = brak (DATA-09). */
+    fun toEntry(row: HistoryRow): HistoryEntry {
+        val command = COMMANDS[row.command] ?: HistoryCommand.UNRECOGNIZED
+        val reason = row.reason
+        val outcome: HistoryOutcome = when (row.outcome) {
+            "COMPLETED" -> HistoryOutcome.Completed
+            "CARBS_CONFIRMED" -> HistoryOutcome.CarbsConfirmed
+            "FAILED" -> HistoryOutcome.Failed(reason?.let { FAILURE_REASONS[it] })
+            "TIMED_OUT" -> HistoryOutcome.TimedOut(reason?.let { PHASES[it] })
+            "UNKNOWN" -> HistoryOutcome.Unknown(reason?.let { UNKNOWN_REASONS[it] })
+            "CANCELLED" -> HistoryOutcome.Cancelled
+            else -> HistoryOutcome.Unrecognized
+        }
+        return HistoryEntry(
+            id = row.id,
+            command = command,
+            carbsGrams = if (command == HistoryCommand.CARBS) row.carbsGrams else null,
+            outcome = outcome,
+            startedAtEpochMillis = row.startedAtEpochMillis,
+            commandSentAtEpochMillis = row.commandSentAtEpochMillis,
+            codeSentAtEpochMillis = row.codeSentAtEpochMillis,
+            finishedAtEpochMillis = row.finishedAtEpochMillis,
+            replyText = row.replyText,
+            unexpectedMessageCount = row.unexpectedMessageCount,
+        )
+    }
+
+    // Mapy dekodowania: te same literaly co w encode (bez valueOf i Enum.name).
+    private val COMMANDS: Map<String, HistoryCommand> = mapOf(
+        "BG" to HistoryCommand.BG,
+        "PUMP" to HistoryCommand.PUMP,
+        "CARBS" to HistoryCommand.CARBS,
+    )
+
+    private val FAILURE_REASONS: Map<String, FailureReason> = mapOf(
+        "SEND_FAILED" to FailureReason.SEND_FAILED,
+        "UNRECOGNIZED_REPLY" to FailureReason.UNRECOGNIZED_REPLY,
+        "AMOUNT_MISMATCH" to FailureReason.AMOUNT_MISMATCH,
+        "UNEXPECTED_REPLY" to FailureReason.UNEXPECTED_REPLY,
+        "WRONG_CODE" to FailureReason.WRONG_CODE,
+        "CODE_REQUEST_EXPIRED" to FailureReason.CODE_REQUEST_EXPIRED,
+        "CODE_PREPARATION_TIMEOUT" to FailureReason.CODE_PREPARATION_TIMEOUT,
+        "INTERNAL_ERROR" to FailureReason.INTERNAL_ERROR,
+    )
+
+    private val UNKNOWN_REASONS: Map<String, UnknownReason> = mapOf(
+        "CONFIRMATION_TIMEOUT" to UnknownReason.CONFIRMATION_TIMEOUT,
+        "CANCELLED_AFTER_CODE" to UnknownReason.CANCELLED_AFTER_CODE,
+        "CODE_SEND_FAILED" to UnknownReason.CODE_SEND_FAILED,
+        "UNRECOGNIZED_REPLY" to UnknownReason.UNRECOGNIZED_REPLY,
+        "AMOUNT_MISMATCH" to UnknownReason.AMOUNT_MISMATCH,
+        "UNEXPECTED_REPLY" to UnknownReason.UNEXPECTED_REPLY,
+        "INTERNAL_ERROR" to UnknownReason.INTERNAL_ERROR,
+    )
+
+    private val PHASES: Map<String, SessionPhase> = mapOf(
+        "NOT_STARTED" to SessionPhase.NOT_STARTED,
+        "SENDING_COMMAND" to SessionPhase.SENDING_COMMAND,
+        "AWAITING_REPLY" to SessionPhase.AWAITING_REPLY,
+        "AWAITING_CODE_REQUEST" to SessionPhase.AWAITING_CODE_REQUEST,
+        "PREPARING_CODE" to SessionPhase.PREPARING_CODE,
+        "SENDING_CODE" to SessionPhase.SENDING_CODE,
+        "AWAITING_CONFIRMATION" to SessionPhase.AWAITING_CONFIRMATION,
+        "FINISHED" to SessionPhase.FINISHED,
+    )
+
     private fun encode(id: CommandId): String = when (id) {
         CommandId.BG -> "BG"
         CommandId.PUMP -> "PUMP"
