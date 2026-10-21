@@ -278,12 +278,13 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-16: Pokazanie przebiegu aktywnej sesji
 
-`CommandRunViewModel` obserwuje `SessionCoordinator.activeSession`; dla każdej niepustej sesji zbiera jej `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku, zanim ViewModel powstał (np. po ponownym otwarciu aplikacji). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
+`CommandRunViewModel` obserwuje `CurrentRun` (stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku, zanim ViewModel powstał (np. po ponownym otwarciu aplikacji). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** wspólne dane, **gdy** uruchomiono `BG` (`coordinator.start` albo `CommandLauncher.launch`), **wtedy** stan `CommandRunViewModel` = przebieg polecenia `BG` w fazie `SENDING_COMMAND` albo `AWAITING_REPLY`; **gdy** przyszedł `bg.txt`, **wtedy** stan = wynik.
-- **Zakładając** sesję `CARBS 20` w `AWAITING_CODE_REQUEST` uruchomioną przed utworzeniem `CommandRunViewModel`, **gdy** utworzono ViewModel, **wtedy** stan = przebieg `CARBS` dla 20 g z bieżącym krokiem „czekanie na prośbę o kod”.
+- **Zakładając** sesję `CARBS 20` w `AWAITING_CODE_REQUEST` uruchomioną przed utworzeniem `CommandRunViewModel` (`CurrentRun` już ją zawiera), **gdy** utworzono ViewModel, **wtedy** stan = przebieg `CARBS` dla 20 g z bieżącym krokiem „czekanie na prośbę o kod”.
+- **Zakładając** sesję kończącą się natychmiast (np. `SEND_FAILED`), której `activeSession` kolektor `CommandRunViewModel` nigdy nie zobaczył jako niepustej (CMDUI-19), **gdy** `CommandLauncher` opublikował jej stan w `CurrentRun`, **wtedy** ViewModel i tak pokazuje wynik tej sesji; **gdy** wynik zamknięto, `CurrentRun` jest pusty.
 - **Zakładając** telefon (W8), **gdy** w trakcie `CARBS` przełączono na Ustawienia i z powrotem oraz obrócono ekran, **wtedy** zakładka Polecenia pokazuje ten sam przebieg; w Ustawieniach widać baner „Trwa polecenie” (UI-15 ze Spec 008).
 
 ### CMDUI-17: Kroki przebiegu
@@ -384,7 +385,7 @@ Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy w
 
 ### CMDUI-21: Zamknięcie wyniku i brak referencji do sesji
 
-Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Po fazie `FINISHED` `CommandRunViewModel` trzyma tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez referencji do `CommandSession` ani jej `StateFlow` (sesja trzyma `CodeCredentials` z sekretem). Wynik sesji zakończonej, gdy `CommandRunViewModel` nie istniał (np. `Activity` zamknięte), nie jest pokazywany – jest w Historii (spec 010; decyzja użytkownika, P7). Start nowego polecenia (CMDUI-06, CMDUI-13) zastępuje pokazany wynik przebiegiem nowej sesji.
+Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Po fazie `FINISHED` `CommandRunViewModel` trzyma tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez referencji do `CommandSession` ani jej `StateFlow` (sesja trzyma `CodeCredentials` z sekretem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Start nowego polecenia (CMDUI-06, CMDUI-13) zastępuje pokazany wynik przebiegiem nowej sesji.
 
 **Kryteria akceptacji:**
 
@@ -544,7 +545,7 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 - [x] **P4. W2 ze Spec 006 (`Locked` przy odczycie).** Rozstrzygnięte: komunikat `Locked` sprawdza tylko test JVM (CMDUI-12); ręczne sprawdzenie W2 – w przyszłej specyfikacji usługi pierwszoplanowej.
 - [x] **P5. Ostatnia znana glikemia na ekranie Polecenia** (plan). Rozstrzygnięte: poza zakresem 009.
 - [x] **P6. Anulowanie.** Rozstrzygnięte: przed kodem „Anuluj polecenie” bez okna; po kodzie „Przestań czekać” z oknem potwierdzenia (CMDUI-18).
-- [x] **P7. Wynik sesji zakończonej przy zamkniętej `Activity`.** Rozstrzygnięte: nie jest pokazywany po ponownym otwarciu – tylko w Historii, spec 010 (CMDUI-21).
+- [x] **P7. Wynik sesji zakończonej przy zamkniętej `Activity`.** Rozstrzygnięte: wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął (także po ponownym otwarciu `Activity`); po nowym uruchomieniu procesu – tylko w Historii, spec 010 (CMDUI-21).
 - [x] **P8. Wstecz w trakcie polecenia.** Rozstrzygnięte: okno „Trwa polecenie” z „Zostań”/„Wyjdź”; rozszerza UI-02 ze Spec 008 tylko na czas polecenia (CMDUI-24).
 - [x] **P9. Wiadomości nieoczekiwane.** Rozstrzygnięte: pokazywana tylko liczba, bez treści (CMDUI-20), spójnie z historią (DATA-08).
 - [x] **P10. Błąd wysyłania bez przyczyny.** Rozstrzygnięte: ogólny komunikat „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” (CMDUI-19); przyczyna – osobna zmiana Spec 004/005 („Przyszłe zmiany”).

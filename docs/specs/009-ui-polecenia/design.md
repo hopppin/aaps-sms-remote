@@ -8,9 +8,10 @@ Druga część pakietu `ui` z [AGENTS.md](../../../AGENTS.md#architektura), budo
 
 | Klasa | Odpowiedzialność | Zależności |
 | --- | --- | --- |
-| `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `@CommandRunScope CoroutineScope` |
+| `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track`, `CurrentRun.publish` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `@CommandRunScope CoroutineScope` |
 | `ui.commands.CommandsViewModel` | panel: gotowość, `BG`/`PUMP`, pole `CARBS`, okno „Na pewno”, podsumowanie z PIN-em, komunikaty | `CommandLauncher`, `SessionCoordinator`, `AapsNumberSettingsStore`, `TotpSecretStore`, `SmsPermissions` |
-| `ui.commands.CommandRunViewModel` | przebieg i wynik aktywnej sesji, anulowanie, ekran włączony, Wstecz w trakcie polecenia | `SessionCoordinator` |
+| `ui.commands.CommandRunViewModel` | przebieg i wynik bieżącego uruchomienia (z `CurrentRun`), anulowanie, ekran włączony, Wstecz w trakcie polecenia | `CurrentRun`, `SessionCoordinator` |
+| `ui.commands.CurrentRun` (singleton Hilt) | publikuje `StateFlow<SessionState>` ostatnio uruchomionej sesji do czasu zamknięcia wyniku (CMDUI-16, CMDUI-21); bez referencji do `CommandSession` | – |
 | `ui.commands.ProgressSteps`, `ResultMapper` | czyste odwzorowania faza → kroki, `SessionResult` → `ResultView` | – (`session`, `commands`) |
 
 ViewModele są czystą logiką testowaną w JVM. Kompozycje (`CommandsScreen`, `CommandsPanel`, `CarbsSummary`, `RunScreen`, `ResultCard`, okna) są cienką warstwą: zbierają `StateFlow` (`collectAsStateWithLifecycle`), wołają metody ViewModeli i robią to, co wymaga `Activity`/okna (`FLAG_SECURE`, `keepScreenOn`, `finish()`, nawigacja do Ustawień, prośba o uprawnienia przez `SmsPermissionsSection` ze Spec 008). Podsumowanie i przebieg nie są trasami nawigacji – są trybami zakładki Polecenia (jak skaner w Spec 008), żeby PIN nie przechodził przez argumenty ani `SavedStateHandle`.
@@ -100,6 +101,7 @@ try {
         is StartResult.Started -> {
             started = true
             recorder.track(result.session.state)   // CMDUI-14: przed powrotem
+            currentRun.publish(result.session.state)   // CMDUI-16: przed powrotem, obok track
             LaunchResult.Started
         }
         StartResult.Busy -> Rejected(COMMAND_ACTIVE)
@@ -396,18 +398,29 @@ Stała `PIN_MAX_LENGTH = 12` (decyzja użytkownika, P2 w spec). `Command.Carbs.o
 
 ### `CommandRunViewModel`
 
-`init`: `viewModelScope.launch { coordinator.activeSession.collect { session -> if (session != null) observe(session) } }`. `observe(session)` zbiera `session.state` do fazy `FINISHED` włącznie (`transformWhile`); w każdej fazie przed `FINISHED` ustawia `view = Active(command, ProgressSteps.of(...), phase.cancelMode(), unexpectedMessages.size)`, a przy `FINISHED` – `view = Finished(ResultMapper.map(state.result!!))`, `confirmingStopWaiting = false`, `confirmingExit = false`. `session` jest tylko parametrem tej funkcji (ramka korutyny), nie polem; po powrocie z `observe` referencja znika (CMDUI-21). Ponieważ `activeSession` zmienia się na `null` dopiero po opublikowaniu `FINISHED` (SESSION-22), a `StateFlow` sesji zachowuje ostatnią wartość, `observe` zawsze widzi `FINISHED`. Drugi kolektor: `commandActive = activeSession.value != null`.
+```kotlin
+@Singleton
+class CurrentRun @Inject constructor() {
+    val state: StateFlow<StateFlow<SessionState>?>   // null = brak przebiegu ani wyniku do pokazania
+    fun publish(sessionState: StateFlow<SessionState>)  // zastępuje poprzedni
+    fun clear()                                          // zamknięcie wyniku (CMDUI-21)
+}
+```
+
+`CommandLauncher` po `StartResult.Started`, przed powrotem z `launch` (obok `track`), woła `currentRun.publish(session.state)`. Źródłem przebiegu i wyniku jest `CurrentRun`, nie `activeSession`: `activeSession` może przejść `sesja` → `null`, zanim kolektor ViewModelu odbierze sesję (np. natychmiastowy `SEND_FAILED`), więc wynik mógłby się nie pokazać. `CurrentRun` trzyma `StateFlow` stanu (ostatnia wartość, w tym `FINISHED`, zostaje), a nie `CommandSession`. Blokady przycisków i anulowanie nadal korzystają z `activeSession`.
+
+`init`: `viewModelScope.launch { currentRun.state.collectLatest { flow -> if (flow != null) observe(flow) } }`. `observe(flow)` zbiera `flow` (stan sesji) do fazy `FINISHED` włącznie (`transformWhile`); w każdej fazie przed `FINISHED` ustawia `view = Active(command, ProgressSteps.of(...), phase.cancelMode(), unexpectedMessages.size)`, a przy `FINISHED` – `view = Finished(ResultMapper.map(state.result!!))`, `confirmingStopWaiting = false`, `confirmingExit = false`. `flow` jest tylko parametrem tej funkcji (ramka korutyny), nie polem; po powrocie z `observe` referencja znika (CMDUI-21). Ponieważ `StateFlow` zachowuje ostatnią wartość, `observe` zawsze dochodzi do `FINISHED`, także gdy sesja zakończyła się, zanim ViewModel odebrał `CurrentRun` (CMDUI-16). „Zamknij” wynik (CMDUI-21) wywołuje `currentRun.clear()`; widok wraca do panelu. Drugi kolektor: `commandActive = activeSession.value != null`.
 
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
-| dowolny | nowa aktywna sesja | `view = Active(…)` | `observe` | CMDUI-16 |
+| dowolny | nowa wartość `CurrentRun` | `view = Active(…)` | `observe` | CMDUI-16 |
 | `Active` | zmiana fazy / nieoczekiwanej wiadomości | `view = Active(…)` z nowymi krokami i liczbą | – | CMDUI-17, CMDUI-20 |
 | `Active` | `FINISHED` | `view = Finished(map(result))`, okna zamknięte | – | CMDUI-19, CMDUI-21 |
 | `Active`, `cancelMode = CANCEL` | `onCancelClicked` | – | `activeSession.value?.cancel()` | CMDUI-18 |
 | `Active`, `cancelMode = STOP_WAITING` | `onCancelClicked` | `confirmingStopWaiting = true` | – | CMDUI-18 |
 | `confirmingStopWaiting` | `onStopWaitingConfirmed` | `confirmingStopWaiting = false` | `activeSession.value?.cancel()` | CMDUI-18 |
 | `confirmingStopWaiting` | `onStopWaitingDismissed` | `confirmingStopWaiting = false` | – | CMDUI-18 |
-| `Finished` | `onResultDismissed` / `onBack` | `view = null` | – | CMDUI-21, CMDUI-24 |
+| `Finished` | `onResultDismissed` / `onBack` | `view = null` | `currentRun.clear()` | CMDUI-21, CMDUI-24 |
 | `Active` | `onResultDismissed` | bez zmian | – | CMDUI-21 |
 | `Active` | `onBack` | `confirmingExit = true` | – | CMDUI-24 |
 | `confirmingExit` | `onExitConfirmed` | `confirmingExit = false`, `exitRequested = true` | – | CMDUI-24 |
@@ -563,7 +576,7 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikat
 | CMDUI-13 | `ui/commands/CommandLauncherStartTest` – launcher (CARBS 1 z kodem `0504714321`, `Busy`, niepoprawny zestaw); `CommandsViewModelNoCodeTest` (czyszczenie ViewModelu); `ui/platform/CommandsModuleTest` |
 | CMDUI-14 | `ui/commands/CommandLauncherHistoryTest` – MockK rejestratora i prawdziwy rejestrator z `FakeCommandHistory` |
 | CMDUI-15 | `ui/commands/CommandLauncherRetentionTest` – refleksja; `CommandsViewModelPinRetentionTest` |
-| CMDUI-16 | `ui/commands/CommandRunViewModelObserveTest`; W8 |
+| CMDUI-16 | `ui/commands/CommandRunViewModelObserveTest` (w tym sesja kończąca się natychmiast), `CommandLauncherStartTest` (publikacja w `CurrentRun`); W8 |
 | CMDUI-17 | `ui/commands/ProgressStepsTest` – czysta funkcja (wszystkie fazy × 3 polecenia); W5 |
 | CMDUI-18 | `ui/commands/CommandRunViewModelCancelTest`; W8 |
 | CMDUI-19 | `ui/commands/ResultMapperTest` – wszystkie wiersze tabeli; W4, W5, W12 |
@@ -586,7 +599,7 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Wymagania częściowe
 
 **Pliki wspólne:** `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` – 3, potem 4; `ui/navigation/AppScaffold.kt` – 6, potem 7; `strings.xml` – 6 i 7 (każde dopisuje własny blok `<!-- 009: … -->`, bez zmian cudzych kluczy; 6 usuwa `placeholder_commands_text`); `ui/settings/secret/SecureWindowEffect.kt` (Spec 008) – tylko 6; `ui/settings/secret/FakeTotpSecretStore.kt` (test, Spec 008) – rozszerza 1, używają 3 i 4; `ui/commands/CommandTestFixtures.kt` – tworzy 1, rozszerzają 3–5.
 
-1. **Uruchamianie: `CommandLauncher` i zakres aplikacji** – `ui/commands/CommandRunScope.kt`, `LaunchResult.kt`, `CommandLauncher.kt`, `ui/platform/CommandsModule.kt`; testy `CommandTestFixtures`, `CommandLauncherChecksTest`, `CommandLauncherStartTest`, `CommandLauncherHistoryTest`, `CommandLauncherRetentionTest`, `CommandsModuleTest`. Wymagania: CMDUI-12 (launcher), CMDUI-13, CMDUI-14, CMDUI-15 (launcher), CMDUI-27. Równolegle z 2.
+1. **Uruchamianie: `CommandLauncher` i zakres aplikacji** – `ui/commands/CommandRunScope.kt`, `CurrentRun.kt`, `LaunchResult.kt`, `CommandLauncher.kt`, `ui/platform/CommandsModule.kt`; testy `CommandTestFixtures`, `CommandLauncherChecksTest`, `CommandLauncherStartTest` (także publikacja w `CurrentRun`), `CommandLauncherHistoryTest`, `CommandLauncherRetentionTest`, `CommandsModuleTest`. Wymagania: CMDUI-12 (launcher), CMDUI-13, CMDUI-14, CMDUI-15 (launcher), CMDUI-16 (publikacja `CurrentRun`), CMDUI-27. Równolegle z 2.
 2. **Odwzorowania przebiegu i wyniku** – `ui/commands/ProgressSteps.kt` (z `CancelMode`), `ResultView.kt`, `ResultMapper.kt`; testy `ProgressStepsTest`, `ResultMapperTest`, `ResultRedactionTest`. Wymagania: CMDUI-17, CMDUI-18 (`cancelMode`), CMDUI-19, CMDUI-20 (treść), CMDUI-26 (`toString` wyniku). Bez zależności; równolegle z 1.
 3. **`CommandsViewModel`: gotowość, `BG`/`PUMP`, blokady, komunikaty** – `ui/commands/Readiness.kt`, `CommandMessage.kt` (z `toMessage`), `CommandsUiState.kt`, `CommandsViewModel.kt` (bez `CARBS`); testy `CommandsViewModelReadinessTest`, `CommandsViewModelLockTest` (`BG`/`PUMP`), `CommandsViewModelNoCodeTest`, `CommandMessageTest`. Wymagania: CMDUI-02, CMDUI-03, CMDUI-04, CMDUI-05 (część), CMDUI-06, CMDUI-12 (komunikaty), CMDUI-13 (czyszczenie ViewModelu). Zależy od 1.
 4. **`CommandsViewModel`: `CARBS`, podsumowanie i PIN** – `CommandsViewModel.kt`, `CommandsUiState.kt`; testy `CommandsViewModelCarbsInputTest`, `CommandsViewModelLargeAmountTest`, `CommandsViewModelSummaryTest`, `CommandsViewModelPinRetentionTest`, `CommandsViewModelLockTest` („Wyślij” w trakcie uruchamiania), `CommandsRedactionTest`. Wymagania: CMDUI-05 (część), CMDUI-07 – CMDUI-11, CMDUI-12 (ViewModel), CMDUI-15 (ViewModel), CMDUI-23 (znacznik), CMDUI-24 (panel), CMDUI-26 (`toString` panelu). Zależy od 3.
