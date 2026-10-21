@@ -66,7 +66,7 @@ class CommandLauncher @Inject constructor(
     @CommandRunScope private val scope: CoroutineScope,
 ) {
     /**
-     * [pin] != null dokładnie dla command.definition.requiresCode. Każdy Rejected i anulowanie
+     * [pin] != null dokładnie dla CommandCatalog.definitionOf(command.id).requiresCode. Każdy Rejected i anulowanie
      * korutyny = pin wyczyszczony. Nie rzuca poza CancellationException.
      */
     suspend fun launch(command: Command, pin: AapsPin?): LaunchResult
@@ -78,7 +78,7 @@ Algorytm `launch` (kolejność wiążąca, CMDUI-12 – CMDUI-14):
 ```kotlin
 var started = false
 try {
-    if ((pin != null) != command.definition.requiresCode) return Rejected(START_FAILED)
+    if ((pin != null) != CommandCatalog.definitionOf(command.id).requiresCode) return Rejected(START_FAILED)
     if (coordinator.activeSession.value != null) return Rejected(COMMAND_ACTIVE)
     when (numbers.state.value) {
         AapsNumberState.Loading -> return Rejected(NUMBER_LOADING)
@@ -459,7 +459,7 @@ class CurrentRunData(val command: Command, val state: StateFlow<SessionState>) {
 | `Unknown(r, text)` | `UNKNOWN` | `UNKNOWN_<r>` | `confirmation` w min dla `CONFIRMATION_TIMEOUT` | `text` |
 | `Cancelled` | `CANCELLED` | `CANCELLED` | – | – |
 
-`codeNotSent` = `command.definition.requiresCode && (outcome is Failed && reason != WRONG_CODE || outcome is TimedOut || outcome is Cancelled)`; `unknownWarning` = `outcome is Unknown`; `unexpectedCount` = `result.unexpectedMessages.size`; `commandGrams` = `(command as? Command.Carbs)?.grams`. Minuty: `timeouts.reply.inWholeMinutes.toInt()` (3), `timeouts.confirmation.inWholeMinutes.toInt()` (6). `messageArg != null` dokładnie dla `CARBS_CONFIRMED`, `NO_RESPONSE`, `SEND_TIMEOUT`, `UNKNOWN_CONFIRMATION_TIMEOUT` – tych samych komunikatów, których klucze mają w tabeli tekstów argument `d`.
+`codeNotSent` = `CommandCatalog.definitionOf(command.id).requiresCode && (outcome is Failed && reason != WRONG_CODE || outcome is TimedOut || outcome is Cancelled)`; `unknownWarning` = `outcome is Unknown`; `unexpectedCount` = `result.unexpectedMessages.size`; `commandGrams` = `(command as? Command.Carbs)?.grams`. Minuty: `timeouts.reply.inWholeMinutes.toInt()` (3), `timeouts.confirmation.inWholeMinutes.toInt()` (6). `messageArg != null` dokładnie dla `CARBS_CONFIRMED`, `NO_RESPONSE`, `SEND_TIMEOUT`, `UNKNOWN_CONFIRMATION_TIMEOUT` – tych samych komunikatów, których klucze mają w tabeli tekstów argument `d`.
 
 Zmiana po korekcie spójności (2026-10-21): kod zadania 2 (scalony w #160) mapuje `Completed` dla `Command.Carbs` na `CARBS_CONFIRMED` bez argumentu (tekst z `%1$d` bez wartości i fałszywe twierdzenie o potwierdzeniu). Wymaga drobnej zmiany w osobnym issue: wartość `DETAILS_MISSING`, gałąź w `ResultMapper`, `ResultMessage.textRes()` w `RunTexts.kt`, klucz `result_details_missing` i testy z „Mapowania wymagań na testy”.
 
