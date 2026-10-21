@@ -449,3 +449,11 @@ Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekra
 - **Podpowiedź o blokadzie ekranu**, jeśli W7 ze Spec 006 pokaże, że generacja klucza z `setUnlockedDeviceRequired(true)` nie udaje się bez blokady ekranu: komunikat dla `Failed(KEY_GENERATION)` „Ustaw blokadę ekranu i spróbuj ponownie” (zmiana UI-12).
 - **Podpowiedź o ustawieniach z ograniczeniami**, jeśli W7 tej spec (W6 Spec 005) pokaże, że Android blokuje prośbę o uprawnienia SMS dla aplikacji z APK: dodatkowy tekst przy trwałej odmowie (zmiana UI-18).
 - **Utrwalenie stanu `INVALIDATED`** po restarcie procesu (Spec 006, „Przyszłe zmiany”), jeśli użytkownicy nie zrozumieją, czemu po restarcie widzą „Brak sekretu”.
+
+## Historia zmian
+
+- **2026-10-21 – doprecyzowania po implementacji (bez zmian wymagań).** Design uzupełniony o zachowanie, które realizuje kod zadań 1–10 i poprawek z przeglądu:
+  - Tabele przejść `AapsNumberViewModel`: warunek `onEditClicked` liczony ze źródeł w chwili akcji (`!busy`, brak polecenia, stan ≠ `Loading`); `onInputChanged` i `onEditCancelled` ignorowane przy `busy`.
+  - Tabele przejść `TotpSecretViewModel`: `onCameraPermissionResult` otwiera skaner tylko przy `canScan` i nie wymaga oczekującej prośby; `onReplaceConfirmed` przy `!canPaste`/`!canScan` tylko zamyka okno; `onPasteSubmitted` celowo bez `canSubmitPaste` (wyścig → `COMMAND_ACTIVE`); `onCameraFailed`/`onScannerClosed` ignorowane poza skanerem.
+  - Ekran Ustawień: kasowanie komunikatu przed pokazaniem paska Snackbar, `onStop()` także przy usunięciu ekranu z kompozycji, `ActivityNotFoundException` przy „Otwórz ustawienia aplikacji”, „Zezwól” przy pustej liście uprawnień → odświeżenie stanu, pole i „Anuluj” numeru nieaktywne przy `busy`, `DialogProperties` okna wklejania.
+  - `QrScanner`: pojedyncze błędy detektora ignorowane, 5 z rzędu → błąd aparatu; wyjątek konfiguracji/`bindToLifecycle` → błąd aparatu raz.

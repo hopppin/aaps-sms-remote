@@ -90,8 +90,10 @@ class TotpSecretViewModel @Inject constructor(
     fun onReplaceConfirmed() {
         val state = compose()
         when (state.confirmingReplace) {
-            PendingSecretInput.PASTE -> if (state.canPaste) openPaste()
-            PendingSecretInput.SCAN -> if (state.canScan) openScannerOrRequestCamera()
+            PendingSecretInput.PASTE ->
+                if (state.canPaste) openPaste() else local.update { it.copy(confirmingReplace = null) }
+            PendingSecretInput.SCAN ->
+                if (state.canScan) openScannerOrRequestCamera() else local.update { it.copy(confirmingReplace = null) }
             null -> Unit
         }
     }

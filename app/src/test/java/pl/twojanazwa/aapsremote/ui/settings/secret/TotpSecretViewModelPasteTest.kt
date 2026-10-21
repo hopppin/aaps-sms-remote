@@ -14,11 +14,9 @@ import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 import java.io.File
 
 class TotpSecretViewModelPasteTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     /** Magazyn ABSENT, otwarte okno wklejania. */
     private fun openPaste(): SecretFixture {

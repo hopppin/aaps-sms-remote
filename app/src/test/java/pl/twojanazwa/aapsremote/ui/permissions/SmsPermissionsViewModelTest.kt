@@ -11,11 +11,9 @@ import pl.twojanazwa.aapsremote.sms.FakeSmsPermissions
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class SmsPermissionsViewModelTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private fun vm(fake: FakeSmsPermissions) = SmsPermissionsViewModel(fake)
 

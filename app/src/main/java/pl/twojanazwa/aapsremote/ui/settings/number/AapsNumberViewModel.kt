@@ -70,6 +70,7 @@ class AapsNumberViewModel @Inject constructor(
 
     /** „Ustaw numer” i „Zmień”. */
     fun onEditClicked() {
+        if (local.value.busy || commandActive()) return // UI-15, UI-16: jak canSet/canChange, liczone ze źródeł
         val initial = when (val state = store.state.value) {
             is AapsNumberState.Configured -> state.number.destination
             AapsNumberState.NotConfigured, AapsNumberState.LoadFailed -> ""
@@ -79,6 +80,7 @@ class AapsNumberViewModel @Inject constructor(
     }
 
     fun onInputChanged(text: String) {
+        if (local.value.busy) return // UI-05, UI-16: wynik zapisu dotyczy tekstu wysłanego do magazynu
         local.update { it.copy(input = text, inputError = null) }
     }
 
@@ -110,6 +112,7 @@ class AapsNumberViewModel @Inject constructor(
     }
 
     fun onEditCancelled() {
+        if (local.value.busy) return // UI-16
         local.update { it.copy(editing = false, input = "", inputError = null) }
     }
 
