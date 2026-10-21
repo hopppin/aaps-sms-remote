@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.platform
 
 import dagger.Provides
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -32,7 +33,10 @@ class CommandsModuleTest {
         val scope = CommandsModule.commandRunScope()
         val job = scope.coroutineContext[Job]!!
         try {
-            scope.launch { throw IllegalStateException("test") }.join()
+            val caught = CompletableDeferred<Throwable>()
+            val handler = CoroutineExceptionHandler { _, e -> caught.complete(e) }
+            scope.launch(handler) { throw IllegalStateException("test") }.join()
+            withTimeout(5_000) { caught.await() }
             assertTrue(job.isActive)
             val done = CompletableDeferred<Unit>()
             scope.launch { done.complete(Unit) }
