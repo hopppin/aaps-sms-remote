@@ -28,11 +28,10 @@ import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandRunViewModelResultTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    /** Instancyjne (nie statyczne): świeży scheduler na każdy test, bo testy przesuwają czas. */
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private val forbiddenTypes = listOf<Class<*>>(
         CommandSession::class.java,

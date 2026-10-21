@@ -20,11 +20,10 @@ import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandRunViewModelObserveTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    /** Instancyjne (nie statyczne): świeży scheduler na każdy test, bo testy przesuwają czas. */
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator)
 
