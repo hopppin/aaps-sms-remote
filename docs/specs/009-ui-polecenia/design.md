@@ -8,7 +8,7 @@ Druga część pakietu `ui` z [AGENTS.md](../../../AGENTS.md#architektura), budo
 
 | Klasa | Odpowiedzialność | Zależności |
 | --- | --- | --- |
-| `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track`, `CurrentRun.publish` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `@CommandRunScope CoroutineScope` |
+| `ui.commands.CommandLauncher` | sprawdzenia przed startem, odczyt sekretu, `SessionCoordinator.start` w zakresie aplikacji, `SessionHistoryRecorder.track`, `CurrentRun.publish` | `SessionCoordinator`, `AapsNumberSettingsStore`, `SmsPermissions`, `TotpSecretProvider`, `SessionHistoryRecorder`, `CurrentRun`, `@CommandRunScope CoroutineScope` |
 | `ui.commands.CommandsViewModel` | panel: gotowość, `BG`/`PUMP`, pole `CARBS`, okno „Na pewno”, podsumowanie z PIN-em, komunikaty | `CommandLauncher`, `SessionCoordinator`, `AapsNumberSettingsStore`, `TotpSecretStore`, `SmsPermissions` |
 | `ui.commands.CommandRunViewModel` | przebieg i wynik bieżącego uruchomienia (z `CurrentRun`), anulowanie, ekran włączony, Wstecz w trakcie polecenia | `CurrentRun`, `SessionCoordinator` |
 | `ui.commands.CurrentRun` (singleton Hilt) | publikuje `StateFlow<SessionState>` ostatnio uruchomionej sesji do czasu zamknięcia wyniku (CMDUI-16, CMDUI-21); bez referencji do `CommandSession` | – |
@@ -50,7 +50,7 @@ enum class LaunchRejection {
 }
 
 sealed interface LaunchResult {
-    /** Sesja wystartowała; widok bierze ją z SessionCoordinator.activeSession (bez referencji w wyniku). */
+    /** Sesja wystartowała; przebieg i wynik widok bierze z `CurrentRun` (publikowanego przez launcher), a `activeSession` służy tylko blokadom i anulowaniu. */
     data object Started : LaunchResult
     data class Rejected(val reason: LaunchRejection) : LaunchResult
 }
@@ -62,6 +62,7 @@ class CommandLauncher @Inject constructor(
     private val permissions: SmsPermissions,
     private val secrets: TotpSecretProvider,
     private val recorder: SessionHistoryRecorder,
+    private val currentRun: CurrentRun,
     @CommandRunScope private val scope: CoroutineScope,
 ) {
     /**
@@ -595,7 +596,7 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Wymagania częściowe
 
 **Warunek wstępny:** zaimplementowane zadania 1, 2, 3, 8 i 10 z [design 008](../008-ui-ustawienia/design.md#podział-na-zadania) (fundament, nawigacja, ViewModel i sekcja uprawnień SMS, `SecureWindowEffect`). Zadania 1–5 tej spec wymagają tylko zadania 1 ze Spec 008 (`SessionModule`, `MainDispatcherExtension`, `SessionDoubles`) i atrap z zadań 4–5 ze Spec 008.
 
-**Zależności i równoległość:** {1, 2} równolegle; 3 ← 1; 4 ← 3; 5 ← 2 (równolegle z 3 i 4); 6 ← 4 (+ Spec 008: 2, 3, 8, 10); 7 ← 5, 6.
+**Zależności i równoległość:** {1, 2} równolegle; 3 ← 1; 4 ← 3; 5 ← 1, 2 (`CurrentRun` z 1; równolegle z 3 i 4); 6 ← 4 (+ Spec 008: 2, 3, 8, 10); 7 ← 5, 6.
 
 **Pliki wspólne:** `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` – 3, potem 4; `ui/navigation/AppScaffold.kt` – 6, potem 7; `strings.xml` – 6 i 7 (każde dopisuje własny blok `<!-- 009: … -->`, bez zmian cudzych kluczy; 6 usuwa `placeholder_commands_text`); `ui/settings/secret/SecureWindowEffect.kt` (Spec 008) – tylko 6; `ui/settings/secret/FakeTotpSecretStore.kt` (test, Spec 008) – rozszerza 1, używają 3 i 4; `ui/commands/CommandTestFixtures.kt` – tworzy 1, rozszerzają 3–5.
 
@@ -603,6 +604,6 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Wymagania częściowe
 2. **Odwzorowania przebiegu i wyniku** – `ui/commands/ProgressSteps.kt` (z `CancelMode`), `ResultView.kt`, `ResultMapper.kt`; testy `ProgressStepsTest`, `ResultMapperTest`, `ResultRedactionTest`. Wymagania: CMDUI-17, CMDUI-18 (`cancelMode`), CMDUI-19, CMDUI-20 (treść), CMDUI-26 (`toString` wyniku). Bez zależności; równolegle z 1.
 3. **`CommandsViewModel`: gotowość, `BG`/`PUMP`, blokady, komunikaty** – `ui/commands/Readiness.kt`, `CommandMessage.kt` (z `toMessage`), `CommandsUiState.kt`, `CommandsViewModel.kt` (bez `CARBS`); testy `CommandsViewModelReadinessTest`, `CommandsViewModelLockTest` (`BG`/`PUMP`), `CommandsViewModelNoCodeTest`, `CommandMessageTest`. Wymagania: CMDUI-02, CMDUI-03, CMDUI-04, CMDUI-05 (część), CMDUI-06, CMDUI-12 (komunikaty), CMDUI-13 (czyszczenie ViewModelu). Zależy od 1.
 4. **`CommandsViewModel`: `CARBS`, podsumowanie i PIN** – `CommandsViewModel.kt`, `CommandsUiState.kt`; testy `CommandsViewModelCarbsInputTest`, `CommandsViewModelLargeAmountTest`, `CommandsViewModelSummaryTest`, `CommandsViewModelPinRetentionTest`, `CommandsViewModelLockTest` („Wyślij” w trakcie uruchamiania), `CommandsRedactionTest`. Wymagania: CMDUI-05 (część), CMDUI-07 – CMDUI-11, CMDUI-12 (ViewModel), CMDUI-15 (ViewModel), CMDUI-23 (znacznik), CMDUI-24 (panel), CMDUI-26 (`toString` panelu). Zależy od 3.
-5. **`CommandRunViewModel`: przebieg, anulowanie, wynik** – `ui/commands/RunUiState.kt`, `CommandRunViewModel.kt`; testy `CommandRunViewModelObserveTest`, `…CancelTest`, `…ResultTest`, `…KeepScreenOnTest`, `…BackTest`. Wymagania: CMDUI-16, CMDUI-18, CMDUI-20 (liczba w przebiegu), CMDUI-21, CMDUI-22 (znacznik), CMDUI-23 (znacznik przebiegu i wyniku), CMDUI-24 (przebieg), CMDUI-26 (`toString` przebiegu). Zależy od 2; równolegle z 3 i 4.
+5. **`CommandRunViewModel`: przebieg, anulowanie, wynik** – `ui/commands/RunUiState.kt`, `CommandRunViewModel.kt`; testy `CommandRunViewModelObserveTest`, `…CancelTest`, `…ResultTest`, `…KeepScreenOnTest`, `…BackTest`. Wymagania: CMDUI-16, CMDUI-18, CMDUI-20 (liczba w przebiegu), CMDUI-21, CMDUI-22 (znacznik), CMDUI-23 (znacznik przebiegu i wyniku), CMDUI-24 (przebieg), CMDUI-26 (`toString` przebiegu). Zależy od 1 (`CurrentRun`) i 2; równolegle z 3 i 4.
 6. **Ekran: panel, podsumowanie, okna, `FLAG_SECURE`** – `ui/commands/CommandsScreen.kt` (panel i podsumowanie, bez przebiegu), `CommandsPanel.kt`, `CarbsSummary.kt`, `CommandDialogs.kt` (okno „Na pewno”), `CommandTexts.kt`; `ui/platform/SecureWindowCounter.kt`, zmiana `SecureWindowEffect.kt`; `AppScaffold.kt` (ViewModele w zakresie `Activity`, `onOpenSettings`, `LocalSecureWindow`); usunięcie `CommandsPlaceholderScreen.kt` i `placeholder_commands_text` (aktualizacja `NavigationStringsTest`); `strings.xml` (blok `commands_*`); testy `CommandTextsTest`, `CommandsSourcesTest`, `SecureWindowCounterTest`. Wymagania: CMDUI-01, CMDUI-02 – CMDUI-04 (widok), CMDUI-07 – CMDUI-10 (widok), CMDUI-23 (podsumowanie), CMDUI-25 (część). PR opisuje W1, W2, W3, W6, W10 (podsumowanie; oraz ponowne W9 ze Spec 008 – skaner nadal chroniony). Zależy od 4 i zadań 2, 3, 8, 10 ze Spec 008.
 7. **Ekran przebiegu i wyniku, ekran włączony, Wstecz** – `ui/commands/RunScreen.kt`, `ResultCard.kt`, `RunTexts.kt`, okna „Przestać czekać?” i „Trwa polecenie” w `CommandDialogs.kt`; `ui/platform/KeepScreenOnEffect.kt`; `CommandsScreen.kt` (tryb przebiegu, `BackHandler`, `exitRequested`); `AppScaffold.kt` (`KeepScreenOnEffect`); `strings.xml` (bloki `run_*`, `result_*`); test `RunTextsTest`. Wymagania: CMDUI-16 – CMDUI-22 (widok), CMDUI-23 (przebieg i wynik w `SecureWindowEffect`), CMDUI-24, CMDUI-25 (część). PR opisuje W4, W5, W7, W8, W9, W10 (przebieg i wynik), W11, W12 oraz punkty z wcześniejszych spec (sekcja „Punkty weryfikacji z wcześniejszych specyfikacji” w spec): Spec 005 W1–W5, W7; Spec 006 W1 (odczyt), W3, W4, W9, W10 (W2 ze Spec 006 – nie w 009, P4 w spec); Spec 007 W1 (`BG`), W7; Spec 008 UI-15. Zależy od 5 i 6.
