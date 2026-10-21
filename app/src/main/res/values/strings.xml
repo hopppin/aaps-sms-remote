@@ -1,3 +1,14 @@
 <resources>
     <string name="app_name">AAPS SMS Remote</string>
+
+    <!-- 008: nawigacja i zaślepki -->
+    <string name="nav_commands">Polecenia</string>
+    <string name="nav_history">Historia</string>
+    <string name="nav_settings">Ustawienia</string>
+    <string name="placeholder_commands_text">Polecenia pojawią się w kolejnej wersji. Do tego czasu skonfiguruj aplikację w zakładce Ustawienia.</string>
+    <string name="placeholder_history_text">Historia poleceń pojawi się w kolejnej wersji.</string>
+    <string name="action_save">Zapisz</string>
+    <string name="action_cancel">Anuluj</string>
+    <string name="action_delete">Usuń</string>
+    <string name="action_open_app_settings">Otwórz ustawienia aplikacji</string>
 </resources>
