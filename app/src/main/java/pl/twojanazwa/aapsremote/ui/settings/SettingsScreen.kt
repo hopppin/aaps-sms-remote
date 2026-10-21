@@ -3,6 +3,7 @@ package pl.twojanazwa.aapsremote.ui.settings
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,13 +34,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.ui.permissions.CameraPermission
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
 import pl.twojanazwa.aapsremote.ui.settings.number.AapsNumberViewModel
 import pl.twojanazwa.aapsremote.ui.settings.number.NumberSection
 import pl.twojanazwa.aapsremote.ui.settings.number.textRes
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
 import pl.twojanazwa.aapsremote.ui.settings.secret.PasteUriDialog
+import pl.twojanazwa.aapsremote.ui.settings.secret.QrScanner
 import pl.twojanazwa.aapsremote.ui.settings.secret.SecretInputMode
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 import pl.twojanazwa.aapsremote.ui.settings.secret.SecretSection
 import pl.twojanazwa.aapsremote.ui.settings.secret.TotpSecretViewModel
 import pl.twojanazwa.aapsremote.ui.settings.secret.textRes
@@ -59,7 +63,10 @@ fun SettingsScreen(
     val secretState by secretViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { smsViewModel.onResume() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        smsViewModel.onResume()
+        secretViewModel.onResume()
+    }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { secretViewModel.onStop() }
     // Przy zmianie zakładki ON_STOP może nie dotrzeć przed usunięciem treści z kompozycji (UI-14); onStop jest idempotentne.
     DisposableEffect(Unit) { onDispose { secretViewModel.onStop() } }
@@ -70,7 +77,31 @@ fun SettingsScreen(
         }
     }
 
-    val numberMessage = numberState.message?.let { stringResource(it.textRes()) }
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        secretViewModel.onCameraPermissionResult(
+            activity != null &&
+                ActivityCompat.shouldShowRequestPermissionRationale(activity, CameraPermission.CAMERA),
+        )
+    }
+    LaunchedEffect(secretState.cameraPermissionRequest) {
+        if (secretState.cameraPermissionRequest) {
+            cameraLauncher.launch(CameraPermission.CAMERA)
+            secretViewModel.onCameraPermissionRequestLaunched()
+        }
+    }
+    SecureWindowEffect(secretState.secureWindow)
+    BackHandler(enabled = secretState.mode == SecretInputMode.SCANNER) { secretViewModel.onScannerClosed() }
+
+    val openAppSettings = {
+        context.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null),
+            ),
+        )
+    }
+
+    val numberMessage =numberState.message?.let { stringResource(it.textRes()) }
     LaunchedEffect(numberMessage) {
         if (numberMessage != null) {
             snackbarHostState.showSnackbar(numberMessage)
@@ -87,7 +118,13 @@ fun SettingsScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        Column(
+        if (secretState.mode == SecretInputMode.SCANNER) {
+            QrScanner(
+                onQrValue = secretViewModel::onQrScanned,
+                onCameraError = secretViewModel::onCameraFailed,
+                onCancel = secretViewModel::onScannerClosed,
+            )
+        } else Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
@@ -124,8 +161,7 @@ fun SettingsScreen(
                 onReplaceDismissed = secretViewModel::onReplaceDismissed,
                 onDeleteConfirmed = secretViewModel::onDeleteConfirmed,
                 onDeleteDismissed = secretViewModel::onDeleteDismissed,
-                // Tymczasowo false: skaner (i włączenie tego parametru) dochodzi w #126.
-                scanAvailable = false,
+                onOpenAppSettings = openAppSettings,
             )
             SmsPermissionsSection(
                 state = smsState,
@@ -133,14 +169,7 @@ fun SettingsScreen(
                     val toRequest = smsViewModel.permissionsToRequest()
                     if (toRequest.isNotEmpty()) smsLauncher.launch(toRequest.toTypedArray())
                 },
-                onOpenAppSettings = {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.fromParts("package", context.packageName, null),
-                        ),
-                    )
-                },
+                onOpenAppSettings = openAppSettings,
             )
         }
         if (secretState.mode == SecretInputMode.PASTE) {
