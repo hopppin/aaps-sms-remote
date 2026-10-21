@@ -1,6 +1,6 @@
 # Spec 008: UI – ustawienia, sekret TOTP i uprawnienia
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `UI`
 - **Pakiety:** `ui` (`ui.navigation`, `ui.settings`, `ui.settings.number`, `ui.settings.secret`, `ui.permissions`, `ui.commands`, `ui.history`, `ui.platform`), `session.platform` (moduł Hilt koordynatora sesji)
 - **Powiązane:** [docs/plan.md](../../plan.md#ekrany-aplikacji) (ekrany „Konfiguracja”, „Historia i ustawienia”); [Spec 001: Generator TOTP](../001-totp/spec.md) (`OtpauthParser`, `TotpSecret`, TOTP-06–TOTP-09); [Spec 004: Sesja polecenia](../004-sesja-polecenia/spec.md) (`SessionCoordinator`, SESSION-22); [Spec 005: SMS](../005-sms/spec.md) (`SmsPermissions`, SMS-14, SMS-15, W6); [Spec 006: Sekret TOTP](../006-sekret-totp/spec.md) (`TotpSecretStore`, `SecretState`, `SaveResult`, `DeleteResult`, W1–W10); [Spec 007: Dane](../007-dane/spec.md) (`AapsNumberSettingsStore`, `AapsNumberState`, `SaveNumberResult`, `ClearNumberResult`, sekcja Bezpieczeństwo, W1–W7); [stan prac](../../stan-prac.md); następne specyfikacje `ui`: 009 (ekran Polecenia i przebieg polecenia), 010 (ekran Historia)
@@ -334,15 +334,16 @@ Pakiety `ui` i `session.platform` nie wywołują API logowania (`android.util.Lo
 
 ### UI-22: Manifest i zależności
 
-`AndroidManifest.xml` deklaruje `uses-permission` `android.permission.CAMERA` oraz `uses-feature` `android.hardware.camera.any` z `android:required="false"` (instalacja na telefonie bez aparatu; zostaje wklejenie URI). Wymagania SMS-15 pozostają spełnione (bez nowych `<receiver>`/`<service>` w manifeście aplikacji, `allowBackup="false"`). Uprawnienia sieciowe dołączane przez biblioteki ML Kit – według odpowiedzi na pytanie P1. Nowe biblioteki i wersje – tabela w design; nie są dodawane biblioteki ikon (ikony zakładek to zasoby wektorowe w `res/drawable`).
+`AndroidManifest.xml` deklaruje `uses-permission` `android.permission.CAMERA` oraz `uses-feature` `android.hardware.camera.any` z `android:required="false"` (instalacja na telefonie bez aparatu; zostaje wklejenie URI). Wymagania SMS-15 pozostają spełnione (bez nowych `<receiver>`/`<service>` w manifeście aplikacji, `allowBackup="false"`). Aplikacja nie ma uprawnień sieciowych: manifest aplikacji (z przestrzenią nazw `xmlns:tools`) zawiera `<uses-permission android:name="android.permission.INTERNET" tools:node="remove" />` i to samo dla `android.permission.ACCESS_NETWORK_STATE`, więc uprawnienia dołączane przez zależności ML Kit (`com.google.android.datatransport`) nie trafiają do połączonego manifestu; skan QR działa offline (UI-09), a telemetria ML Kit nie jest wysyłana. Nowe biblioteki i wersje – tabela w design; nie są dodawane biblioteki ikon (ikony zakładek to zasoby wektorowe w `res/drawable`).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** `app/src/main/AndroidManifest.xml`, **gdy** test JVM go przeczytał, **wtedy** zawiera `uses-permission` `android.permission.CAMERA`, `uses-feature` `android.hardware.camera.any` z `required` = `false`, `allowBackup` = `false`, i nie zawiera `<receiver>` ani `<service>`.
+- **Zakładając** `app/src/main/AndroidManifest.xml`, **gdy** test JVM go przeczytał, **wtedy** zawiera `uses-permission` `android.permission.INTERNET` i `android.permission.ACCESS_NETWORK_STATE`, każde z atrybutem `tools:node` = `remove` (przestrzeń nazw `http://schemas.android.com/tools`), i nie zawiera żadnego z nich bez tego atrybutu.
 - **Zakładając** `gradle/libs.versions.toml`, **gdy** test JVM go przeczytał, **wtedy** artefakt ML Kit to `com.google.mlkit:barcode-scanning` (model w paczce), a nie `com.google.android.gms:play-services-mlkit-barcode-scanning` (model pobierany przez Usługi Google Play).
-- **Zakładając** zbudowany APK debug (W8), **gdy** wypisano uprawnienia (`aapt2 dump permissions` albo „Merged Manifest” w Android Studio), **wtedy** lista uprawnień zgadza się z odpowiedzią na P1.
+- **Zakładając** zbudowany APK debug (W8), **gdy** wypisano uprawnienia (`aapt2 dump permissions` albo „Merged Manifest” w Android Studio), **wtedy** lista zawiera `SEND_SMS`, `RECEIVE_SMS` i `CAMERA`, a nie zawiera `INTERNET` ani `ACCESS_NETWORK_STATE`; skan QR w trybie samolotowym działa (W3).
 
-### UI-23: Ochrona ekranu z sekretem (do potwierdzenia – P2)
+### UI-23: Ochrona ekranu z sekretem
 
 Gdy otwarty jest skaner albo okno wklejania, okno `Activity` ma `WindowManager.LayoutParams.FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach); po zamknięciu skanera i okna flaga jest zdejmowana.
 
@@ -380,8 +381,8 @@ Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo) i sposób ich spełnien
 
 - **Nie logujemy sekretu, kodów ani PIN-u.** `ui` i `session.platform` nie wywołują API logowania (UI-21). Wejście sekretu nie trafia do komunikatów, wyjątków ani `toString()` (UI-12, UI-21). PIN AAPS nie występuje w tej specyfikacji (009).
 - **Sekret nie zostaje w pamięci UI dłużej niż do zapisu.** ViewModel nie ma pól z sekretem; wejście ze skanera jest zmienną lokalną; tekst pola wklejania jest czyszczony przy zapisie (przed parserem), anulowaniu, przejściu w tło i starcie polecenia; nie trafia do `SavedStateHandle` ani `rememberSaveable`, więc nie jest zapisywany przez system w stanie instancji (UI-11, UI-14). Pytanie o zastąpienie jest zadawane przed odczytem wejścia (UI-08). Pole jest maskowane, z klawiaturą typu hasło, żeby słownik klawiatury nie uczył się fragmentów URI (UI-11). Ograniczenie: obiekty `String` (wartość QR, tekst pola) nie dają się wyzerować w JVM.
-- **Kopie poza kontrolą aplikacji.** Aplikacja nie czyta schowka sama; URI wklejone przez użytkownika zostaje w schowku systemowym (czyszczenie – „Przyszłe zmiany”). Kod QR na ekranie AAPS jest poza aplikacją. Ochrona przed zrzutem ekranu skanera/okna wklejania – UI-23 (P2).
-- **Skan offline, minimum danych.** Model ML Kit jest w paczce aplikacji (UI-22), analiza klatek odbywa się na telefonie, klatki nie są zapisywane (UI-09). Biblioteki ML Kit dołączają moduł telemetrii Google (`com.google.android.datatransport`) z uprawnieniami `INTERNET` i `ACCESS_NETWORK_STATE` w połączonym manifeście – decyzja w P1.
+- **Kopie poza kontrolą aplikacji.** Aplikacja nie czyta schowka sama; URI wklejone przez użytkownika zostaje w schowku systemowym (czyszczenie – „Przyszłe zmiany”). Kod QR na ekranie AAPS jest poza aplikacją. Ochrona przed zrzutem ekranu skanera/okna wklejania – `FLAG_SECURE` na czas otwartego skanera i okna wklejania (UI-23).
+- **Skan offline, minimum danych.** Model ML Kit jest w paczce aplikacji (UI-22), analiza klatek odbywa się na telefonie, klatki nie są zapisywane (UI-09). Biblioteki ML Kit dołączają moduł telemetrii Google (`com.google.android.datatransport`) z uprawnieniami `INTERNET` i `ACCESS_NETWORK_STATE` w połączonym manifeście; aplikacja usuwa oba uprawnienia (`tools:node="remove"`, UI-22), więc nie ma dostępu do sieci, a telemetria nie jest wysyłana.
 - **Zmiana numeru w trakcie polecenia** (Spec 007, sekcja Bezpieczeństwo): zmiana i usunięcie numeru są niedostępne i sprawdzane w chwili wywołania, gdy polecenie jest w toku (UI-15). Pozostałe okno wyścigu: zapis numeru przekazany do magazynu tuż przed startem polecenia kończy się już w trakcie polecenia. Skutek jest bezpieczny: `sms` czyta numer przy każdym wysłaniu i odbiorze (SMS-04, SMS-09), więc odpowiedzi ze starego numeru są odrzucane przez filtr (brak odpowiedzi → limit czasu sesji), a kod jest odsyłany tylko po prośbie o kod z bieżącego numeru. Pełne rozwiązanie (numer ustalany raz na polecenie) – „Przyszłe zmiany” w Spec 007.
 - **Blokada zmiany sekretu w trakcie polecenia** (UI-15) nie jest wymagana dla poprawności – sesja dostaje własną kopię sekretu w `CodeCredentials` przed startem (Spec 006), więc zapis ani usunięcie sekretu w magazynie nie wpływa na trwające polecenie. Powody blokady: jedna, prosta reguła „w trakcie polecenia numer i sekret są tylko do odczytu”; brak wątpliwości użytkownika, którym sekretem zostało potwierdzone polecenie; brak uruchamiania aparatu i okien uprawnień, gdy aplikacja ma pozostać na pierwszym planie z ekranem przebiegu (Spec 005, założenie MVP).
 - **Minimum uprawnień:** dochodzi tylko `CAMERA` (UI-22); bez `READ_SMS`, bez dostępu do pamięci i galerii. `allowBackup=false` bez zmian.
@@ -408,12 +409,12 @@ Kompozycje, nawigacja, kamera, okna uprawnień i wiązania Hilt nie mają testó
 | W5 | Wklejenie URI: znaki maskowane, Gboard bez podpowiedzi z fragmentami URI; „Zapisz” z `URI_RFC` → zapisano, pole puste przy ponownym otwarciu; błędny URI → komunikat; „Anuluj” → pole puste; przejście do innej aplikacji i powrót → okno zamknięte | UI-11, UI-12, UI-14 |
 | W6 | Usunięcie sekretu z potwierdzeniem i anulowaniem → „Brak sekretu TOTP”; po ponownym starcie procesu stan sekretu bez zmian | UI-07, UI-13 |
 | W7 | Uprawnienia SMS na aplikacji instalowanej z APK: prośba, odmowa, trwała odmowa, przycisk ustawień, powrót i odświeżenie; zanotować, czy Android wymagał „ustawień z ograniczeniami” (to samo co W6 w Spec 005) | UI-17, UI-18 |
-| W8 | Uprawnienia w zbudowanym APK debug (`aapt2 dump permissions` albo „Merged Manifest”): `SEND_SMS`, `RECEIVE_SMS`, `CAMERA` i uprawnienia sieciowe zgodnie z P1 | UI-22 |
-| W9 | `FLAG_SECURE` przy otwartym skanerze i oknie wklejania (jeśli P2 = tak) | UI-23 |
+| W8 | Uprawnienia w zbudowanym APK debug (`aapt2 dump permissions` albo „Merged Manifest”): są `SEND_SMS`, `RECEIVE_SMS`, `CAMERA`; brak `INTERNET` i `ACCESS_NETWORK_STATE` (połączony manifest bez uprawnień sieciowych); w ustawieniach systemu „Informacje o aplikacji” nie pokazują dostępu do sieci | UI-22 |
+| W9 | `FLAG_SECURE` przy otwartym skanerze i oknie wklejania: zrzut ekranu zablokowany, podgląd w ostatnich aplikacjach pusty; po zamknięciu zrzut działa | UI-23 |
 
 Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekranu Polecenia – ich sprawdzenie ręczne opisuje pierwszy PR 009, który uruchamia polecenie.
 
-**Punkty weryfikacji z wcześniejszych specyfikacji** (propozycja podziału – pytanie P3):
+**Punkty weryfikacji z wcześniejszych specyfikacji** (podział zatwierdzony przez użytkownika – P3):
 
 - **Spec 006 (W1–W10)** – opisuje PR zadania 9 z design (pierwszy zapis sekretu – z wklejonego URI); PR zadania 10 (skaner) powtarza W5–W7 dla zapisu ze skanera. W 008 nie ma odczytu sekretu (`load`), więc PR opisuje: W1 w części zapisu i parametrów `KeyInfo`, W5, W6, W7, W8. Punkty wymagające odczytu – W1 w części odczytu i zgodności kodu z Authenticatorem, W2, W3, W4, W9, W10 – opisuje pierwszy PR 009 z poleceniem wymagającym kodu.
 - **Spec 007 (W1–W7)** – PR zadania 8 z design (sekcja numeru) opisuje punkty dotyczące numeru: W1 bez części „polecenie `BG` wychodzi na ten numer”, W2, W6 w części numeru (`bmgr backupnow` przy zapisanym numerze). Do 009: W1 w części polecenia `BG` i W7 (przyciski poleceń przy wczytywaniu). Do 010: W3, W4, W5 i W6 w części historii.
@@ -421,9 +422,10 @@ Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekra
 
 ## Otwarte pytania
 
-- [ ] **P1. Uprawnienia sieciowe z ML Kit.** `com.google.mlkit:barcode-scanning:17.3.0` zależy od `com.google.mlkit:common`, a ta od `com.google.android.datatransport:transport-backend-cct` i `transport-runtime`, których manifesty dodają do połączonego manifestu `android.permission.INTERNET` i `android.permission.ACCESS_NETWORK_STATE` (telemetria ML Kit do Google) oraz komponenty (`MlKitInitProvider`, usługi i receiver `datatransport`, wszystkie nieeksportowane). Dziś aplikacja nie ma żadnego uprawnienia sieciowego. Propozycja: usunąć oba uprawnienia z połączonego manifestu (`<uses-permission … tools:node="remove" />` w manifeście aplikacji) – skan działa bez sieci (model w paczce), telemetria się nie wyśle. Alternatywa: zaakceptować uprawnienia sieciowe. Którą opcję wybierasz?
-- [ ] **P2. `FLAG_SECURE` przy skanerze i oknie wklejania (UI-23).** Podgląd aparatu pokazuje kod QR z sekretem, a lista ostatnich aplikacji zapisuje miniaturę ekranu. Propozycja: włączać `FLAG_SECURE` tylko na czas otwartego skanera i okna wklejania. Zgoda? (Przy odmowie UI-23 zostanie wycofane.)
-- [ ] **P3. Podział ręcznej weryfikacji z wcześniejszych spec.** W 008 nie ma odczytu sekretu ani poleceń, więc część punktów W ze Spec 006 i 007 nie da się tu wykonać. Propozycja z sekcji „Punkty weryfikacji z wcześniejszych specyfikacji”: ze Spec 006 w 008 tylko W1 (zapis, `KeyInfo`), W5–W8, reszta w 009; ze Spec 007 w 008 W1 (bez `BG`), W2, W6 (numer), w 009 W1 (`BG`) i W7, w 010 W3–W5 i W6 (historia). Zgoda?
+- [x] **P1. Uprawnienia sieciowe z ML Kit.** `com.google.mlkit:barcode-scanning:17.3.0` zależy od `com.google.mlkit:common`, a ta od `com.google.android.datatransport:transport-backend-cct` i `transport-runtime`, których manifesty dodają do połączonego manifestu `INTERNET` i `ACCESS_NETWORK_STATE` (telemetria ML Kit). Rozstrzygnięte: oba uprawnienia są usuwane z połączonego manifestu przez `tools:node="remove"` w manifeście aplikacji – skan offline, aplikacja bez dostępu do sieci (UI-22, W8).
+- [x] **P2. `FLAG_SECURE` przy skanerze i oknie wklejania.** Rozstrzygnięte: tak – `FLAG_SECURE` tylko na czas otwartego skanera i okna wklejania (UI-23, W9).
+- [x] **P3. Podział ręcznej weryfikacji z wcześniejszych spec.** Rozstrzygnięte: zgoda na podział z sekcji „Punkty weryfikacji z wcześniejszych specyfikacji” – Spec 006: W1 (zapis, `KeyInfo`) i W5–W8 w 008, reszta w 009; Spec 007: W1 bez `BG`, W2 i W6 (numer) w 008, W1 (`BG`) i W7 w 009, W3–W5 i W6 (historia) w 010; Spec 005: W6 w 008, reszta w 009.
+- [x] Nawigacja (dolny pasek, start na Poleceniach), testy tylko JVM, CameraX + ML Kit z modelem w paczce i zapasowe wklejenie URI, podział `ui` na 008/009/010 – decyzje użytkownika (sekcje Zakres i Założenia).
 
 ## Przyszłe zmiany (nie blokują)
 
