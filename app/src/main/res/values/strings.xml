@@ -53,6 +53,9 @@
     <string name="secret_delete_text">Polecenia wymagające kodu (CARBS) nie będą działać do ponownego zeskanowania QR.</string>
     <string name="secret_paste_title">Wklej URI z AAPS</string>
     <string name="secret_paste_label">URI otpauth://</string>
+    <!-- 008: skaner -->
+    <string name="secret_scanner_hint">Skieruj aparat na kod QR pokazany w AAPS.</string>
+    <string name="secret_camera_denied">Bez dostępu do aparatu nie zeskanujesz kodu QR. Możesz wkleić URI z AAPS.</string>
     <string name="secret_msg_saved">Zapisano sekret TOTP</string>
     <string name="secret_msg_locked">Odblokuj telefon i spróbuj ponownie.</string>
     <string name="secret_msg_key_generation_failed">Nie udało się utworzyć klucza szyfrowania. Spróbuj ponownie.</string>
