@@ -12,6 +12,44 @@ import pl.twojanazwa.aapsremote.ui.commands.timedOutResultMessage
 import pl.twojanazwa.aapsremote.ui.commands.toResultMessage
 
 object HistoryEntryMapper {
+    /** HISTUI-03, HISTUI-05. */
+    fun item(entry: HistoryEntry, timeouts: SessionTimeouts = SessionTimeouts()): HistoryItem = HistoryItem(
+        id = entry.id,
+        command = commandLabel(entry),
+        grams = carbsGrams(entry),
+        result = result(entry, timeouts),
+        listTimeEpochMillis = entry.startedAtEpochMillis ?: entry.finishedAtEpochMillis,
+    )
+
+    /** HISTUI-05, HISTUI-06. */
+    fun details(entry: HistoryEntry, timeouts: SessionTimeouts = SessionTimeouts()): HistoryDetails = HistoryDetails(
+        id = entry.id,
+        command = commandLabel(entry),
+        grams = carbsGrams(entry),
+        result = result(entry, timeouts),
+        times = HistoryTimeLabel.entries.map { label ->
+            label to when (label) {
+                HistoryTimeLabel.STARTED -> entry.startedAtEpochMillis
+                HistoryTimeLabel.COMMAND_SENT -> entry.commandSentAtEpochMillis
+                HistoryTimeLabel.CODE_SENT -> entry.codeSentAtEpochMillis
+                HistoryTimeLabel.FINISHED -> entry.finishedAtEpochMillis
+            }
+        },
+        replyText = entry.replyText,
+        unexpectedCount = entry.unexpectedMessageCount.takeIf { it > 0 },
+    )
+
+    private fun commandLabel(entry: HistoryEntry): HistoryCommandLabel = when (entry.command) {
+        HistoryCommand.BG -> HistoryCommandLabel.BG
+        HistoryCommand.PUMP -> HistoryCommandLabel.PUMP
+        HistoryCommand.CARBS ->
+            if (entry.carbsGrams != null) HistoryCommandLabel.CARBS else HistoryCommandLabel.CARBS_NO_AMOUNT
+        HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
+    }
+
+    private fun carbsGrams(entry: HistoryEntry): Int? =
+        if (entry.command == HistoryCommand.CARBS) entry.carbsGrams else null
+
     /** HISTUI-04. Wyczerpujący when po HistoryOutcome (bez else); null i Unrecognized bez wyjątku (DATA-09). */
     fun result(entry: HistoryEntry, timeouts: SessionTimeouts = SessionTimeouts()): HistoryResultView {
         val outcome = entry.outcome

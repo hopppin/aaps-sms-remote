@@ -13,4 +13,18 @@ class HistoryRedactionTest {
         )
         assertFalse(view.toString().contains("37"), view.toString())
     }
+
+    @Test
+    fun `HISTUI-15 toString wiersza i szczegolow nie zawiera ilosci tresci ani czasow`() {
+        val entry = historyEntry(
+            HistoryOutcome.CarbsConfirmed,
+            HistoryCommand.CARBS,
+            carbsGrams = 37,
+            replyText = "Pomyslnie wprowadzono 37 g weglowodanow",
+        )
+        listOf(HistoryEntryMapper.item(entry).toString(), HistoryEntryMapper.details(entry).toString())
+            .forEach { text ->
+                listOf("37", "Pomyslnie", "1111111").forEach { assertFalse(text.contains(it), text) }
+            }
+    }
 }
