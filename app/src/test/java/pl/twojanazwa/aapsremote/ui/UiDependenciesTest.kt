@@ -20,4 +20,11 @@ class UiDependenciesTest {
         assertTrue("play-services-mlkit-barcode-scanning" !in text)
         assertTrue("com.google.android.gms" !in text)
     }
+
+    @Test
+    fun `UI-22 moduł app deklaruje ML Kit z modelem w paczce`() {
+        val file = File("build.gradle.kts")
+        check(file.exists()) { "Brak skryptu modułu: ${file.absolutePath}" }
+        assertTrue("implementation(libs.mlkit.barcode.scanning)" in file.readText())
+    }
 }
