@@ -11,4 +11,13 @@
     <string name="action_cancel">Anuluj</string>
     <string name="action_delete">Usuń</string>
     <string name="action_open_app_settings">Otwórz ustawienia aplikacji</string>
+
+    <!-- 008: uprawnienia SMS -->
+    <string name="sms_section_title">Uprawnienia SMS</string>
+    <string name="sms_all_granted">Wysyłanie i odbiór SMS dozwolone</string>
+    <string name="sms_missing_label">Brak uprawnień:</string>
+    <string name="sms_permission_send">wysyłanie SMS</string>
+    <string name="sms_permission_receive">odbiór SMS</string>
+    <string name="sms_action_request">Zezwól</string>
+    <string name="sms_denied">Bez uprawnień SMS aplikacja nie wyśle polecenia ani nie odbierze odpowiedzi AAPS.</string>
 </resources>
