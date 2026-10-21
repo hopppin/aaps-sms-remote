@@ -15,7 +15,10 @@ import pl.twojanazwa.aapsremote.sms.SmsBroadcastRegistrar
 import pl.twojanazwa.aapsremote.sms.SmsPermissions
 import pl.twojanazwa.aapsremote.sms.SmsSystemApi
 
-/** Wiązania spec 005. AapsNumberProvider celowo bez wiązania (spec `data`). */
+/**
+ * Wiązania spec 005. AapsNumberProvider celowo bez wiązania (spec `data`) – jest wiązany
+ * w [pl.twojanazwa.aapsremote.data.platform.DataModule].
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SmsModule {
