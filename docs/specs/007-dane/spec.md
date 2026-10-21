@@ -241,11 +241,11 @@ Rejestrator nie wpływa na sesję: nie anuluje jej, nie zmienia jej stanu i nie 
 
 ### DATA-14: Schemat bazy i migracje
 
-Baza Room o nazwie pliku `aaps_remote.db` w domyślnym katalogu baz aplikacji (`databases/`) ma wersję schematu 1 i jedną tabelę `command_history` z kolumnami z design. Identyfikator jest kluczem głównym z `AUTOINCREMENT` (identyfikatory nie są używane ponownie, także po czyszczeniu). Schemat jest eksportowany (`exportSchema = true`) do katalogu `app/schemas/`, a plik schematu wersji 1 jest w repo. Baza nie używa `fallbackToDestructiveMigration` w żadnym wariancie; każda przyszła zmiana schematu wymaga zmiany tej specyfikacji z migracją i jej testem.
+Baza Room o nazwie pliku `aaps_remote.db` w domyślnym katalogu baz aplikacji (`databases/`) ma wersję schematu 1 i jedną tabelę `command_history` z kolumnami z design. Identyfikator jest kluczem głównym z `AUTOINCREMENT` (identyfikatory nie są używane ponownie, także po czyszczeniu). Schemat jest eksportowany (`exportSchema = true`) do katalogu `app/schemas/`, a plik schematu wersji 1 jest w repo (`app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`). Baza nie używa `fallbackToDestructiveMigration` w żadnym wariancie; każda przyszła zmiana schematu wymaga zmiany tej specyfikacji z migracją i jej testem.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wyeksportowany plik schematu `1.json` w `app/schemas/`, **gdy** test JVM go przeczytał, **wtedy** wersja = 1, jest dokładnie jedna tabela `command_history`, nazwy kolumn, ich typy i `NOT NULL` są zgodne z design, a zapytanie tworzące tabelę zawiera `AUTOINCREMENT`.
+- **Zakładając** wyeksportowany plik schematu `app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`, **gdy** test JVM go przeczytał, **wtedy** wersja = 1, jest dokładnie jedna tabela `command_history`, nazwy kolumn, ich typy i `NOT NULL` są zgodne z design, a zapytanie tworzące tabelę zawiera `AUTOINCREMENT`.
 - **Zakładając** źródła `data.platform`, **gdy** test JVM przeszukał je jako tekst, **wtedy** nie zawierają `fallbackToDestructiveMigration`.
 - **Zakładając** telefon po pierwszym poleceniu (sprawdzenie na urządzeniu, W3), **gdy** wyświetlono `databases/` przez `adb shell run-as`, **wtedy** jest plik `aaps_remote.db`, a po zabiciu procesu i ponownym starcie historia zawiera wpis.
 
