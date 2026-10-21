@@ -1,0 +1,84 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "447ca0f88e3a0290973324b723eb08c2",
+    "entities": [
+      {
+        "tableName": "command_history",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `command` TEXT NOT NULL, `carbs_grams` INTEGER, `outcome` TEXT NOT NULL, `reason` TEXT, `started_at` INTEGER, `command_sent_at` INTEGER, `code_sent_at` INTEGER, `finished_at` INTEGER, `reply_text` TEXT, `unexpected_count` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "command",
+            "columnName": "command",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "carbsGrams",
+            "columnName": "carbs_grams",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outcome",
+            "columnName": "outcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "startedAtEpochMillis",
+            "columnName": "started_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "commandSentAtEpochMillis",
+            "columnName": "command_sent_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "codeSentAtEpochMillis",
+            "columnName": "code_sent_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "finishedAtEpochMillis",
+            "columnName": "finished_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "replyText",
+            "columnName": "reply_text",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "unexpectedMessageCount",
+            "columnName": "unexpected_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '447ca0f88e3a0290973324b723eb08c2')"
+    ]
+  }
+}
