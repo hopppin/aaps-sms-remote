@@ -1,6 +1,8 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
@@ -63,6 +65,8 @@ class CommandLauncher @Inject constructor(
                     LoadResult.Unavailable -> return LaunchResult.Rejected(LaunchRejection.SECRET_UNAVAILABLE)
                 }
             }
+            // Anulowanie po load() (lub w ścieżce bez kodu) nie może wystartować sesji; PIN czyści finally.
+            currentCoroutineContext().ensureActive()
             val result = try {
                 coordinator.start(scope, command, credentials)
             } catch (e: IllegalArgumentException) {
