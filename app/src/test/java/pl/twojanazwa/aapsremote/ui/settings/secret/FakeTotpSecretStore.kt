@@ -18,6 +18,12 @@ class FakeTotpSecretStore(initial: SecretState = SecretState.UNKNOWN) : TotpSecr
     val saveResults = ArrayDeque<SaveResult>()
     val deleteResults = ArrayDeque<DeleteResult>()
 
+    /** Kolejne wyniki `load()`; pusta kolejka = `Absent`. */
+    val loadResults = ArrayDeque<LoadResult>()
+
+    /** Gdy ustawiona, `load()` czeka na jej zakończenie (po zliczeniu wywołania). */
+    var loadGate: CompletableDeferred<Unit>? = null
+
     /** Gdy ustawiona, `save`/`delete` czekają na jej zakończenie. */
     var gate: CompletableDeferred<Unit>? = null
 
@@ -56,6 +62,7 @@ class FakeTotpSecretStore(initial: SecretState = SecretState.UNKNOWN) : TotpSecr
 
     override suspend fun load(): LoadResult {
         loadCount++
-        return LoadResult.Absent
+        loadGate?.await()
+        return loadResults.removeFirstOrNull() ?: LoadResult.Absent
     }
 }
