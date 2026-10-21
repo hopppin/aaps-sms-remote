@@ -1,6 +1,8 @@
 package pl.twojanazwa.aapsremote.ui.settings.secret
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import pl.twojanazwa.aapsremote.otp.TotpSecret
@@ -23,6 +25,9 @@ class FakeTotpSecretStore(initial: SecretState = SecretState.UNKNOWN) : TotpSecr
 
     /** Gdy ustawiona, `load()` czeka na jej zakończenie (po zliczeniu wywołania). */
     var loadGate: CompletableDeferred<Unit>? = null
+
+    /** Gdy true, oczekiwanie na [loadGate] nie reaguje na anulowanie wywołującego. */
+    var loadIgnoresCancellation = false
 
     /** Gdy ustawiona, `save`/`delete` czekają na jej zakończenie. */
     var gate: CompletableDeferred<Unit>? = null
@@ -62,7 +67,11 @@ class FakeTotpSecretStore(initial: SecretState = SecretState.UNKNOWN) : TotpSecr
 
     override suspend fun load(): LoadResult {
         loadCount++
-        loadGate?.await()
+        val gate = loadGate
+        if (gate != null) {
+            // Nieprzerywalne: load wraca z wynikiem mimo anulowania wywołującego (test strażnika ensureActive).
+            if (loadIgnoresCancellation) withContext(NonCancellable) { gate.await() } else gate.await()
+        }
         return loadResults.removeFirstOrNull() ?: LoadResult.Absent
     }
 }

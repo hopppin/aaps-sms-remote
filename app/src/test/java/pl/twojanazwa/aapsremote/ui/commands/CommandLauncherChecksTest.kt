@@ -123,6 +123,30 @@ class CommandLauncherChecksTest {
     }
 
     @Test
+    fun `CMDUI-12 load wracajacy po anulowaniu nie startuje sesji a PIN jest wyczyszczony`() = runTest {
+        val env = CommandTestEnv(this)
+        val gate = CompletableDeferred<Unit>()
+        env.secrets.loadGate = gate
+        env.secrets.loadIgnoresCancellation = true
+        env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+        val pin = CommandTestFixtures.pin()
+        val launcher = env.launcher()
+        val job = launch { launcher.launch(CommandTestFixtures.carbs(20), pin) }
+        runCurrent()
+        assertEquals(1, env.secrets.loadCount)
+
+        job.cancel()
+        gate.complete(Unit)
+        runCurrent()
+
+        assertTrue(job.isCancelled)
+        assertTrue(pin.isCleared)
+        assertEquals(0, env.sender.sendCount)
+        assertNull(env.coordinator.activeSession.value)
+        assertNull(env.currentRun.state.value)
+    }
+
+    @Test
     fun `CMDUI-12 zajeta sesja odrzuca polecenie przed odczytem sekretu`() = runTest {
         val env = CommandTestEnv(this)
         val launcher = env.launcher()
