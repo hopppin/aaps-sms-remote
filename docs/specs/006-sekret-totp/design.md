@@ -11,7 +11,7 @@ Pakiet `pl.twojanazwa.aapsremote.security` dostaje magazyn sekretu TOTP obok ist
 
 Kluczowa obserwacja: `Cipher` z JCE działa tak samo z kluczem programowym (`SecretKeySpec`) i z uchwytem klucza z `AndroidKeyStore` (dostawca wybierany przy `Cipher.init` według klucza). Dlatego cały kod szyfrowania (`Cipher.getInstance("AES/GCM/NoPadding")`, `init`, `updateAAD`, `doFinal`, odczyt IV) leży w logice czystej, a platforma dostarcza tylko klucz.
 
-Zależności (kierunek): `security` → `otp` (`TotpSecret`). `otp` i `session` nie importują `security` poza istniejącym `AapsPin`. `ui` (przyszła spec): `OtpauthParser` → `TotpSecretStore.save`; przy poleceniu z kodem `TotpSecretProvider.load` → `CodeCredentials(pin, secret)` → `SessionCoordinator`; `TotpSecretStore.state` → ekran konfiguracji / blokada przycisków.
+Zależności (kierunek): `security` → `otp` (`TotpSecret`). `otp` i `session` nie importują `security` poza istniejącym `AapsPin`. `ui` (przyszła spec): `OtpauthParser` → `TotpSecretStore.save`; przy poleceniu z kodem `CommandLauncher` (spec 009) wywołuje `TotpSecretProvider.load` → `CodeCredentials(pin, secret)` → `SessionCoordinator` (ViewModel nie dostaje sekretu); `TotpSecretStore.state` → ekran konfiguracji / blokada przycisków.
 
 Przepływ zapisu: `ui` → `KeystoreTotpSecretStore.save` (blokada → dyspozytor I/O → `secret.copyBytes()` → `AesGcmSecretCipher.encrypt` [`SecretKeySource.getKey` albo `generateKey`] → `SealedSecretFormat.encode` → `SecretRecordStorage.write`) → `SaveResult`.
 
@@ -57,7 +57,7 @@ sealed interface DeleteResult {
     data object Failed : DeleteResult
 }
 
-/** Port dla warstwy składającej CodeCredentials (ui/ViewModel). */
+/** Port dla warstwy składającej CodeCredentials (`CommandLauncher`, spec 009). */
 fun interface TotpSecretProvider {
     /** SECRET-06. Nie rzuca poza CancellationException. */
     suspend fun load(): LoadResult
@@ -383,7 +383,7 @@ when (val r = cipher.decrypt(sealed)) {
 | `TotpSecret` z `OtpauthParser` | `ui` (wynik skanu) | do powrotu z `save`; `ui` nie trzyma go dłużej |
 | kopia `copyBytes()` przy zapisie | zmienna lokalna `save` | wyzerowana w `finally` |
 | `plaintext` z `decrypt` | zmienna lokalna `load` | wyzerowany w `finally` po `TotpSecret.fromBytes` (który kopiuje) |
-| `TotpSecret` z `load` | `ui` → `CodeCredentials` → `CommandSession` | do końca sesji, potem odśmiecenie (bez zerowania – „Przyszłe zmiany” w spec) |
+| `TotpSecret` z `load` | `CommandLauncher` (spec 009) → `CodeCredentials` → `CommandSession` | do końca sesji, potem odśmiecenie (bez zerowania – „Przyszłe zmiany” w spec) |
 | bufory `Cipher`, `SecretKeySpec` w `TotpGenerator` | JCA / Keystore | poza kontrolą aplikacji |
 | `SealedSecret`, tekst rekordu | zmienne lokalne | do odśmiecenia (nie są tajne bez klucza) |
 

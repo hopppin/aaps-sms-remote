@@ -35,8 +35,8 @@ Sekret TOTP z kodu QR AAPS jest w aplikacji jedynym czynnikiem „co masz” prz
 ## Założenia i zależności
 
 - **Wejście zapisu:** `TotpSecret` z `OtpauthResult.Success` (Spec 001). Magazyn czyta bajty wyłącznie przez `TotpSecret.copyBytes()` i zeruje tę kopię.
-- **Wyjście odczytu:** `TotpSecret` utworzony przez `TotpSecret.fromBytes`; `ui` (ViewModel) składa z niego i z `AapsPin` obiekt `CodeCredentials` (Spec 004) i przekazuje do `SessionCoordinator`. Sekret odszyfrowany przed startem sesji zostaje w pamięci sesji do jej końca, także gdy ekran zostanie potem zablokowany.
-- **Wymaganie dla spec `ui`:** sekret jest odczytywany tuż przed startem polecenia wymagającego kodu (po wpisaniu PIN-u i zatwierdzeniu), a ViewModel nie przechowuje `TotpSecret` w polu dłużej niż do przekazania `CodeCredentials` koordynatorowi (SECRET-14).
+- **Wyjście odczytu:** `TotpSecret` utworzony przez `TotpSecret.fromBytes`; `CommandLauncher` ([Spec 009](../009-ui-polecenia/spec.md)) składa z niego i z `AapsPin` obiekt `CodeCredentials` (Spec 004) i przekazuje do `SessionCoordinator`; ViewModel nie dostaje `TotpSecret` ani `CodeCredentials`. Sekret odszyfrowany przed startem sesji zostaje w pamięci sesji do jej końca, także gdy ekran zostanie potem zablokowany.
+- **Wymaganie dla spec `ui`:** sekret jest odczytywany tuż przed startem polecenia wymagającego kodu (po wpisaniu PIN-u i zatwierdzeniu) wyłącznie przez `CommandLauncher` ([Spec 009](../009-ui-polecenia/spec.md)); jedynym odbiorcą sekretu jest `CommandLauncher`, który nie przechowuje `TotpSecret` dłużej niż do zbudowania `CodeCredentials` (SECRET-14), a ViewModel nigdy go nie dostaje.
 - **Aplikacja nie działa w trybie Direct Boot** (brak `directBootAware`), więc magazyn jest używany dopiero po pierwszym odblokowaniu telefonu od uruchomienia.
 - **Testy:** logika czysta w testach JVM (JUnit 5), w tym prawdziwe AES-GCM z JCE z kluczem programowym. Cienka warstwa Androida bez Robolectric i `androidTest` (jak decyzja P3 ze Spec 005), sprawdzana ręcznie według listy W1–W10 (sekcja „Weryfikacja na urządzeniu”), gdy powstanie `ui`.
 
