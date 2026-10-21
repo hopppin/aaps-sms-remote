@@ -57,4 +57,21 @@ class HistoryExclusionTest {
     fun `DATA-08 wiersz nie ma pol zabronionych typow`() {
         assertNoForbiddenTypes(HistoryRow::class)
     }
+
+    @Test
+    fun `DATA-08 wiersz nie zawiera tresci wiadomosci nieoczekiwanych`() {
+        val result = HistoryFixtures.carbsConfirmed(
+            listOf(
+                HistoryFixtures.sms("Pomyslnie wprowadzono 7 g weglowodanow"),
+                HistoryFixtures.sms("Inny tekst 4321"),
+            ),
+        )
+        val row = HistoryCodec.toRow(result)
+        val texts = listOfNotNull(row.command, row.outcome, row.reason, row.replyText)
+        for (t in texts) {
+            assertFalse(t.contains("wprowadzono 7 g"), "tresc wiadomosci nieoczekiwanej")
+            assertFalse(t.contains("Inny tekst"), "tresc wiadomosci nieoczekiwanej")
+        }
+        assertEquals(2, row.unexpectedMessageCount)
+    }
 }
