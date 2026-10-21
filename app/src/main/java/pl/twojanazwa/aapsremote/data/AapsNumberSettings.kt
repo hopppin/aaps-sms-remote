@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import pl.twojanazwa.aapsremote.sms.AapsNumber
+import pl.twojanazwa.aapsremote.sms.AapsNumberProvider
 
 /**
  * Numer AAPS: wczytanie, zapis i usunięcie (DATA-01 – DATA-04). Numer nie trafia do logów
@@ -23,11 +24,16 @@ class AapsNumberSettings @Inject constructor(
     private val storage: SettingsStorage,
     @DataDispatcher private val dispatcher: CoroutineDispatcher,
     @DataScope scope: CoroutineScope,
-) : AapsNumberSettingsStore {
+) : AapsNumberSettingsStore, AapsNumberProvider {
     private val mutex = Mutex()
     private val _state = MutableStateFlow<AapsNumberState>(AapsNumberState.Loading)
 
     override val state: StateFlow<AapsNumberState> = _state.asStateFlow()
+
+    /** DATA-05: tylko odczyt state.value; bez I/O, bez blokady. */
+    override fun currentNumber(): String? = (_state.value as? AapsNumberState.Configured)?.number?.destination
+
+    override fun toString(): String = "AapsNumberSettings(***)"
 
     init {
         scope.launch { load() }
