@@ -74,4 +74,21 @@ class HistoryExclusionTest {
         }
         assertEquals(2, row.unexpectedMessageCount)
     }
+
+    @Test
+    fun `DATA-08 wpis nie zawiera tresci wiadomosci nieoczekiwanych`() {
+        val result = HistoryFixtures.carbsConfirmed(
+            listOf(
+                HistoryFixtures.sms("Pomyslnie wprowadzono 7 g weglowodanow"),
+                HistoryFixtures.sms("Inny tekst 4321"),
+            ),
+        )
+        val entry = HistoryCodec.toEntry(HistoryCodec.toRow(result))
+        val texts = listOfNotNull(entry.command.toString(), entry.outcome.toString(), entry.replyText, entry.toString())
+        for (t in texts) {
+            assertFalse(t.contains("wprowadzono 7 g"), "tresc wiadomosci nieoczekiwanej")
+            assertFalse(t.contains("Inny tekst"), "tresc wiadomosci nieoczekiwanej")
+        }
+        assertEquals(2, entry.unexpectedMessageCount)
+    }
 }
