@@ -9,11 +9,9 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class TotpSecretViewModelReplaceTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private fun fixture(initial: SecretState): SecretFixture =
         SecretFixture(main.dispatcher, initial).also { it.idle() }
@@ -123,5 +121,25 @@ class TotpSecretViewModelReplaceTest {
         val s = f.viewModel.uiState.value
         assertNull(s.confirmingReplace)
         assertEquals(SecretInputMode.PASTE, s.mode)
+    }
+
+    @Test
+    fun `UI-15 zastap przy poleceniu w toku zamyka pytanie i nie otwiera pola`() = runTest(main.dispatcher) {
+        for (scan in listOf(false, true)) {
+            val f = fixture(SecretState.PRESENT)
+            if (scan) f.viewModel.onScanClicked() else f.viewModel.onPasteClicked()
+            f.idle()
+            assertEquals(
+                if (scan) PendingSecretInput.SCAN else PendingSecretInput.PASTE,
+                f.viewModel.uiState.value.confirmingReplace,
+            )
+            f.session.startCommand()
+            f.idle()
+            f.viewModel.onReplaceConfirmed()
+            f.idle()
+            val s = f.viewModel.uiState.value
+            assertNull(s.confirmingReplace)
+            assertEquals(SecretInputMode.NONE, s.mode)
+        }
     }
 }

@@ -9,11 +9,9 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class TotpSecretViewModelClipboardTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     /** Magazyn ABSENT, otwarte okno wklejania z tekstem [pasted] i schowkiem [clip]. */
     private fun openPaste(pasted: String, clip: String?): SecretFixture {
