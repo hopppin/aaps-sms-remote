@@ -62,38 +62,58 @@ fun QrScanner(
         val delivered = AtomicBoolean(false)
         var released = false
 
-        controller.cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-        controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
-        controller.setImageAnalysisAnalyzer(
-            executor,
-            MlKitAnalyzer(listOf(scanner), ImageAnalysis.COORDINATE_SYSTEM_ORIGINAL, executor) { result ->
-                if (released || delivered.get()) return@MlKitAnalyzer
-                val value = result?.getValue(scanner)
-                    ?.firstNotNullOfOrNull { barcode -> barcode.rawValue?.takeIf { it.isNotEmpty() } }
-                if (value != null && delivered.compareAndSet(false, true)) {
-                    currentOnQrValue.value(value)
-                }
-            },
-        )
-        controller.bindToLifecycle(lifecycleOwner)
+        fun fail() {
+            if (!released && delivered.compareAndSet(false, true)) currentOnCameraError.value()
+        }
 
-        val initialization = controller.initializationFuture
-        initialization.addListener(
-            {
-                if (!released) {
-                    val ready = try {
-                        initialization.get()
-                        controller.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        false
+        // Pojedyncze błędy detektora to utracone klatki; trwały błąd (kolejne klatki z rzędu) = błąd kamery.
+        var detectorFailures = 0
+
+        try {
+            controller.cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+            controller.setEnabledUseCases(CameraController.IMAGE_ANALYSIS)
+            controller.setImageAnalysisAnalyzer(
+                executor,
+                MlKitAnalyzer(listOf(scanner), ImageAnalysis.COORDINATE_SYSTEM_ORIGINAL, executor) { result ->
+                    if (released || delivered.get()) return@MlKitAnalyzer
+                    if (result?.getThrowable(scanner) != null) {
+                        detectorFailures++
+                        if (detectorFailures >= MAX_DETECTOR_FAILURES) fail()
+                        return@MlKitAnalyzer
                     }
-                    if (!ready && delivered.compareAndSet(false, true)) currentOnCameraError.value()
-                }
-            },
-            executor,
-        )
+                    detectorFailures = 0
+                    val value = result?.getValue(scanner)
+                        ?.firstNotNullOfOrNull { barcode -> barcode.rawValue?.takeIf { it.isNotEmpty() } }
+                    if (value != null && delivered.compareAndSet(false, true)) {
+                        currentOnQrValue.value(value)
+                    }
+                },
+            )
+            controller.bindToLifecycle(lifecycleOwner)
+
+            val initialization = controller.initializationFuture
+            initialization.addListener(
+                {
+                    if (!released) {
+                        val ready = try {
+                            initialization.get()
+                            controller.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (!ready) fail()
+                    }
+                },
+                executor,
+            )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: RuntimeException) {
+            // Np. IllegalStateException z bindToLifecycle bez tylnej kamery; bez logowania i bez treści wyjątku.
+            executor.execute { fail() }
+        }
 
         onDispose {
             released = true
@@ -134,3 +154,5 @@ fun QrScanner(
         }
     }
 }
+
+private const val MAX_DETECTOR_FAILURES = 5
