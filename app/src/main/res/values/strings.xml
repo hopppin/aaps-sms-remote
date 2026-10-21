@@ -37,6 +37,33 @@
     <string name="sms_permission_receive">odbiór SMS</string>
     <string name="sms_action_request">Zezwól</string>
     <string name="sms_denied">Bez uprawnień SMS aplikacja nie wyśle polecenia ani nie odbierze odpowiedzi AAPS.</string>
+    <!-- 008: sekret -->
+    <string name="secret_section_title">Sekret TOTP</string>
+    <string name="secret_checking">Sprawdzanie…</string>
+    <string name="secret_absent">Brak sekretu TOTP. Zeskanuj kod QR z AAPS.</string>
+    <string name="secret_present">Sekret TOTP zapisany</string>
+    <string name="secret_invalidated">Sekret TOTP przestał działać (np. po zmianie blokady ekranu). Zeskanuj ponownie kod QR z AAPS.</string>
+    <string name="secret_action_scan">Skanuj QR</string>
+    <string name="secret_action_paste">Wklej URI</string>
+    <string name="secret_action_delete">Usuń sekret</string>
+    <string name="secret_replace_title">Zastąpić zapisany sekret TOTP?</string>
+    <string name="secret_replace_text">Kody z poprzedniego sekretu przestaną działać w aplikacji.</string>
+    <string name="secret_replace_confirm">Zastąp</string>
+    <string name="secret_delete_title">Usunąć sekret TOTP?</string>
+    <string name="secret_delete_text">Polecenia wymagające kodu (CARBS) nie będą działać do ponownego zeskanowania QR.</string>
+    <string name="secret_paste_title">Wklej URI z AAPS</string>
+    <string name="secret_paste_label">URI otpauth://</string>
+    <string name="secret_msg_saved">Zapisano sekret TOTP</string>
+    <string name="secret_msg_locked">Odblokuj telefon i spróbuj ponownie.</string>
+    <string name="secret_msg_key_generation_failed">Nie udało się utworzyć klucza szyfrowania. Spróbuj ponownie.</string>
+    <string name="secret_msg_save_failed">Nie udało się zapisać sekretu. Spróbuj ponownie.</string>
+    <string name="secret_msg_not_totp_qr">To nie jest kod QR TOTP z AAPS.</string>
+    <string name="secret_msg_unsupported_parameters">Nieobsługiwane parametry TOTP. Wymagane: SHA1, 6 cyfr, 30 s.</string>
+    <string name="secret_msg_invalid_secret">Kod nie zawiera poprawnego sekretu TOTP.</string>
+    <string name="secret_msg_deleted">Usunięto sekret TOTP</string>
+    <string name="secret_msg_delete_failed">Nie udało się usunąć sekretu. Spróbuj ponownie.</string>
+    <string name="secret_msg_camera_unavailable">Nie udało się uruchomić aparatu. Możesz wkleić URI z AAPS.</string>
+
     <!-- 009: przebieg -->
     <string name="run_title_bg">Polecenie BG</string>
     <string name="run_title_pump">Polecenie PUMP</string>
