@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import pl.twojanazwa.aapsremote.R
 
 /** Okno wklejania URI (UI-11, UI-12, UI-14); tekst pola wyłącznie ze stanu ViewModelu, bez `remember*`. */
@@ -24,6 +26,8 @@ fun PasteUriDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        // Dialog to osobne okno: FLAG_SECURE Activity może go nie objąć (UI-23). Dotknięcie poza oknem nie kasuje wpisu.
+        properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn, dismissOnClickOutside = false),
         title = { Text(stringResource(R.string.secret_paste_title)) },
         text = {
             OutlinedTextField(

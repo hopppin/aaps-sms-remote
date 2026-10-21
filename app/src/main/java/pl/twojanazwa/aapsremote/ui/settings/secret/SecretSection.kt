@@ -29,8 +29,8 @@ fun SecretSection(
     onReplaceDismissed: () -> Unit,
     onDeleteConfirmed: () -> Unit,
     onDeleteDismissed: () -> Unit,
+    scanAvailable: Boolean,
     modifier: Modifier = Modifier,
-    scanAvailable: Boolean = false,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(

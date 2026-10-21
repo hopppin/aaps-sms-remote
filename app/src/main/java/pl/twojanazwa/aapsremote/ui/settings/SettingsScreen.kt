@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -60,6 +61,8 @@ fun SettingsScreen(
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { smsViewModel.onResume() }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) { secretViewModel.onStop() }
+    // Przy zmianie zakładki ON_STOP może nie dotrzeć przed usunięciem treści z kompozycji (UI-14); onStop jest idempotentne.
+    DisposableEffect(Unit) { onDispose { secretViewModel.onStop() } }
 
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         smsViewModel.onPermissionsResult { permission ->
@@ -121,6 +124,8 @@ fun SettingsScreen(
                 onReplaceDismissed = secretViewModel::onReplaceDismissed,
                 onDeleteConfirmed = secretViewModel::onDeleteConfirmed,
                 onDeleteDismissed = secretViewModel::onDeleteDismissed,
+                // Tymczasowo false: skaner (i włączenie tego parametru) dochodzi w #126.
+                scanAvailable = false,
             )
             SmsPermissionsSection(
                 state = smsState,
