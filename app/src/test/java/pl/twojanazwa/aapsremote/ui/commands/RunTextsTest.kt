@@ -45,7 +45,8 @@ class RunTextsTest {
             "run_exit_title", "run_exit_text", "run_exit_stay", "run_exit_leave",
             "result_kind_success", "result_kind_failure", "result_kind_no_response",
             "result_kind_unknown", "result_kind_cancelled",
-            "result_bg_reply", "result_pump_reply", "result_carbs_confirmed", "result_send_failed",
+            "result_bg_reply", "result_pump_reply", "result_carbs_confirmed", "result_details_missing",
+            "result_send_failed",
             "result_unrecognized_reply", "result_amount_mismatch", "result_unexpected_reply",
             "result_wrong_code", "result_code_request_expired", "result_code_preparation_timeout",
             "result_internal_error", "result_no_response", "result_send_timeout",
@@ -74,6 +75,43 @@ class RunTextsTest {
         assertEquals(
             "Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.",
             strings["result_unknown_warning"],
+        )
+    }
+
+    @Test
+    fun `CMDUI-25 zasob ma procent 1 d dokladnie gdy ResultMapper podaje messageArg`() {
+        val byMessage = ResultMapperTest().resultSamples().map { ResultMapper.map(it) }.associateBy { it.message }
+        assertEquals(ResultMessage.entries.toSet(), byMessage.keys)
+        val keyPattern = Regex("""R\.string\.(\w+)""")
+        val source = File("src/main/java/pl/twojanazwa/aapsremote/ui/commands/RunTexts.kt").readText()
+        ResultMessage.entries.forEach { message ->
+            val line = source.lines().single { it.trim().startsWith("ResultMessage.${message.name} ->") }
+            val key = keyPattern.find(line)!!.groupValues[1]
+            val hasArg = strings[key]!!.contains("%1\$d")
+            assertEquals(byMessage.getValue(message).messageArg != null, hasArg, "$message / $key")
+            assertEquals(message in ResultMapperTest.MESSAGES_WITH_ARG, hasArg, "$message / $key")
+        }
+    }
+
+    @Test
+    fun `CMDUI-25 result_details_missing jest niepusty i bez argumentu`() {
+        assertEquals("Brak szczegółów wyniku.", strings["result_details_missing"])
+    }
+
+    @Test
+    fun `CMDUI-25 trzy zmienione tresci o wysylaniu kodu wg spec`() {
+        assertEquals(
+            "Kod mógł już dotrzeć do AAPS. AAPS może wykonać polecenie mimo to. " +
+                "Wynik będzie nieznany – sprawdź w AAPS.",
+            strings["run_stop_text"],
+        )
+        assertEquals(
+            "Kod przekazany do wysłania, ale AAPS nie potwierdził w ciągu %1\$d min.",
+            strings["result_unknown_confirmation_timeout"],
+        )
+        assertEquals(
+            "Przestano czekać po przekazaniu kodu do wysłania.",
+            strings["result_unknown_cancelled_after_code"],
         )
     }
 }

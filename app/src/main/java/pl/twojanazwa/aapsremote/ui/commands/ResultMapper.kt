@@ -28,7 +28,7 @@ object ResultMapper {
                 message = when (command) {
                     is Command.Bg -> ResultMessage.BG_REPLY
                     is Command.Pump -> ResultMessage.PUMP_REPLY
-                    is Command.Carbs -> ResultMessage.CARBS_CONFIRMED
+                    is Command.Carbs -> ResultMessage.DETAILS_MISSING
                 }
                 text = outcome.text
             }

@@ -211,4 +211,120 @@ class ResultMapperTest {
         assertEquals(2, view.unexpectedCount)
         assertEquals(1, view.commandGrams)
     }
+
+    private fun fileText(name: String): String =
+        File("src/test/resources/parser/aaps-3.4.2.6-pl/$name").readText()
+
+    @Test
+    fun `CMDUI-19 Completed dla CARBS 20 to sukces DETAILS_MISSING bez argumentu i bez wyjatku`() {
+        val view = ResultMapper.map(
+            result(carbs(20), SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
+        )
+        assertEquals(ResultKind.SUCCESS, view.kind)
+        assertEquals(ResultMessage.DETAILS_MISSING, view.message)
+        assertNull(view.messageArg)
+        assertEquals("p", view.replyText)
+        assertFalse(view.codeNotSent)
+    }
+
+    @Test
+    fun `CMDUI-19 CarbsConfirmed 37 dla polecenia CARBS 1 daje argument z wyniku`() {
+        val view = ResultMapper.map(result(carbs(1), SessionOutcome.CarbsConfirmed(37, "t")))
+        assertEquals(37, view.messageArg)
+        assertEquals(1, view.commandGrams)
+    }
+
+    @Test
+    fun `CMDUI-19 codeNotSent dla CARBS 20 z kazdym FailureReason poza WRONG_CODE`() {
+        FailureReason.entries.forEach { reason ->
+            val view = ResultMapper.map(result(carbs(20), SessionOutcome.Failed(reason, null)))
+            assertEquals(reason != FailureReason.WRONG_CODE, view.codeNotSent, "$reason")
+        }
+    }
+
+    @Test
+    fun `CMDUI-19 codeNotSent false i ostrzezenie dla CARBS 20 z kazdym UnknownReason`() {
+        UnknownReason.entries.forEach { reason ->
+            val view = ResultMapper.map(result(carbs(20), SessionOutcome.Unknown(reason, null)))
+            assertFalse(view.codeNotSent, "$reason")
+            assertTrue(view.unknownWarning, "$reason")
+        }
+    }
+
+    @Test
+    fun `CMDUI-19 codeNotSent dla CARBS 20 z TimedOut w trzech fazach i Cancelled`() {
+        listOf(
+            SessionPhase.SENDING_COMMAND,
+            SessionPhase.AWAITING_REPLY,
+            SessionPhase.AWAITING_CODE_REQUEST,
+        ).forEach { phase ->
+            assertTrue(ResultMapper.map(result(carbs(20), SessionOutcome.TimedOut(phase))).codeNotSent, "$phase")
+        }
+        assertTrue(ResultMapper.map(result(carbs(20), SessionOutcome.Cancelled)).codeNotSent)
+    }
+
+    @Test
+    fun `CMDUI-19 codeNotSent false dla BG z kazdym wynikiem`() {
+        FailureReason.entries.forEach {
+            assertFalse(ResultMapper.map(result(Command.Bg, SessionOutcome.Failed(it, null))).codeNotSent, "$it")
+        }
+        UnknownReason.entries.forEach {
+            assertFalse(ResultMapper.map(result(Command.Bg, SessionOutcome.Unknown(it, null))).codeNotSent, "$it")
+        }
+        listOf(
+            SessionOutcome.Completed(AapsReply.BgReport(210, "t"), "t"),
+            SessionOutcome.TimedOut(SessionPhase.SENDING_COMMAND),
+            SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY),
+            SessionOutcome.TimedOut(SessionPhase.AWAITING_CODE_REQUEST),
+            SessionOutcome.Cancelled,
+        ).forEach { assertFalse(ResultMapper.map(result(Command.Bg, it)).codeNotSent, "$it") }
+    }
+
+    @Test
+    fun `CMDUI-19 messageArg niepusty dokladnie dla komunikatow z argumentem`() {
+        val seen = mutableSetOf<ResultMessage>()
+        resultSamples().forEach {
+            val view = ResultMapper.map(it)
+            seen += view.message
+            assertEquals(view.message in MESSAGES_WITH_ARG, view.messageArg != null, "${view.message}")
+        }
+        assertEquals(ResultMessage.entries.toSet(), seen)
+    }
+
+    @Test
+    fun `CMDUI-20 tresc SMS dla Completed CarbsConfirmed Failed i Unknown`() {
+        val wrong = fileText("zly-kod.txt")
+        val chleb = "Czesc, kupisz chleb?"
+        fun text(c: Command, o: SessionOutcome) = ResultMapper.map(result(c, o)).replyText
+        assertEquals("p", text(carbs(20), SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")))
+        assertEquals("ok", text(carbs(1), SessionOutcome.CarbsConfirmed(1, "ok")))
+        assertEquals(chleb, text(carbs(1), SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, chleb)))
+        assertEquals(wrong, text(carbs(1), SessionOutcome.Failed(FailureReason.WRONG_CODE, wrong)))
+        assertEquals(chleb, text(carbs(1), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, chleb)))
+    }
+
+    /** Po jednym wyniku na każdy [ResultMessage] (wspólne z RunTextsTest). */
+    internal fun resultSamples(): List<SessionResult> {
+        val c = carbs(20)
+        return listOf(
+            result(Command.Bg, SessionOutcome.Completed(AapsReply.BgReport(210, "t"), "t")),
+            result(Command.Pump, SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
+            result(c, SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
+            result(c, SessionOutcome.CarbsConfirmed(20, "t")),
+            result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.SENDING_COMMAND)),
+            result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY)),
+            result(c, SessionOutcome.Cancelled),
+        ) + FailureReason.entries.map { result(c, SessionOutcome.Failed(it, null)) } +
+            UnknownReason.entries.map { result(c, SessionOutcome.Unknown(it, null)) }
+    }
+
+    companion object {
+        /** Komunikaty z argumentem `%1$d` (design, tabela odwzorowania). */
+        val MESSAGES_WITH_ARG = setOf(
+            ResultMessage.CARBS_CONFIRMED,
+            ResultMessage.NO_RESPONSE,
+            ResultMessage.SEND_TIMEOUT,
+            ResultMessage.UNKNOWN_CONFIRMATION_TIMEOUT,
+        )
+    }
 }

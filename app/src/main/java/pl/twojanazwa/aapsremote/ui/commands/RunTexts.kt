@@ -18,6 +18,7 @@ fun ResultMessage.textRes(): Int = when (this) {
     ResultMessage.BG_REPLY -> R.string.result_bg_reply
     ResultMessage.PUMP_REPLY -> R.string.result_pump_reply
     ResultMessage.CARBS_CONFIRMED -> R.string.result_carbs_confirmed
+    ResultMessage.DETAILS_MISSING -> R.string.result_details_missing
     ResultMessage.SEND_FAILED -> R.string.result_send_failed
     ResultMessage.UNRECOGNIZED_REPLY -> R.string.result_unrecognized_reply
     ResultMessage.AMOUNT_MISMATCH -> R.string.result_amount_mismatch

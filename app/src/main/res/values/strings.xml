@@ -79,7 +79,7 @@
     <string name="run_cancel">Anuluj polecenie</string>
     <string name="run_stop_waiting">Przestań czekać</string>
     <string name="run_stop_title">Przestać czekać?</string>
-    <string name="run_stop_text">Kod został już wysłany. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS.</string>
+    <string name="run_stop_text">Kod mógł już dotrzeć do AAPS. AAPS może wykonać polecenie mimo to. Wynik będzie nieznany – sprawdź w AAPS.</string>
     <string name="run_stop_dismiss">Czekaj dalej</string>
     <string name="run_exit_title">Trwa polecenie</string>
     <string name="run_exit_text">Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.</string>
@@ -94,6 +94,7 @@
     <string name="result_bg_reply">Odpowiedź AAPS na BG</string>
     <string name="result_pump_reply">Odpowiedź AAPS na PUMP</string>
     <string name="result_carbs_confirmed">AAPS potwierdził wprowadzenie %1$d g</string>
+    <string name="result_details_missing">Brak szczegółów wyniku.</string>
     <string name="result_send_failed">Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.</string>
     <string name="result_unrecognized_reply">Nierozpoznana odpowiedź AAPS.</string>
     <string name="result_amount_mismatch">AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS).</string>
@@ -104,8 +105,8 @@
     <string name="result_internal_error">Błąd wewnętrzny aplikacji.</string>
     <string name="result_no_response">Brak odpowiedzi AAPS w ciągu %1$d min.</string>
     <string name="result_send_timeout">Telefon nie potwierdził wysłania SMS w ciągu %1$d min.</string>
-    <string name="result_unknown_confirmation_timeout">Kod wysłany, ale AAPS nie potwierdził w ciągu %1$d min.</string>
-    <string name="result_unknown_cancelled_after_code">Przestano czekać po wysłaniu kodu.</string>
+    <string name="result_unknown_confirmation_timeout">Kod przekazany do wysłania, ale AAPS nie potwierdził w ciągu %1$d min.</string>
+    <string name="result_unknown_cancelled_after_code">Przestano czekać po przekazaniu kodu do wysłania.</string>
     <string name="result_unknown_code_send_failed">Wysyłanie kodu zgłosiło błąd, ale SMS mógł dotrzeć do AAPS.</string>
     <string name="result_unknown_unrecognized_reply">Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS (np. o kolejce pompy).</string>
     <string name="result_unknown_amount_mismatch">Po wysłaniu kodu AAPS podał inną ilość niż wysłana.</string>
