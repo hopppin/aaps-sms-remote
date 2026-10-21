@@ -132,6 +132,27 @@ class SessionHistoryRecorderTest {
     }
 
     @Test
+    fun `DATA-13 DATA-15 CancellationException z record nie jest polykany`() = runTest {
+        val env = Env(this)
+        env.history.throwOnRecord = kotlinx.coroutines.CancellationException("c")
+        val cancelled = MutableStateFlow(finished(HistoryFixtures.bgCompleted()))
+        env.recorder.track(cancelled)
+        advanceUntilIdle()
+
+        val job = env.appScope.coroutineContext[kotlinx.coroutines.Job]!!
+        assertEquals(1, env.history.recorded.size)
+        assertTrue(job.isActive)
+        // zadanie zapisu zakonczone anulowaniem: Mutex zwolniony, kolejna sesja zapisana
+        env.history.throwOnRecord = null
+        val next = HistoryFixtures.carbsConfirmed()
+        env.recorder.track(MutableStateFlow(finished(next)))
+        advanceUntilIdle()
+
+        assertEquals(listOf(next), env.history.recorded.drop(1))
+        assertTrue(job.isActive)
+    }
+
+    @Test
     fun `DATA-13 anulowany zakres przed FINISHED nie zapisuje`() = runTest {
         val env = Env(this)
         val state = awaiting()
