@@ -1,6 +1,6 @@
 # Spec 010: UI – historia poleceń
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `HISTUI`
 - **Pakiety:** `ui` (`ui.history`; drobna zmiana w `ui.commands` i `ui.navigation`)
 - **Powiązane:** [docs/plan.md](../../plan.md#ekrany-aplikacji) (ekran „Historia i ustawienia”), [docs/plan.md](../../plan.md#bezpieczeństwo) („FLAG_SECURE na ekranach z danymi”); [Spec 007: Dane](../007-dane/spec.md) (`CommandHistory`, `HistorySnapshot`, `HistoryEntry`, `HistoryOutcome`, `ClearHistoryResult`, `HistoryLimits`, DATA-07 – DATA-12, W3 – W6); [Spec 008: UI – ustawienia](../008-ui-ustawienia/spec.md) (nawigacja, UI-02, UI-03, UI-20, UI-21, `SecureWindowEffect`, podział weryfikacji P3); [Spec 009: UI – polecenia](../009-ui-polecenia/spec.md) (`ResultKind`, `ResultMessage`, `ResultMapper`, teksty wyniku, CMDUI-19 – CMDUI-21, CMDUI-23, P7); [stan prac](../../stan-prac.md)
@@ -13,10 +13,10 @@ Użytkownik widzi w zakładce Historia ostatnie polecenia wysłane z aplikacji (
 
 - Zakładka Historia zamiast zaślepki ze Spec 008 (UI-03): stany „wczytywanie”, „pusto”, „błąd odczytu” z ponowieniem, lista wpisów.
 - Wiersz listy: polecenie (`BG`, `PUMP`, `CARBS X g`), czas, rodzaj wyniku i komunikat.
-- Szczegóły wpisu po dotknięciu (propozycja P1): wynik z dodatkami, cztery czasy, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych.
+- Szczegóły wpisu po dotknięciu (P1): wynik z dodatkami, cztery czasy, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych.
 - Wspólne odwzorowanie powodów wyniku na komunikaty z `ui.commands` (bez kopii tabeli ze Spec 009) i bezpieczne pokazanie wpisów nierozpoznanych (DATA-09).
 - Czyszczenie całej historii z potwierdzeniem i komunikatem wyniku.
-- `FLAG_SECURE` na zakładce Historia (propozycja P3).
+- `FLAG_SECURE` na zakładce Historia (P3).
 - Teksty po polsku w `strings.xml`.
 - Ręczna weryfikacja: W3, W4, W5 i W6 (część historii) ze Spec 007 oraz własne punkty W1–W8.
 
@@ -109,7 +109,7 @@ Wynik wpisu jest wyliczany jedną czystą funkcją z wyczerpującym `when` po `H
 | `Cancelled` | anulowane | „Polecenie anulowane.” |
 | `Unrecognized` | nierozpoznany → nagłówek „Nierozpoznany wynik” | „Brak szczegółów wyniku …” |
 
-Dodatki (w szczegółach, propozycja P5) – reguły jak w CMDUI-19, z ograniczeniem do danych pewnych:
+Dodatki (w szczegółach, P5) – reguły jak w CMDUI-19, z ograniczeniem do danych pewnych:
 
 - „Kod nie został wysłany.” – polecenie `CARBS` i wynik `Failed` z powodem innym niż `WRONG_CODE` i różnym od `null`, `TimedOut` albo `Cancelled`.
 - „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – każdy `Unknown`, także z powodem `null`.
@@ -124,7 +124,7 @@ Dodatki (w szczegółach, propozycja P5) – reguły jak w CMDUI-19, z ogranicze
 
 ### HISTUI-05: Czasy wpisu
 
-Czasy są pokazywane w strefie czasowej telefonu w chwili wyświetlenia (`ZoneId.systemDefault()`), według wzorców (propozycja P4): w szczegółach `dd.MM.yyyy HH:mm:ss`, w wierszu `dd.MM.yyyy HH:mm`. Wiersz pokazuje czas rozpoczęcia, a gdy go brak – zakończenia; gdy brak obu – „brak”. Szczegóły pokazują cztery czasy z etykietami „Rozpoczęcie”, „Wysłanie polecenia”, „Wysłanie kodu”, „Zakończenie”; czas `null` → „brak”. Formatowanie jest czystą funkcją z jawną strefą.
+Czasy są pokazywane w strefie czasowej telefonu w chwili wyświetlenia (`ZoneId.systemDefault()`), według wzorców (P4): w szczegółach `dd.MM.yyyy HH:mm:ss`, w wierszu `dd.MM.yyyy HH:mm`. Wiersz pokazuje czas rozpoczęcia, a gdy go brak – zakończenia; gdy brak obu – „brak”. Szczegóły pokazują cztery czasy z etykietami „Rozpoczęcie”, „Wysłanie polecenia”, „Wysłanie kodu”, „Zakończenie”; czas `null` → „brak”. Formatowanie jest czystą funkcją z jawną strefą.
 
 **Kryteria akceptacji:**
 
@@ -145,7 +145,7 @@ Szczegóły pokazują treść odpowiedzi AAPS (`HistoryEntry.replyText`) w cało
 
 ### HISTUI-07: Szczegóły wpisu
 
-Dotknięcie wiersza otwiera szczegóły tego wpisu w zakładce Historia (propozycja P1). Szczegóły pokazują polecenie (HISTUI-03), wynik z dodatkami (HISTUI-04), cztery czasy (HISTUI-05), treść i liczbę nieoczekiwanych (HISTUI-06) oraz przycisk „Zamknij” (klucz `result_close` ze Spec 009), który wraca do listy. Gdy otwarty wpis znika ze strumienia (czyszczenie, retencja) albo strumień daje `Unavailable`, szczegóły się zamykają. Szczegóły są stanem ViewModelu (identyfikator wpisu w pamięci), nie trasą nawigacji.
+Dotknięcie wiersza otwiera szczegóły tego wpisu w zakładce Historia (P1). Szczegóły pokazują polecenie (HISTUI-03), wynik z dodatkami (HISTUI-04), cztery czasy (HISTUI-05), treść i liczbę nieoczekiwanych (HISTUI-06) oraz przycisk „Zamknij” (klucz `result_close` ze Spec 009), który wraca do listy. Gdy otwarty wpis znika ze strumienia (czyszczenie, retencja) albo strumień daje `Unavailable`, szczegóły się zamykają. Szczegóły są stanem ViewModelu (identyfikator wpisu w pamięci), nie trasą nawigacji.
 
 **Kryteria akceptacji:**
 
@@ -173,7 +173,7 @@ Gdy strumień daje `Unavailable`, ekran pokazuje tekst „Nie udało się wczyta
 
 ### HISTUI-10: Czyszczenie z potwierdzeniem
 
-Przycisk „Wyczyść historię” jest aktywny tylko w stanie listy i gdy nie trwa czyszczenie. Dotknięcie otwiera okno „Wyczyścić historię?” z tekstem „Wszystkie wpisy (N) zostaną usunięte. Tej operacji nie można cofnąć.” (N = liczba wierszy w chwili otwarcia) i przyciskami „Wyczyść” i „Anuluj” (klucz `action_cancel` ze Spec 008). „Anuluj” i Wstecz zamykają okno bez wywołania `clearAll()`. „Wyczyść” zamyka okno i wywołuje `CommandHistory.clearAll()` dokładnie raz. W trakcie czyszczenia przycisk jest nieaktywny, a kolejne wywołania są ignorowane. Polecenie w toku nie blokuje czyszczenia (propozycja P2).
+Przycisk „Wyczyść historię” jest aktywny tylko w stanie listy i gdy nie trwa czyszczenie. Dotknięcie otwiera okno „Wyczyścić historię?” z tekstem „Wszystkie wpisy (N) zostaną usunięte. Tej operacji nie można cofnąć.” (N = liczba wierszy w chwili otwarcia) i przyciskami „Wyczyść” i „Anuluj” (klucz `action_cancel` ze Spec 008). „Anuluj” i Wstecz zamykają okno bez wywołania `clearAll()`. „Wyczyść” zamyka okno i wywołuje `CommandHistory.clearAll()` dokładnie raz. W trakcie czyszczenia przycisk jest nieaktywny, a kolejne wywołania są ignorowane. Polecenie w toku nie blokuje czyszczenia (P2).
 
 **Kryteria akceptacji:**
 
@@ -206,7 +206,7 @@ Po `Cleared` ekran pokazuje komunikat „Historia wyczyszczona.”, a stan treś
 
 ### HISTUI-13: Ochrona ekranu
 
-Gdy zakładka Historia jest w kompozycji (każdy stan treści, lista i szczegóły), okno `Activity` ma `FLAG_SECURE` przez `SecureWindowEffect` z licznikiem ze Spec 009 (propozycja P3: historia zawiera te same dane co chroniony wynik – CMDUI-23). Po przejściu na inną zakładkę flaga jest zdejmowana, chyba że chroni ją inny ekran.
+Gdy zakładka Historia jest w kompozycji (każdy stan treści, lista i szczegóły), okno `Activity` ma `FLAG_SECURE` przez `SecureWindowEffect` z licznikiem ze Spec 009 (P3: historia zawiera te same dane co chroniony wynik – CMDUI-23). Po przejściu na inną zakładkę flaga jest zdejmowana, chyba że chroni ją inny ekran.
 
 **Kryteria akceptacji:**
 
@@ -286,10 +286,10 @@ Stanu „błąd odczytu” (HISTUI-09) nie da się wywołać ręcznie bez uszkad
 
 ## Otwarte pytania
 
-Propozycje do potwierdzenia przez użytkownika (status `szkic` do czasu odpowiedzi):
+Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez zmian, 2026-10-21):
 
-- [ ] **P1. Szczegóły po dotknięciu.** Propozycja: wiersz listy jest zwarty (polecenie, czas bez sekund, rodzaj i komunikat), a dotknięcie otwiera szczegóły w tej samej zakładce (wynik z dodatkami, cztery czasy z sekundami, treść SMS, liczba nieoczekiwanych) – HISTUI-07. Alternatywa: wszystko w rozwijanym wierszu, bez szczegółów.
-- [ ] **P2. Czyszczenie w trakcie polecenia.** Propozycja: bez blokady. Czyszczenie nie wpływa na sesję ani na wysyłanie kodu, a wpis bieżącego polecenia powstaje dopiero po jego zakończeniu (DATA-13), więc nie zginie. Blokady z UI-15 chronią numer i sekret, od których zależy, dokąd idzie `<kod><PIN>` – tu takiego ryzyka nie ma. Alternatywa: przycisk nieaktywny, gdy `activeSession != null` (wtedy HISTUI-10 zmienia się na blokadę z banerem „Trwa polecenie”).
-- [ ] **P3. `FLAG_SECURE` na zakładce Historia.** Propozycja: tak, na całej zakładce (lista i szczegóły), bo historia zawiera te same dane co chroniony ekran wyniku (CMDUI-23) i plan mówi „FLAG_SECURE na ekranach z danymi” – HISTUI-13. Alternatywa: tylko szczegóły (lista bez treści SMS).
-- [ ] **P4. Format czasu.** Propozycja: strefa telefonu, stały wzorzec polski `dd.MM.yyyy HH:mm:ss` w szczegółach i `dd.MM.yyyy HH:mm` w wierszu; w wierszu czas rozpoczęcia, a gdy go brak – zakończenia (HISTUI-05). Alternatywa: format systemowy (`DateTimeFormatter.ofLocalizedDateTime`), zależny od języka telefonu i wersji JDK, albo względny („5 min temu”).
-- [ ] **P5. Dodatki w historii.** Propozycja: szczegóły pokazują „Kod nie został wysłany.” i ostrzeżenie przed ponowieniem dla wyniku „nieznany” na tych samych zasadach co Spec 009, przy czym „Kod nie został wysłany” tylko przy znanym powodzie (HISTUI-04). Alternatywa: w historii bez dodatków.
+- [x] **P1. Szczegóły po dotknięciu.** Rozstrzygnięte: wiersz listy jest zwarty (polecenie, czas bez sekund, rodzaj i komunikat), a dotknięcie otwiera szczegóły w tej samej zakładce (wynik z dodatkami, cztery czasy z sekundami, treść SMS, liczba nieoczekiwanych) – HISTUI-07 [przyjęta propozycja, 2026-10-21].
+- [x] **P2. Czyszczenie w trakcie polecenia.** Rozstrzygnięte: bez blokady. Czyszczenie nie wpływa na sesję ani na wysyłanie kodu, a wpis bieżącego polecenia powstaje dopiero po jego zakończeniu (DATA-13), więc nie zginie. Blokady z UI-15 chronią numer i sekret, od których zależy, dokąd idzie `<kod><PIN>` – tu takiego ryzyka nie ma [przyjęta propozycja, 2026-10-21].
+- [x] **P3. `FLAG_SECURE` na zakładce Historia.** Rozstrzygnięte: tak, na całej zakładce (lista i szczegóły), bo historia zawiera te same dane co chroniony ekran wyniku (CMDUI-23) i plan mówi „FLAG_SECURE na ekranach z danymi” – HISTUI-13 [przyjęta propozycja, 2026-10-21].
+- [x] **P4. Format czasu.** Rozstrzygnięte: strefa telefonu, stały wzorzec polski `dd.MM.yyyy HH:mm:ss` w szczegółach i `dd.MM.yyyy HH:mm` w wierszu; w wierszu czas rozpoczęcia, a gdy go brak – zakończenia (HISTUI-05) [przyjęta propozycja, 2026-10-21].
+- [x] **P5. Dodatki w historii.** Rozstrzygnięte: szczegóły pokazują „Kod nie został wysłany.” i ostrzeżenie przed ponowieniem dla wyniku „nieznany” na tych samych zasadach co Spec 009, przy czym „Kod nie został wysłany” tylko przy znanym powodzie (HISTUI-04) [przyjęta propozycja, 2026-10-21].

@@ -58,4 +58,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 007 | [Dane – ustawienia i historia poleceń](007-dane/spec.md) | `DATA` | zatwierdzona |
 | 008 | [UI – ustawienia, sekret TOTP i uprawnienia](008-ui-ustawienia/spec.md) | `UI` | zatwierdzona |
 | 009 | [UI – polecenia i przebieg polecenia](009-ui-polecenia/spec.md) | `CMDUI` | zatwierdzona |
-| 010 | [UI – historia poleceń](010-ui-historia/spec.md) | `HISTUI` | szkic |
+| 010 | [UI – historia poleceń](010-ui-historia/spec.md) | `HISTUI` | zatwierdzona |
