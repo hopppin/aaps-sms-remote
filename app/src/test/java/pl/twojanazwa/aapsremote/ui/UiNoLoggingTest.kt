@@ -15,6 +15,23 @@ class UiNoLoggingTest {
     )
 
     @Test
+    fun `CMDUI-26 zrodla ui-commands i ui-platform nie wywoluja API logowania`() {
+        val base = "src/main/java/pl/twojanazwa/aapsremote/ui"
+        val sources = listOf("commands", "platform").flatMap { dir ->
+            val root = File("$base/$dir")
+            assertTrue(root.isDirectory, "Brak katalogu: ${root.path}")
+            root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        }
+        assertTrue(sources.any { it.name == "CurrentRun.kt" }, "Brak CurrentRun.kt")
+        assertTrue(sources.any { it.name == "CommandsModule.kt" }, "Brak CommandsModule.kt")
+        val violations = sources.flatMap { file ->
+            val text = file.readText()
+            forbidden.filter { it.containsMatchIn(text) }.map { "${file.name}: ${it.pattern}" }
+        }
+        assertTrue(violations.isEmpty(), "Użycie API logowania: $violations")
+    }
+
+    @Test
     fun `UI-21 zrodla ui i session-platform nie wywoluja API logowania`() {
         val base = "src/main/java/pl/twojanazwa/aapsremote"
         val roots = listOf(File("$base/ui"), File("$base/session/platform"))
