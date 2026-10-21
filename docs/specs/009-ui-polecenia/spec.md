@@ -1,6 +1,6 @@
 # Spec 009: UI – polecenia i przebieg polecenia
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `CMDUI`
 - **Pakiety:** `ui` (`ui.commands`, `ui.platform`, zmiany w `ui.navigation`)
 - **Powiązane:** [docs/plan.md](../../plan.md#przepływ-działania), [docs/plan.md](../../plan.md#ekrany-aplikacji) (ekrany „Polecenia”, „CARBS”, „Przebieg polecenia”), [docs/plan.md](../../plan.md#parsowanie-odpowiedzi-i-obsługa-błędów); [Spec 003: Katalog poleceń](../003-katalog-polecen/spec.md) (`Command`, `CarbsLimits`, CMD-02 – CMD-06); [Spec 004: Sesja polecenia](../004-sesja-polecenia/spec.md) (`SessionCoordinator`, `CommandSession`, `SessionPhase`, `SessionOutcome`, SESSION-14, SESSION-17, SESSION-22); [Spec 005: SMS](../005-sms/spec.md) (założenie „aplikacja na pierwszym planie”, `SmsPermissions`, W1–W7); [Spec 006: Sekret TOTP](../006-sekret-totp/spec.md) (`TotpSecretProvider.load`, `LoadResult`, SECRET-14, W1–W10); [Spec 007: Dane](../007-dane/spec.md) (`AapsNumberState`, `SessionHistoryRecorder`, DATA-02, DATA-13, W1, W7); [Spec 008: UI – ustawienia](../008-ui-ustawienia/spec.md) (nawigacja, `SessionModule`, `SmsPermissionsViewModel`, `SecureWindowEffect`, UI-15, UI-23, podział weryfikacji P3); [stan prac](../../stan-prac.md); następna specyfikacja `ui`: 010 (ekran Historia)
@@ -26,8 +26,8 @@ Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `
 
 - Ekran Historia (lista wpisów, czyszczenie) – spec 010.
 - Usługa pierwszoplanowa i odbiór SMS w tle albo przy wygaszonym ekranie – przyszła osobna specyfikacja (Spec 005, P2).
-- Ostatnia znana glikemia na ekranie Polecenia (plan) – pytanie P5.
-- Zmiany w pakietach `session`, `commands`, `sms`, `security`, `data` (logika) – ta specyfikacja ich nie zmienia; braki są w „Otwartych pytaniach” i „Przyszłych zmianach”.
+- Ostatnia znana glikemia na ekranie Polecenia (plan) – poza zakresem 009 (decyzja użytkownika, P5).
+- Zmiany w pakietach `session`, `commands`, `sms`, `security`, `data` (logika) – ta specyfikacja ich nie zmienia; braki są w „Przyszłych zmianach”.
 - Przyczyna błędu wysyłania SMS (`SendResult.Failed` jej nie niesie – „Przyszłe zmiany” w Spec 005).
 - Polecenia spoza MVP, ustawienia limitów czasu.
 - Testy Robolectric i testy Compose UI (decyzja użytkownika); kompozycje sprawdzane ręcznie (sekcja „Weryfikacja na urządzeniu”).
@@ -165,7 +165,7 @@ Liczby 1 i 50 w tekstach pochodzą z `CarbsLimits.MIN_GRAMS`/`MAX_GRAMS` (argume
 
 ### CMDUI-08: Szybkie wartości
 
-Sekcja „CARBS” ma przyciski „10 g”, „20 g”, „30 g” z `CarbsLimits.QUICK_VALUES`, w tej kolejności. Dotknięcie szybkiej wartości wpisuje ją w pole ilości (np. `"20"`), usuwa błąd pola i od razu otwiera podsumowanie dla tej ilości (szybkie wartości nie przekraczają 40 g, CMD-06). (Zachowanie zależne od pytania P1.)
+Sekcja „CARBS” ma przyciski „10 g”, „20 g”, „30 g” z `CarbsLimits.QUICK_VALUES`, w tej kolejności. Dotknięcie szybkiej wartości wpisuje ją w pole ilości (np. `"20"`), usuwa błąd pola i od razu otwiera podsumowanie dla tej ilości (szybkie wartości nie przekraczają 40 g, CMD-06). (Decyzja użytkownika, P1.)
 
 **Kryteria akceptacji:**
 
@@ -184,7 +184,7 @@ Gdy poprawne polecenie ma `requiresExtraConfirmation` = `true` (41–50 g, CMD-0
 
 ### CMDUI-10: Podsumowanie z PIN-em
 
-Podsumowanie zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.”, pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”. Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (format do potwierdzenia, pytanie P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
+Podsumowanie zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.”, pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”. Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
 
 **Kryteria akceptacji:**
 
@@ -374,7 +374,7 @@ Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `Carb
 
 ### CMDUI-20: Treść odpowiedzi AAPS i wiadomości nieoczekiwane
 
-Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy wynik ją niesie: `Completed.text`, `CarbsConfirmed.text`, `Failed.text` i `Unknown.text` (gdy nie `null`). Przebieg i wynik pokazują liczbę wiadomości nieoczekiwanych (`SessionState.unexpectedMessages.size` / `SessionResult.unexpectedMessages.size`) jako „Wiadomości od AAPS niezwiązane z tym poleceniem: N (np. potwierdzenie polecenia wysłanego z innego telefonu).”, tylko gdy N > 0; treść wiadomości nieoczekiwanych nie jest pokazywana (pytanie P9).
+Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy wynik ją niesie: `Completed.text`, `CarbsConfirmed.text`, `Failed.text` i `Unknown.text` (gdy nie `null`). Przebieg i wynik pokazują liczbę wiadomości nieoczekiwanych (`SessionState.unexpectedMessages.size` / `SessionResult.unexpectedMessages.size`) jako „Wiadomości od AAPS niezwiązane z tym poleceniem: N (np. potwierdzenie polecenia wysłanego z innego telefonu).”, tylko gdy N > 0; treść wiadomości nieoczekiwanych nie jest pokazywana (decyzja użytkownika, P9).
 
 **Kryteria akceptacji:**
 
@@ -384,7 +384,7 @@ Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy w
 
 ### CMDUI-21: Zamknięcie wyniku i brak referencji do sesji
 
-Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Po fazie `FINISHED` `CommandRunViewModel` trzyma tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez referencji do `CommandSession` ani jej `StateFlow` (sesja trzyma `CodeCredentials` z sekretem). Wynik sesji zakończonej, gdy `CommandRunViewModel` nie istniał (np. `Activity` zamknięte), nie jest pokazywany – jest w Historii (spec 010; pytanie P7). Start nowego polecenia (CMDUI-06, CMDUI-13) zastępuje pokazany wynik przebiegiem nowej sesji.
+Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Po fazie `FINISHED` `CommandRunViewModel` trzyma tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez referencji do `CommandSession` ani jej `StateFlow` (sesja trzyma `CodeCredentials` z sekretem). Wynik sesji zakończonej, gdy `CommandRunViewModel` nie istniał (np. `Activity` zamknięte), nie jest pokazywany – jest w Historii (spec 010; decyzja użytkownika, P7). Start nowego polecenia (CMDUI-06, CMDUI-13) zastępuje pokazany wynik przebiegiem nowej sesji.
 
 **Kryteria akceptacji:**
 
@@ -403,7 +403,7 @@ Gdy polecenie jest w toku (`activeSession.value != null`), okno `Activity` ma w�
 
 ### CMDUI-23: Ochrona ekranu z PIN-em
 
-Gdy otwarte jest podsumowanie z polem PIN-u, okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach); po zamknięciu podsumowania flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania). (Zakres do potwierdzenia – pytanie P3.)
+Gdy otwarte jest podsumowanie z polem PIN-u, okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach); po zamknięciu podsumowania flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania). Przebieg i wynik nie mają `FLAG_SECURE` (decyzja użytkownika, P3).
 
 **Kryteria akceptacji:**
 
@@ -423,7 +423,7 @@ Na zakładce Polecenia przycisk Wstecz:
 | polecenie w toku | okno „Trwa polecenie” z tekstem „Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.” i przyciskami „Zostań” i „Wyjdź”; „Wyjdź” zamyka `Activity` (sesja trwa dalej w zakresie aplikacji, CMDUI-13), „Zostań” zamyka okno |
 | żadne z powyższych | jak UI-02 (zamyka aplikację) |
 
-(Okno „Trwa polecenie” zależy od pytania P8.)
+(Okno „Trwa polecenie” – decyzja użytkownika, P8.)
 
 **Kryteria akceptacji:**
 
@@ -519,7 +519,7 @@ Kompozycje, okna, `FLAG_SECURE`, utrzymanie ekranu, nawigacja i Hilt nie mają t
 | W4 | `BG` i `PUMP` z prawdziwym AAPS na API 28 i najnowszym dostępnym: SMS z domyślnej karty (W1 ze Spec 005), wynik wysłania (W2), odbiór (W3), długa odpowiedź `PUMP` w całości (W4); numer po zabiciu procesu (W1 ze Spec 007, część `BG`); dual SIM bez domyślnej karty – zanotować wynik (W5 ze Spec 005) | CMDUI-06, CMDUI-16, CMDUI-19, CMDUI-20 |
 | W5 | `CARBS 1` (wirtualna pompa albo za zgodą użytkownika): pole, podsumowanie, PIN, kroki na żywo, wynik „AAPS potwierdził wprowadzenie 1 g”; kod zgodny z Authenticatorem (W1 ze Spec 006, odczyt); skrzynka wysłanych zawiera `<kod><PIN>` – zanotować (W7 ze Spec 005); zły PIN → „AAPS odrzucił kod” | CMDUI-07, CMDUI-10, CMDUI-12, CMDUI-13, CMDUI-17, CMDUI-19 |
 | W6 | PIN: maskowanie, klawiatura numeryczna bez podpowiedzi (Gboard); przejście do innej aplikacji z otwartym podsumowaniem i powrót → podsumowanie zamknięte, pole puste; szybka wartość 20 g → podsumowanie dla 20 g; 45 g → „Na pewno 45 g?”, „Nie” → nic nie wysłane | CMDUI-08, CMDUI-09, CMDUI-10, CMDUI-11 |
-| W7 | Sekret przy starcie `CARBS`: zmiana blokady ekranu i `CARBS` działa (W3 ze Spec 006); wyłączenie blokady ekranu → zanotować wynik (`Loaded` albo komunikat „zeskanuj ponownie”, W4 ze Spec 006); zabicie procesu zaraz po zamianie sekretu → `CARBS` z kodem starego albo nowego sekretu (W9 ze Spec 006); Smart Lock → nigdy „zeskanuj ponownie” (W10 ze Spec 006); W2 ze Spec 006 – według pytania P4 | CMDUI-12 |
+| W7 | Sekret przy starcie `CARBS`: zmiana blokady ekranu i `CARBS` działa (W3 ze Spec 006); wyłączenie blokady ekranu → zanotować wynik (`Loaded` albo komunikat „zeskanuj ponownie”, W4 ze Spec 006); zabicie procesu zaraz po zamianie sekretu → `CARBS` z kodem starego albo nowego sekretu (W9 ze Spec 006); Smart Lock → nigdy „zeskanuj ponownie” (W10 ze Spec 006); W2 ze Spec 006 nie jest sprawdzane w 009 (P4) | CMDUI-12 |
 | W8 | W trakcie `CARBS`: przełączenie zakładek i obrót → ten sam przebieg; w Ustawieniach baner „Trwa polecenie” i nieaktywne „Zmień”/„Usuń”/„Skanuj QR”/„Wklej URI” (ręczne sprawdzenie UI-15 ze Spec 008); „Anuluj polecenie” przed prośbą o kod → „Anulowano”, późniejsza prośba AAPS bez kodu; „Przestań czekać” po kodzie → okno, potwierdzenie → „Nieznany – sprawdź w AAPS” | CMDUI-16, CMDUI-18, CMDUI-21 |
 | W9 | Ekran włączony: czas wygaszania 15 s, `CARBS` czeka > 15 s → ekran nie gaśnie (także na zakładce Ustawienia); po wyniku gaśnie | CMDUI-22 |
 | W10 | `FLAG_SECURE` na podsumowaniu: zrzut zablokowany, podgląd w ostatnich aplikacjach pusty; po zamknięciu zrzut działa; skaner QR w Ustawieniach nadal chroniony (UI-23) | CMDUI-23 |
@@ -529,22 +529,24 @@ Kompozycje, okna, `FLAG_SECURE`, utrzymanie ekranu, nawigacja i Hilt nie mają t
 **Punkty weryfikacji z wcześniejszych specyfikacji** (podział P3 ze Spec 008):
 
 - **Spec 005:** W1–W5 i W7 – W4, W5 tej spec (W6 sprawdzone w Spec 008, W7).
-- **Spec 006:** W1 w części odczytu i zgodności z Authenticatorem – W5; W3, W4, W9, W10 – W7; W2 – pytanie P4.
+- **Spec 006:** W1 w części odczytu i zgodności z Authenticatorem – W5; W3, W4, W9, W10 – W7; W2 – tylko test JVM komunikatu `Locked` (CMDUI-12), ręcznie w przyszłej spec usługi pierwszoplanowej (P4).
 - **Spec 007:** W1 w części `BG` – W4; W7 – W2.
 - **Spec 008:** UI-15 (blokada ustawień w trakcie polecenia) – W8.
 
 ## Otwarte pytania
 
-- [ ] **P1. Szybkie wartości.** Czy dotknięcie „10 g”/„20 g”/„30 g” ma od razu otwierać podsumowanie z PIN-em, czy tylko wpisywać wartość w pole (potem „Dalej”)? **Propozycja:** od razu podsumowanie (CMDUI-08) – jedno dotknięcie mniej, a podsumowanie i tak pyta o zatwierdzenie PIN-em.
-- [ ] **P2. Format PIN-u AAPS.** Spec 004 wymaga tylko niepustego PIN-u; AAPS w znanych źródłach nie określa formatu w tej specyfikacji. **Propozycja:** tylko cyfry, 1–12 znaków, klawiatura numeryczna typu hasło (CMDUI-10). Czy PIN AAPS może zawierać litery albo być dłuższy?
-- [ ] **P3. `FLAG_SECURE`.** **Propozycja:** tak na podsumowaniu z PIN-em (CMDUI-23, spójnie z UI-23); nie na przebiegu i wyniku (treść odpowiedzi AAPS nie jest sekretem aplikacji, a zrzut wyniku bywa przydatny). Plan mówi „FLAG_SECURE na ekranach z danymi” – czy przebieg/wynik (glikemia, stan pompy) też mają być chronione?
-- [ ] **P4. W2 ze Spec 006 (`Locked` przy odczycie).** Odczyt sekretu następuje zaraz po „Wyślij”, gdy telefon jest odblokowany; zablokowanego telefonu nie da się wywołać z UI bez usługi w tle. **Propozycja:** komunikat `Locked` sprawdza test JVM (CMDUI-12); W2 ze Spec 006 przenieść do przyszłej specyfikacji usługi pierwszoplanowej (albo próba „najlepszy wysiłek”: zablokowanie telefonu w < 1 s po „Wyślij”, wynik zanotować bez wymagania).
-- [ ] **P5. Ostatnia znana glikemia na ekranie Polecenia** (plan, „Ekrany aplikacji”). **Propozycja:** poza zakresem 009; ewentualnie w 010 albo osobnej zmianie (wymaga odczytu historii na panelu).
-- [ ] **P6. Anulowanie po kodzie.** **Propozycja:** przycisk „Przestań czekać” z oknem potwierdzenia (CMDUI-18); przed kodem „Anuluj polecenie” bez okna.
-- [ ] **P7. Wynik sesji zakończonej przy zamkniętej `Activity`.** **Propozycja:** nie pokazywać go po ponownym otwarciu (tylko w Historii, spec 010) – CMDUI-21. Alternatywa: singleton przechowujący ostatni wynik do zamknięcia przez użytkownika.
-- [ ] **P8. Wstecz w trakcie polecenia.** **Propozycja:** okno „Trwa polecenie” z „Zostań”/„Wyjdź” (CMDUI-24) – rozszerza UI-02 ze Spec 008 tylko na czas polecenia. Alternatywa: Wstecz zamyka aplikację bez pytania (jak UI-02), a ryzyko opisuje tylko tekst w przebiegu.
-- [ ] **P9. Treść wiadomości nieoczekiwanych.** **Propozycja:** tylko liczba (CMDUI-20), spójnie z historią (DATA-08) – treść dotyczy cudzego polecenia i mogłaby mylić. Czy pokazywać też treść?
-- [ ] **P10. Błąd wysyłania bez przyczyny.** `SendResult.Failed` nie niesie przyczyny (Spec 005, „Przyszłe zmiany”). **Propozycja:** ogólny komunikat „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” (CMDUI-19); przyczyna – osobna zmiana Spec 004/005.
+Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje zaakceptowane):
+
+- [x] **P1. Szybkie wartości.** Rozstrzygnięte: dotknięcie „10 g”/„20 g”/„30 g” wpisuje wartość w pole i od razu otwiera podsumowanie z PIN-em (CMDUI-08).
+- [x] **P2. Format PIN-u AAPS.** Rozstrzygnięte: tylko cyfry, 1–12 znaków, klawiatura numeryczna typu hasło (CMDUI-10).
+- [x] **P3. `FLAG_SECURE`.** Rozstrzygnięte: tylko na podsumowaniu z PIN-em; przebieg i wynik bez `FLAG_SECURE` (CMDUI-23).
+- [x] **P4. W2 ze Spec 006 (`Locked` przy odczycie).** Rozstrzygnięte: komunikat `Locked` sprawdza tylko test JVM (CMDUI-12); ręczne sprawdzenie W2 – w przyszłej specyfikacji usługi pierwszoplanowej.
+- [x] **P5. Ostatnia znana glikemia na ekranie Polecenia** (plan). Rozstrzygnięte: poza zakresem 009.
+- [x] **P6. Anulowanie.** Rozstrzygnięte: przed kodem „Anuluj polecenie” bez okna; po kodzie „Przestań czekać” z oknem potwierdzenia (CMDUI-18).
+- [x] **P7. Wynik sesji zakończonej przy zamkniętej `Activity`.** Rozstrzygnięte: nie jest pokazywany po ponownym otwarciu – tylko w Historii, spec 010 (CMDUI-21).
+- [x] **P8. Wstecz w trakcie polecenia.** Rozstrzygnięte: okno „Trwa polecenie” z „Zostań”/„Wyjdź”; rozszerza UI-02 ze Spec 008 tylko na czas polecenia (CMDUI-24).
+- [x] **P9. Wiadomości nieoczekiwane.** Rozstrzygnięte: pokazywana tylko liczba, bez treści (CMDUI-20), spójnie z historią (DATA-08).
+- [x] **P10. Błąd wysyłania bez przyczyny.** Rozstrzygnięte: ogólny komunikat „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” (CMDUI-19); przyczyna – osobna zmiana Spec 004/005 („Przyszłe zmiany”).
 
 ## Przyszłe zmiany (nie blokują)
 
