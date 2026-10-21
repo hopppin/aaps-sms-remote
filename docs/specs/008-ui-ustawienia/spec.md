@@ -16,6 +16,7 @@ Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, z
 - Ekran Ustawienia, sekcja „Numer telefonu AAPS”: stan numeru, ustawienie/zmiana z walidacją, usunięcie z potwierdzeniem, komunikaty wyników.
 - Ekran Ustawienia, sekcja „Sekret TOTP”: stan sekretu, skan kodu QR aparatem (CameraX + ML Kit, tylko format QR, offline), ręczne wklejenie URI `otpauth://`, pytanie o zastąpienie istniejącego sekretu, usunięcie z potwierdzeniem, komunikaty wyników, uprawnienie `CAMERA`.
 - Ekran Ustawienia, sekcja „Uprawnienia SMS”: stan `SEND_SMS`/`RECEIVE_SMS`, prośba o uprawnienia, komunikat przy odmowie, przejście do ustawień aplikacji przy trwałej odmowie, odświeżenie po powrocie do aplikacji.
+- Czyszczenie schowka systemowego po wklejeniu URI, gdy zawiera dokładnie wklejony tekst.
 - Blokada zmiany i usunięcia numeru oraz sekretu, gdy `SessionCoordinator.activeSession.value != null`.
 - Moduł Hilt `session.platform.SessionModule`: singleton `SessionCoordinator` i `UsableTotpProvider`.
 - Nowe zależności Gradle, wpisy w manifeście (`CAMERA`), teksty UI po polsku w `strings.xml`.
@@ -28,7 +29,6 @@ Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, z
 - Ustawienie limitów czasu sesji (plan: „limit oczekiwania”) – limity są stałe (Spec 004).
 - Wybór karty SIM (Spec 005: tylko domyślna karta SMS).
 - Testy Robolectric i testy Compose UI; kompozycje i warstwa kamery są sprawdzane ręcznie (sekcja „Weryfikacja na urządzeniu”).
-- Czyszczenie schowka systemowego po wklejeniu URI („Przyszłe zmiany”).
 
 ## Założenia i zależności
 
@@ -36,7 +36,7 @@ Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, z
 - **Sekret TOTP:** jedynym parserem URI jest `otp.OtpauthParser` (TOTP-06–TOTP-09), jedynym miejscem zapisu `TotpSecretStore.save` (SECRET-04); `ui` nie dekoduje Base32 i nie interpretuje parametrów URI.
 - **Stan sekretu** `SecretState` zaczyna jako `UNKNOWN` (SECRET-12); `ui` wywołuje `refreshState()`, żeby poznać stan bez odszyfrowania.
 - **Sesja:** `SessionCoordinator` jest jeden na aplikację (SESSION-22); `activeSession.value != null` oznacza trwające polecenie. W 008 żaden ekran nie uruchamia sesji – robi to 009; blokady z tej spec działają od razu na wspólnym singletonie.
-- **Testy (decyzja użytkownika):** tylko JVM – ViewModele, logika stanu ekranów, testy plików (manifest, `strings.xml`, źródła); JUnit 5, MockK, Turbine, `kotlinx-coroutines-test`. Bez Robolectric i bez testów Compose UI. Kompozycje, nawigacja, kamera, okna uprawnień i Hilt – weryfikacja ręczna W1–W9 i `assembleDebug`.
+- **Testy (decyzja użytkownika):** tylko JVM – ViewModele, logika stanu ekranów, testy plików (manifest, `strings.xml`, źródła); JUnit 5, MockK, Turbine, `kotlinx-coroutines-test`. Bez Robolectric i bez testów Compose UI. Kompozycje, nawigacja, kamera, okna uprawnień i Hilt – weryfikacja ręczna W1–W10 i `assembleDebug`.
 - **Wymagania dla spec 009** (wynikają z tej specyfikacji, nie są tu realizowane):
   - przed startem polecenia 009 używa tego samego stanu uprawnień SMS (`SmsPermissions` + klasyfikacja odmowy z UI-17, UI-18) i tych samych tekstów komunikatów;
   - 009 uruchamia sesje wyłącznie przez singleton `SessionCoordinator` z UI-19;
@@ -310,7 +310,7 @@ Moduł Hilt `session.platform.SessionModule` (`SingletonComponent`) dostarcza `U
 
 - **Zakładając** klasę `SessionModule`, **gdy** test JVM sprawdził refleksją metody dostarczające, **wtedy** metoda dla `SessionCoordinator` i metoda dla `UsableTotpProvider` mają adnotacje `@Provides` i `@Singleton`.
 - **Zakładając** atrapy `SmsSender`, `IncomingSmsSource` i zegar, **gdy** test wywołał metody modułu, **wtedy** powstał koordynator z `activeSession.value == null`, który uruchamia polecenie `BG` (`StartResult.Started`), a jego `send` trafia do atrapy `SmsSender`.
-- **Zakładając** zbudowaną aplikację (`assembleDebug`), **gdy** Hilt wygenerował graf, **wtedy** `SessionCoordinator` i `UsableTotpProvider` mają po jednym wiązaniu, w `session.platform.SessionModule`, a ViewModele z UI-04–UI-18 wstrzykują ten sam `SessionCoordinator`.
+- **Zakładając** zbudowaną aplikację (`assembleDebug`), **gdy** Hilt wygenerował graf, **wtedy** `SessionCoordinator` i `UsableTotpProvider` mają po jednym wiązaniu, w `session.platform.SessionModule`, a `AapsNumberViewModel` i `TotpSecretViewModel` wstrzykują ten sam `SessionCoordinator` (`SmsPermissionsViewModel` nie zależy od sesji).
 
 ### UI-20: Teksty po polsku w zasobach
 
@@ -352,12 +352,27 @@ Gdy otwarty jest skaner albo okno wklejania, okno `Activity` ma `WindowManager.L
 - **Zakładając** stan ekranu sekretu, **gdy** otwarto skaner, potem go zamknięto, potem otwarto okno wklejania i je zamknięto, **wtedy** znacznik „ekran chroniony” w stanie ma kolejno wartości `true`, `false`, `true`, `false`.
 - **Zakładając** otwarty skaner na telefonie (W9), **gdy** wykonano zrzut ekranu i otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd aplikacji jest pusty; po zamknięciu skanera zrzut działa.
 
+### UI-24: Czyszczenie schowka po wklejeniu URI
+
+Przy zamknięciu okna wklejania – „Zapisz”, „Anuluj” albo `ON_STOP` z otwartym oknem – ViewModel bierze tekst pola sprzed jego wyczyszczenia i, gdy jest niepusty, porównuje go z bieżącym tekstem schowka systemowego (port `SecretClipboard`). Dokładna zgodność (`==`, bez przycinania znaków białych) → schowek jest czyszczony (`ClipboardManager.clearPrimaryClip()`, API 28+). Inny tekst, pusty schowek, brak dostępu do schowka albo pusty tekst pola → schowek bez zmian. Czyszczenie przy „Zapisz” odbywa się niezależnie od wyniku parsowania i zapisu. Porównanie jest jedynym użyciem treści schowka: nie trafia ona do stanu ViewModelu, logów, komunikatów ani wyjątków; wyjątki portu są połykane.
+
+**Kryteria akceptacji:**
+
+- **Zakładając** okno wklejania z tekstem `URI_RFC` i schowek z `URI_RFC`, **gdy** dotknięto „Zapisz” (magazyn zwraca `Saved`), **wtedy** schowek wyczyszczono dokładnie raz; tak samo przy „Anuluj” i przy `ON_STOP` z otwartym oknem.
+- **Zakładając** okno z tekstem `URI_RFC` i schowek z tekstem `otpauth://totp/INNE?secret=GEZDGNBV`, **gdy** dotknięto „Zapisz”, **wtedy** schowek nie był czyszczony.
+- **Zakładając** okno z tekstem `URI_RFC` i schowek z `URI_RFC` poprzedzonym spacją, **gdy** dotknięto „Anuluj”, **wtedy** schowek nie był czyszczony.
+- **Zakładając** okno z tekstem `otpauth://hotp/AAPS?secret=GEZDGNBV` i schowek z tym samym tekstem, **gdy** dotknięto „Zapisz” (parser zwraca `Failure`), **wtedy** schowek wyczyszczono.
+- **Zakładając** schowek zwracający `null` (brak dostępu) albo port rzucający wyjątek przy odczycie, **gdy** dotknięto „Zapisz” z tekstem `URI_RFC`, **wtedy** schowek nie był czyszczony, bez wyjątku na zewnątrz.
+- **Zakładając** okno wklejania zamknięte (skaner otwarty, osobno: nic nie otwarte) i schowek z `URI_RFC`, **gdy** zgłoszono `ON_STOP`, **wtedy** schowek nie był czytany ani czyszczony.
+- **Zakładając** pole z pustym tekstem, **gdy** dotknięto „Anuluj”, **wtedy** schowek nie był czytany.
+- **Zakładając** telefon (W10), **gdy** skopiowano `URI_RFC`, wklejono w pole i dotknięto „Zapisz”, **wtedy** schowek systemowy jest pusty; po skopiowaniu innego tekstu i „Anuluj” z pustym polem schowek zawiera ten tekst. Zanotować zachowanie przy `ON_STOP` (API 29+: brak dostępu do schowka bez fokusu) i powiadomienie systemu o odczycie schowka (API 31+).
+
 ## Przypadki błędów
 
 | Sytuacja | Oczekiwane zachowanie | Wymaganie |
 | --- | --- | --- |
 | Numer nieprawidłowy (np. `70090012`, pusty) | błąd pod polem, edycja otwarta, tekst zachowany | UI-05 |
-| `commit()` numeru nieudany | komunikat „Nie udało się zapisać/usunąć numeru”, stan bez zmian (DATA-03/DATA-04) | UI-05, UI-06 |
+| Nieudane `save()` / `clear()` numeru (wynik `SaveNumberResult.Failed` / `ClearNumberResult.Failed` z kontraktu `AapsNumberSettingsStore`) | komunikat „Nie udało się zapisać/usunąć numeru”, stan bez zmian (DATA-03/DATA-04) | UI-05, UI-06 |
 | Numer nie wczytał się (`LoadFailed`) | tekst błędu wczytania, „Ustaw numer” | UI-04 |
 | Kod QR / URI nie jest `otpauth://totp` | komunikat „To nie jest kod QR TOTP z AAPS”, brak zapisu | UI-12 |
 | URI z innym algorytmem / cyframi / okresem | komunikat o nieobsługiwanych parametrach, brak zapisu | UI-12 |
@@ -374,6 +389,7 @@ Gdy otwarty jest skaner albo okno wklejania, okno `Activity` ma `WindowManager.L
 | Akcja zmieniająca w chwili startu polecenia (wyścig) | komunikat „Trwa polecenie”, brak wywołania magazynu | UI-15 |
 | Podwójne dotknięcie „Zapisz” | jedno wywołanie magazynu | UI-16 |
 | Aplikacja w tle z otwartym polem wklejania / skanerem | pole wyczyszczone, okno i skaner zamknięte | UI-14 |
+| Schowek zawiera inny tekst niż wklejony albo brak dostępu do schowka | schowek bez zmian, bez wyjątku | UI-24 |
 
 ## Bezpieczeństwo
 
@@ -381,7 +397,7 @@ Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo) i sposób ich spełnien
 
 - **Nie logujemy sekretu, kodów ani PIN-u.** `ui` i `session.platform` nie wywołują API logowania (UI-21). Wejście sekretu nie trafia do komunikatów, wyjątków ani `toString()` (UI-12, UI-21). PIN AAPS nie występuje w tej specyfikacji (009).
 - **Sekret nie zostaje w pamięci UI dłużej niż do zapisu.** ViewModel nie ma pól z sekretem; wejście ze skanera jest zmienną lokalną; tekst pola wklejania jest czyszczony przy zapisie (przed parserem), anulowaniu, przejściu w tło i starcie polecenia; nie trafia do `SavedStateHandle` ani `rememberSaveable`, więc nie jest zapisywany przez system w stanie instancji (UI-11, UI-14). Pytanie o zastąpienie jest zadawane przed odczytem wejścia (UI-08). Pole jest maskowane, z klawiaturą typu hasło, żeby słownik klawiatury nie uczył się fragmentów URI (UI-11). Ograniczenie: obiekty `String` (wartość QR, tekst pola) nie dają się wyzerować w JVM.
-- **Kopie poza kontrolą aplikacji.** Aplikacja nie czyta schowka sama; URI wklejone przez użytkownika zostaje w schowku systemowym (czyszczenie – „Przyszłe zmiany”). Kod QR na ekranie AAPS jest poza aplikacją. Ochrona przed zrzutem ekranu skanera/okna wklejania – `FLAG_SECURE` na czas otwartego skanera i okna wklejania (UI-23).
+- **Kopie poza kontrolą aplikacji.** Aplikacja czyta schowek tylko po to, by porównać go z wklejonym tekstem przy zamknięciu okna wklejania, i czyści go wyłącznie przy dokładnej zgodności (UI-24); treść schowka nie jest zapisywana ani logowana. Gdy system nie da dostępu do schowka (np. aplikacja bez fokusu przy `ON_STOP`, API 29+), URI zostaje w schowku – poza kontrolą aplikacji. Kod QR na ekranie AAPS jest poza aplikacją. Ochrona przed zrzutem ekranu skanera/okna wklejania – `FLAG_SECURE` na czas otwartego skanera i okna wklejania (UI-23).
 - **Skan offline, minimum danych.** Model ML Kit jest w paczce aplikacji (UI-22), analiza klatek odbywa się na telefonie, klatki nie są zapisywane (UI-09). Biblioteki ML Kit dołączają moduł telemetrii Google (`com.google.android.datatransport`) z uprawnieniami `INTERNET` i `ACCESS_NETWORK_STATE` w połączonym manifeście; aplikacja usuwa oba uprawnienia (`tools:node="remove"`, UI-22), więc nie ma dostępu do sieci, a telemetria nie jest wysyłana.
 - **Zmiana numeru w trakcie polecenia** (Spec 007, sekcja Bezpieczeństwo): zmiana i usunięcie numeru są niedostępne i sprawdzane w chwili wywołania, gdy polecenie jest w toku (UI-15). Pozostałe okno wyścigu: zapis numeru przekazany do magazynu tuż przed startem polecenia kończy się już w trakcie polecenia. Skutek jest bezpieczny: `sms` czyta numer przy każdym wysłaniu i odbiorze (SMS-04, SMS-09), więc odpowiedzi ze starego numeru są odrzucane przez filtr (brak odpowiedzi → limit czasu sesji), a kod jest odsyłany tylko po prośbie o kod z bieżącego numeru. Pełne rozwiązanie (numer ustalany raz na polecenie) – „Przyszłe zmiany” w Spec 007.
 - **Blokada zmiany sekretu w trakcie polecenia** (UI-15) nie jest wymagana dla poprawności – sesja dostaje własną kopię sekretu w `CodeCredentials` przed startem (Spec 006), więc zapis ani usunięcie sekretu w magazynie nie wpływa na trwające polecenie. Powody blokady: jedna, prosta reguła „w trakcie polecenia numer i sekret są tylko do odczytu”; brak wątpliwości użytkownika, którym sekretem zostało potwierdzone polecenie; brak uruchamiania aparatu i okien uprawnień, gdy aplikacja ma pozostać na pierwszym planie z ekranem przebiegu (Spec 005, założenie MVP).
@@ -411,6 +427,7 @@ Kompozycje, nawigacja, kamera, okna uprawnień i wiązania Hilt nie mają testó
 | W7 | Uprawnienia SMS na aplikacji instalowanej z APK: prośba, odmowa, trwała odmowa, przycisk ustawień, powrót i odświeżenie; zanotować, czy Android wymagał „ustawień z ograniczeniami” (to samo co W6 w Spec 005) | UI-17, UI-18 |
 | W8 | Uprawnienia w zbudowanym APK debug (`aapt2 dump permissions` albo „Merged Manifest”): są `SEND_SMS`, `RECEIVE_SMS`, `CAMERA`; brak `INTERNET` i `ACCESS_NETWORK_STATE` (połączony manifest bez uprawnień sieciowych); w ustawieniach systemu „Informacje o aplikacji” nie pokazują dostępu do sieci | UI-22 |
 | W9 | `FLAG_SECURE` przy otwartym skanerze i oknie wklejania: zrzut ekranu zablokowany, podgląd w ostatnich aplikacjach pusty; po zamknięciu zrzut działa | UI-23 |
+| W10 | Schowek: skopiowanie `URI_RFC`, wklejenie i „Zapisz” → schowek pusty; skopiowanie innego tekstu, otwarcie i „Anuluj” z pustym polem → schowek bez zmian; przejście w tło z otwartym oknem → zanotować, czy schowek wyczyszczono (API 29+ może nie dać dostępu); zanotować powiadomienie systemu o odczycie schowka (API 31+) | UI-24 |
 
 Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekranu Polecenia – ich sprawdzenie ręczne opisuje pierwszy PR 009, który uruchamia polecenie.
 
@@ -431,5 +448,4 @@ Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekra
 
 - **Podpowiedź o blokadzie ekranu**, jeśli W7 ze Spec 006 pokaże, że generacja klucza z `setUnlockedDeviceRequired(true)` nie udaje się bez blokady ekranu: komunikat dla `Failed(KEY_GENERATION)` „Ustaw blokadę ekranu i spróbuj ponownie” (zmiana UI-12).
 - **Podpowiedź o ustawieniach z ograniczeniami**, jeśli W7 tej spec (W6 Spec 005) pokaże, że Android blokuje prośbę o uprawnienia SMS dla aplikacji z APK: dodatkowy tekst przy trwałej odmowie (zmiana UI-18).
-- **Czyszczenie schowka** po zapisie sekretu z wklejonego URI (`ClipboardManager.clearPrimaryClip`, API 28+), jeśli schowek zawiera tekst `otpauth://`.
 - **Utrwalenie stanu `INVALIDATED`** po restarcie procesu (Spec 006, „Przyszłe zmiany”), jeśli użytkownicy nie zrozumieją, czemu po restarcie widzą „Brak sekretu”.

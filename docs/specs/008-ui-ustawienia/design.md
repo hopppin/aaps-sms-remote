@@ -124,6 +124,26 @@ class SmsPermissionsViewModel @Inject constructor(
 
 Warstwa Androida: `ui.platform.AndroidCameraPermission` (`ContextCompat.checkSelfPermission(appContext, CAMERA) == PERMISSION_GRANTED`) i `ui.platform.UiModule` (`@Binds CameraPermission`). Prośby: `rememberLauncherForActivityResult(RequestMultiplePermissions())` (SMS) i `RequestPermission()` (CAMERA); rationale: `ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)` z `LocalActivity.current`. Ustawienia aplikacji: `Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))`.
 
+### Schowek (UI-24)
+
+```kotlin
+package pl.twojanazwa.aapsremote.ui.settings.secret
+
+/** Port schowka systemowego. Implementacja: ui.platform.AndroidSecretClipboard. Nie loguje, nie przechowuje tekstu. */
+interface SecretClipboard {
+    /** Tekst pierwszego elementu bieżącego schowka; null, gdy brak, brak dostępu albo wyjątek. */
+    fun currentText(): String?
+
+    /** Czyści schowek; wyjątki są połykane (bez logowania). */
+    fun clear()
+}
+
+/** Czysta logika (UI-24): czyści schowek tylko, gdy [pasted] jest niepusty i schowek zawiera dokładnie ten tekst. */
+internal fun clearClipboardIfPasted(clipboard: SecretClipboard, pasted: String)
+```
+
+`ui.platform.AndroidSecretClipboard`: `ClipboardManager` z kontekstu aplikacji; `currentText()` = `primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()` w `try`/`catch (e: RuntimeException)` → `null`; `clear()` = `clearPrimaryClip()` (API 28+, minSdk 28) w `try`/`catch`. Wiązanie w `UiModule`. Uwagi platformowe (do W10): od API 29 aplikacja bez fokusu nie czyta schowka (`currentText()` = `null` przy `ON_STOP` → schowek bez zmian); od API 31 system może pokazać powiadomienie o odczycie schowka przez aplikację.
+
 ### Numer AAPS (UI-04 – UI-06, UI-15, UI-16)
 
 ```kotlin
@@ -225,6 +245,7 @@ class TotpSecretViewModel @Inject constructor(
     private val store: TotpSecretStore,
     private val coordinator: SessionCoordinator,
     private val cameraPermission: CameraPermission,
+    private val clipboard: SecretClipboard,
 ) : ViewModel() {
     val uiState: StateFlow<TotpSecretUiState>
 
@@ -244,7 +265,7 @@ class TotpSecretViewModel @Inject constructor(
     fun onDeleteConfirmed()
     fun onDeleteDismissed()
     fun onResume()      // ponowne sprawdzenie CAMERA: przyznane → cameraDenial = NONE
-    fun onStop()        // UI-14: pasteText = "", mode = NONE
+    fun onStop()        // UI-14: pasteText = "", mode = NONE; UI-24: schowek, gdy było otwarte okno wklejania
     fun onMessageShown()
 }
 
@@ -330,7 +351,8 @@ Miejsce zgodne z konwencją `<pakiet>/platform/<Nazwa>Module.kt` (`SmsModule`, `
 | `busy` | `Failed` | `busy = false`, `message = SAVE_FAILED` | – | UI-05 |
 | `editing` | `onEditCancelled` | `editing = false`, `input = ""`, `inputError = null` | – | UI-05 |
 | `canClear` | `onClearClicked` | `confirmingClear` (albo `COMMAND_ACTIVE` przy poleceniu) | – | UI-06, UI-15 |
-| `confirmingClear` | `onClearConfirmed` | `confirmingClear = false`, `busy` (albo `COMMAND_ACTIVE`) | `store.clear()` | UI-06, UI-15 |
+| `confirmingClear` | `onClearConfirmed`, `activeSession.value != null` | `confirmingClear = false`, `message = COMMAND_ACTIVE` | brak wywołania magazynu | UI-15 |
+| `confirmingClear`, `busy` = false | `onClearConfirmed`, brak polecenia | `confirmingClear = false`, `busy` | `store.clear()` | UI-06, UI-16 |
 | `busy` (clear) | `Cleared` / `Failed` | `busy = false`, `message = CLEARED` / `CLEAR_FAILED` | – | UI-06 |
 | `confirmingClear` | `onClearDismissed` | `confirmingClear = false` | – | UI-06 |
 | dowolny | `activeSession`: `null` → sesja | `confirmingClear = false`, `commandActive` | operacja w toku dokończona | UI-15 |
@@ -345,9 +367,9 @@ Wspólna procedura `accept(raw)` (wejście ze skanera albo z pola): (1) `activeS
 | --- | --- | --- | --- | --- |
 | `canScan`, `display` ∈ {`CHECKING`, `PRESENT`} | `onScanClicked` | `confirmingReplace = SCAN` | – | UI-08 |
 | `canPaste`, `display` ∈ {`CHECKING`, `PRESENT`} | `onPasteClicked` | `confirmingReplace = PASTE` | – | UI-08 |
-| `canScan`, `display` ∈ {`ABSENT`, `INVALIDATED`} albo `confirmingReplace = SCAN` + `onReplaceConfirmed` | sprawdzenie CAMERA = `true` | `mode = SCANNER`, `cameraDenial = NONE` | – | UI-08, UI-10 |
-| j.w. | sprawdzenie CAMERA = `false` | `cameraPermissionRequest = true` | – | UI-10 |
-| `canPaste`, `display` ∈ {`ABSENT`, `INVALIDATED`} albo `confirmingReplace = PASTE` + `onReplaceConfirmed` | – | `mode = PASTE`, `pasteText = ""` | – | UI-08, UI-11 |
+| `canScan`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onScanClicked`) albo `confirmingReplace = SCAN` (`onReplaceConfirmed`) | sprawdzenie CAMERA = `true` | `confirmingReplace = null`, `mode = SCANNER`, `cameraDenial = NONE` | – | UI-08, UI-10 |
+| j.w. | sprawdzenie CAMERA = `false` | `confirmingReplace = null`, `cameraPermissionRequest = true` | – | UI-08, UI-10 |
+| `canPaste`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onPasteClicked`) albo `confirmingReplace = PASTE` (`onReplaceConfirmed`) | – | `confirmingReplace = null`, `mode = PASTE`, `pasteText = ""` | – | UI-08, UI-11 |
 | `confirmingReplace ≠ null` | `onReplaceDismissed` | `confirmingReplace = null` | – | UI-08 |
 | `cameraPermissionRequest` | `onCameraPermissionRequestLaunched` | `cameraPermissionRequest = false` | – | UI-10 |
 | – | `onCameraPermissionResult(r)` | CAMERA = `true` → `mode = SCANNER`, `cameraDenial = NONE`; inaczej `cameraDenial = classify([CAMERA]) { r }` | – | UI-10 |
@@ -356,12 +378,13 @@ Wspólna procedura `accept(raw)` (wejście ze skanera albo z pola): (1) `activeS
 | `mode = SCANNER` | `onCameraFailed` | `mode = NONE`, `message = CAMERA_UNAVAILABLE` | – | UI-09 |
 | `mode = SCANNER` | `onScannerClosed` | `mode = NONE` | – | UI-09 |
 | `mode = PASTE` | `onPasteTextChanged(t)` | `pasteText = t` | – | UI-11 |
-| `mode = PASTE`, `canSubmitPaste` | `onPasteSubmitted` | `raw = pasteText`; `pasteText = ""`, `mode = NONE` | `accept(raw)` | UI-11, UI-14 |
-| `mode = PASTE` | `onPasteDismissed` | `pasteText = ""`, `mode = NONE` | – | UI-11 |
+| `mode = PASTE`, `canSubmitPaste` | `onPasteSubmitted` | `raw = pasteText`; `pasteText = ""`, `mode = NONE` | `clearClipboardIfPasted(clipboard, raw)`, potem `accept(raw)` | UI-11, UI-14, UI-24 |
+| `mode = PASTE` | `onPasteDismissed` | `text = pasteText`; `pasteText = ""`, `mode = NONE` | `clearClipboardIfPasted(clipboard, text)` | UI-11, UI-24 |
 | `canDelete` | `onDeleteClicked` | `confirmingDelete` (albo `COMMAND_ACTIVE`) | – | UI-13, UI-15 |
-| `confirmingDelete` | `onDeleteConfirmed` | `confirmingDelete = false`, `busy` (albo `COMMAND_ACTIVE`) | `store.delete()` | UI-13, UI-15 |
+| `confirmingDelete` | `onDeleteConfirmed`, `activeSession.value != null` | `confirmingDelete = false`, `message = COMMAND_ACTIVE` | brak wywołania magazynu | UI-15 |
+| `confirmingDelete`, `busy` = false | `onDeleteConfirmed`, brak polecenia | `confirmingDelete = false`, `busy` | `store.delete()` | UI-13, UI-16 |
 | `busy` (delete) | `Deleted` / `Failed` | `busy = false`, `message = DELETED` / `DELETE_FAILED` | – | UI-13 |
-| dowolny | `onStop` | `pasteText = ""`, `mode = NONE` | – | UI-14 |
+| dowolny | `onStop` | `text = pasteText` (gdy `mode = PASTE`); `pasteText = ""`, `mode = NONE` | przy `mode = PASTE`: `clearClipboardIfPasted(clipboard, text)` | UI-14, UI-24 |
 | `cameraDenial ≠ NONE` | `onResume`, CAMERA = `true` | `cameraDenial = NONE` | – | UI-10 |
 
 Odwzorowanie wyników na `SecretMessage` (UI-12):
@@ -497,7 +520,7 @@ Uwagi:
 
 ## Mapowanie wymagań na testy
 
-Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`; nazwy testów zawierają identyfikator wymagania. Pomocnicze: `ui/MainDispatcherExtension.kt`, `ui/SessionDoubles.kt` (`activeSession` jako `MutableStateFlow<CommandSession?>`, `mockk<CommandSession>()`), `ui/settings/number/FakeAapsNumberSettingsStore.kt`, `ui/settings/secret/FakeTotpSecretStore.kt` (wyniki z kolejki, opcjonalna bramka `CompletableDeferred`, zapamiętany `TotpSecret`), `ui/permissions/FakeCameraPermission.kt`; `sms/FakeSmsPermissions.kt` istnieje.
+Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Konwencja: identyfikator wymagania jest w nazwie każdej metody testowej (nazwa w backtickach, np. `` `UI-12 bledny Base32 daje INVALID_SECRET bez zapisu` ``); tabela niżej mapuje wymagania na klasy testów. Pomocnicze: `ui/MainDispatcherExtension.kt`, `ui/SessionDoubles.kt` (`activeSession` jako `MutableStateFlow<CommandSession?>`, `mockk<CommandSession>()`), `ui/settings/number/FakeAapsNumberSettingsStore.kt`, `ui/settings/secret/FakeTotpSecretStore.kt` (wyniki z kolejki, opcjonalna bramka `CompletableDeferred`, zapamiętany `TotpSecret`), `ui/permissions/FakeCameraPermission.kt`, `ui/settings/secret/FakeSecretClipboard.kt` (tekst ustawiany w teście, licznik `clear()`); `sms/FakeSmsPermissions.kt` istnieje.
 
 | Wymaganie | Test (klasa / rodzaj) |
 | --- | --- |
@@ -524,6 +547,7 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`; nazwy test�
 | UI-21 | `ui/UiNoLoggingTest` – źródła `ui/` i `session/platform/`; `ui/settings/number/NumberRedactionTest`, `ui/settings/secret/SecretRedactionTest` – `toString()` |
 | UI-22 | `ui/UiManifestTest` – manifest; `ui/UiDependenciesTest` – `libs.versions.toml`; W8 |
 | UI-23 | `ui/settings/secret/TotpSecretViewModelSecureWindowTest` – znacznik `secureWindow`; W9 |
+| UI-24 | `ui/settings/secret/ClipboardClearingTest` (funkcja `clearClipboardIfPasted`), `ui/settings/secret/TotpSecretViewModelClipboardTest` (zapis, anulowanie, `onStop`) – atrapa schowka; W10 |
 
 ## Podział na zadania
 
@@ -531,15 +555,15 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Wymagania częściowe
 
 **Zależności i równoległość:** 1 → {2, 3, 4, 5} równolegle (rozłączne pliki); 6 ← 5; 7 ← 6; 8 ← 2, 3, 4; 9 ← 2, 6; 10 ← 7, 9. Zadania 8 i 9 mogą iść równolegle, ale oba zmieniają `SettingsScreen.kt` i `strings.xml` – drugi PR robi rebase na pierwszym.
 
-**Pliki wspólne:** `gradle/libs.versions.toml`, `app/build.gradle.kts`, `AndroidManifest.xml`, `ui/platform/UiModule.kt`, `ui/permissions/PermissionDenial.kt`, `ui/permissions/CameraPermission.kt` – tylko zadanie 1 (typy używane przez zadania 3 i 5–7 powstają raz, przed nimi); `MainActivity.kt` – tylko zadanie 2; `strings.xml` – zadania 2, 8, 9, 10 (każde dopisuje własny blok z komentarzem `<!-- 008: … -->`, bez zmian cudzych kluczy); `ui/settings/SettingsScreen.kt` – tworzy 2, zmieniają 8, 9, 10; `ui/settings/secret/TotpSecretViewModel.kt` i `TotpSecretUiState.kt` – 5, 6, 7 kolejno.
+**Pliki wspólne:** `gradle/libs.versions.toml`, `app/build.gradle.kts`, `AndroidManifest.xml`, `ui/platform/UiModule.kt`, `ui/permissions/PermissionDenial.kt`, `ui/permissions/CameraPermission.kt`, `ui/settings/secret/SecretClipboard.kt` – tylko zadanie 1 (typy używane przez zadania 3 i 5–7 powstają raz, przed nimi); `MainActivity.kt` – tylko zadanie 2; `strings.xml` – zadania 2, 8, 9, 10 (każde dopisuje własny blok z komentarzem `<!-- 008: … -->`, bez zmian cudzych kluczy); `ui/settings/SettingsScreen.kt` – tworzy 2, zmieniają 8, 9, 10; `ui/settings/secret/TotpSecretViewModel.kt` i `TotpSecretUiState.kt` – 5, 6, 7 kolejno.
 
-1. **Fundament: zależności, manifest, moduł sesji, typy uprawnień** – `gradle/libs.versions.toml`, `app/build.gradle.kts` (wszystkie zależności z tabeli), `AndroidManifest.xml` (`CAMERA`, `uses-feature camera.any required=false`; `tools:node="remove"` dla `INTERNET` i `ACCESS_NETWORK_STATE`), `session/platform/SessionModule.kt`, `ui/permissions/PermissionDenial.kt` (z klasyfikatorem), `ui/permissions/CameraPermission.kt`, `ui/platform/AndroidCameraPermission.kt`, `ui/platform/UiModule.kt`; testy `SessionModuleTest`, `UiManifestTest`, `UiDependenciesTest`, `UiNoLoggingTest`, `PermissionDenialClassifierTest`, pomocnicze `MainDispatcherExtension`, `SessionDoubles`, `FakeCameraPermission`. Wymagania: UI-19, UI-21 (logowanie), UI-22, UI-10 i UI-18 (klasyfikacja odmowy); `assembleDebug`; W8. Bez zależności.
+1. **Fundament: zależności, manifest, moduł sesji, typy uprawnień** – `gradle/libs.versions.toml`, `app/build.gradle.kts` (wszystkie zależności z tabeli), `AndroidManifest.xml` (`CAMERA`, `uses-feature camera.any required=false`; `tools:node="remove"` dla `INTERNET` i `ACCESS_NETWORK_STATE`), `session/platform/SessionModule.kt`, `ui/permissions/PermissionDenial.kt` (z klasyfikatorem), `ui/permissions/CameraPermission.kt`, `ui/platform/AndroidCameraPermission.kt`, `ui/settings/secret/SecretClipboard.kt` (port i `clearClipboardIfPasted`), `ui/platform/AndroidSecretClipboard.kt`, `ui/platform/UiModule.kt`; testy `SessionModuleTest`, `UiManifestTest`, `UiDependenciesTest`, `UiNoLoggingTest`, `PermissionDenialClassifierTest`, `ClipboardClearingTest`, pomocnicze `MainDispatcherExtension`, `SessionDoubles`, `FakeCameraPermission`, `FakeSecretClipboard`. Wymagania: UI-19, UI-21 (logowanie), UI-22, UI-10 i UI-18 (klasyfikacja odmowy), UI-24 (logika porównania); `assembleDebug`; W8. Bez zależności.
 2. **Nawigacja i zaślepki** – `ui/navigation/AppDestination.kt`, `AppScaffold.kt`, `ui/commands/CommandsPlaceholderScreen.kt`, `ui/history/HistoryPlaceholderScreen.kt`, `ui/settings/SettingsScreen.kt` (szkielet bez sekcji), `res/drawable/ic_nav_*.xml`, `MainActivity.kt`, `strings.xml` (blok nawigacji, zaślepek, `action_*`); testy `AppDestinationTest`, `NavigationStringsTest`. Wymagania: UI-01, UI-02, UI-03, UI-20 (część); W1. Zależy od 1.
 3. **Uprawnienia SMS – ViewModel** – `ui/permissions/SmsPermissionsUiState.kt`, `SmsPermissionsViewModel.kt`; test `SmsPermissionsViewModelTest`. Wymagania: UI-17, UI-18 (logika), UI-15 (uprawnienia bez blokady). Zależy od 1; równolegle z 2, 4, 5.
 4. **Numer – ViewModel** – `ui/settings/number/NumberDisplay.kt`, `NumberMessage.kt`, `AapsNumberUiState.kt`, `AapsNumberViewModel.kt`; testy `FakeAapsNumberSettingsStore`, `AapsNumberViewModelStateTest`, `…EditTest`, `…ClearTest`, `…LockTest`, `NumberRedactionTest`. Wymagania: UI-04, UI-05, UI-06, UI-15 (numer), UI-16 (numer), UI-21 (`toString` numeru). Zależy od 1; równolegle z 2, 3, 5.
-5. **Sekret – ViewModel: stan, wklejanie, zapis** – `ui/settings/secret/SecretDisplay.kt`, `SecretMessage.kt`, `TotpSecretUiState.kt`, `TotpSecretViewModel.kt` (konstruktor z `CameraPermission`, bez logiki skanera); testy `FakeTotpSecretStore`, `TotpSecretViewModelStateTest`, `…ReplaceTest` (ścieżka wklejania), `…PasteTest`, `…SaveTest`. Wymagania: UI-07, UI-08 (wklejanie), UI-11 (logika), UI-12, UI-14 (część: refleksja, czyszczenie pola przy zapisie). Zależy od 1; równolegle z 2, 3, 4.
-6. **Sekret – ViewModel: usunięcie, blokady, `onStop`** – `TotpSecretViewModel.kt`, `TotpSecretUiState.kt`; testy `TotpSecretViewModelDeleteTest`, `…RetentionTest`, `…LockTest`, `SecretRedactionTest`. Wymagania: UI-13, UI-14, UI-15 (sekret), UI-16 (sekret), UI-21 (`toString` sekretu). Zależy od 5.
+5. **Sekret – ViewModel: stan, wklejanie, zapis** – `ui/settings/secret/SecretDisplay.kt`, `SecretMessage.kt`, `TotpSecretUiState.kt`, `TotpSecretViewModel.kt` (konstruktor z `CameraPermission` i `SecretClipboard`, bez logiki skanera i schowka); testy `FakeTotpSecretStore`, `TotpSecretViewModelStateTest`, `…ReplaceTest` (ścieżka wklejania), `…PasteTest`, `…SaveTest`. Wymagania: UI-07, UI-08 (wklejanie), UI-11 (logika), UI-12, UI-14 (część: refleksja, czyszczenie pola przy zapisie). Zależy od 1; równolegle z 2, 3, 4.
+6. **Sekret – ViewModel: usunięcie, blokady, `onStop`, schowek** – `TotpSecretViewModel.kt`, `TotpSecretUiState.kt`; testy `TotpSecretViewModelDeleteTest`, `…RetentionTest`, `…LockTest`, `…ClipboardTest`, `SecretRedactionTest`. Wymagania: UI-13, UI-14, UI-15 (sekret), UI-16 (sekret), UI-21 (`toString` sekretu), UI-24 (ViewModel). Zależy od 5.
 7. **Sekret – ViewModel: skaner i CAMERA** – `TotpSecretViewModel.kt`, `TotpSecretUiState.kt`; testy `TotpSecretViewModelScanTest`, `…CameraPermissionTest`, `…ReplaceTest` (ścieżka skanu), `…SecureWindowTest`. Wymagania: UI-08 (skan), UI-09 (logika), UI-10 (logika), UI-23 (znacznik). Zależy od 6.
 8. **Ekran: sekcje numeru i uprawnień SMS** – `ui/settings/number/NumberSection.kt`, `NumberTexts.kt`, `ui/settings/permissions/SmsPermissionsSection.kt`, `PermissionTexts.kt`, `SettingsScreen.kt` (sekcje, baner, Snackbar, `ON_RESUME`, prośba o SMS, intencja ustawień), `strings.xml` (bloki numeru, SMS, `settings_command_active`, `msg_command_active`); testy `NumberTextsTest`, `PermissionTextsTest`. Wymagania: UI-04 – UI-06 (widok), UI-17, UI-18 (widok), UI-20 (część). PR opisuje W2, W7 oraz ze Spec 007: W1 (bez `BG`), W2, W6 (numer); ze Spec 005: W6. Zależy od 2, 3, 4.
-9. **Ekran: sekcja sekretu i wklejanie** – `ui/settings/secret/SecretSection.kt`, `PasteUriDialog.kt`, `SecretTexts.kt`, `SettingsScreen.kt` (sekcja sekretu, okna, `ON_STOP`), `strings.xml` (blok sekretu bez skanera); test `SecretTextsTest`. Wymagania: UI-07, UI-08, UI-11, UI-12, UI-13 (widok), UI-20 (część). PR opisuje W5, W6 i – jako pierwszy PR zapisujący sekret – punkty Spec 006 możliwe bez odczytu (podział P3 ze spec): W1 (zapis, `KeyInfo`), W5, W6, W7, W8. Zależy od 2, 6.
+9. **Ekran: sekcja sekretu i wklejanie** – `ui/settings/secret/SecretSection.kt`, `PasteUriDialog.kt`, `SecretTexts.kt`, `SettingsScreen.kt` (sekcja sekretu, okna, `ON_STOP`), `strings.xml` (blok sekretu bez skanera); test `SecretTextsTest`. Wymagania: UI-07, UI-08, UI-11, UI-12, UI-13 (widok), UI-20 (część). PR opisuje W5, W6, W10 i – jako pierwszy PR zapisujący sekret – punkty Spec 006 możliwe bez odczytu (podział P3 ze spec): W1 (zapis, `KeyInfo`), W5, W6, W7, W8. Zależy od 2, 6.
 10. **Skaner QR (CameraX + ML Kit) i `FLAG_SECURE`** – `ui/settings/secret/QrScanner.kt`, `SecureWindowEffect.kt`, `SecretSection.kt`/`SettingsScreen.kt` (tryb skanera, `BackHandler`, prośba o CAMERA, tekst odmowy, przycisk ustawień), `strings.xml` (`secret_scanner_hint`, `secret_camera_denied`, `secret_msg_camera_unavailable`); bez nowych testów automatycznych (warstwa kamery), rozszerzenie `SecretTextsTest` o nowe klucze. Wymagania: UI-09, UI-10, UI-23 (widok). PR opisuje W3, W4, W9 i ponownie W5–W7 ze Spec 006 dla zapisu ze skanera. Zależy od 7, 9.
