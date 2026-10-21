@@ -1,0 +1,33 @@
+package pl.twojanazwa.aapsremote.ui.commands
+
+import pl.twojanazwa.aapsremote.commands.CommandId
+
+enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
+
+enum class ResultMessage {
+    BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED,
+    SEND_FAILED, UNRECOGNIZED_REPLY, AMOUNT_MISMATCH, UNEXPECTED_REPLY, WRONG_CODE,
+    CODE_REQUEST_EXPIRED, CODE_PREPARATION_TIMEOUT, INTERNAL_ERROR,
+    NO_RESPONSE, SEND_TIMEOUT,
+    UNKNOWN_CONFIRMATION_TIMEOUT, UNKNOWN_CANCELLED_AFTER_CODE, UNKNOWN_CODE_SEND_FAILED,
+    UNKNOWN_UNRECOGNIZED_REPLY, UNKNOWN_AMOUNT_MISMATCH, UNKNOWN_UNEXPECTED_REPLY, UNKNOWN_INTERNAL_ERROR,
+    CANCELLED,
+}
+
+data class ResultView(
+    val commandId: CommandId,
+    /** Ilość z polecenia CARBS (nagłówek „Polecenie CARBS X g”), null dla BG/PUMP. */
+    val commandGrams: Int?,
+    val kind: ResultKind,
+    val message: ResultMessage,
+    /** Argument komunikatu: gramy (CARBS_CONFIRMED) albo minuty (NO_RESPONSE, SEND_TIMEOUT, UNKNOWN_CONFIRMATION_TIMEOUT). */
+    val messageArg: Int?,
+    val replyText: String?,
+    val codeNotSent: Boolean,
+    val unknownWarning: Boolean,
+    val unexpectedCount: Int,
+) {
+    /** CMDUI-26: bez gramów, argumentu i treści SMS. */
+    override fun toString(): String =
+        "ResultView(commandId=$commandId, kind=$kind, message=$message, ***)"
+}

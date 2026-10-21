@@ -41,7 +41,7 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 /** Zakres korutyn aplikacji, w którym biegną sesje (CMDUI-13). */
 @Qualifier
-@Retention(AnnotationRetention.BINARY)
+@Retention(AnnotationRetention.RUNTIME)
 annotation class CommandRunScope
 
 enum class LaunchRejection {
