@@ -67,19 +67,24 @@ class CommandLauncher @Inject constructor(
             }
             // Anulowanie po load() (lub w ścieżce bez kodu) nie może wystartować sesji; PIN czyści finally.
             currentCoroutineContext().ensureActive()
-            val result = try {
-                coordinator.start(scope, command, credentials)
-            } catch (e: IllegalArgumentException) {
-                return LaunchResult.Rejected(LaunchRejection.START_FAILED)
-            }
-            return when (result) {
-                is StartResult.Started -> {
-                    started = true
-                    recorder.track(result.session.state)
-                    currentRun.publish(CurrentRunData(command, result.session.state))
-                    LaunchResult.Started
+            // Odcinek start -> track -> publish jest nierozdzielny i bez zawieszania: sesja, która zdąży się
+            // zakończyć po start, nie może po cudzym kolejnym uruchomieniu nadpisać CurrentRun (monitor `this`,
+            // bez pola, bo CMDUI-15).
+            return synchronized(this) {
+                val result = try {
+                    coordinator.start(scope, command, credentials)
+                } catch (e: IllegalArgumentException) {
+                    return@synchronized LaunchResult.Rejected(LaunchRejection.START_FAILED)
                 }
-                StartResult.Busy -> LaunchResult.Rejected(LaunchRejection.COMMAND_ACTIVE)
+                when (result) {
+                    is StartResult.Started -> {
+                        started = true
+                        recorder.track(result.session.state)
+                        currentRun.publish(CurrentRunData(command, result.session.state))
+                        LaunchResult.Started
+                    }
+                    StartResult.Busy -> LaunchResult.Rejected(LaunchRejection.COMMAND_ACTIVE)
+                }
             }
         } finally {
             if (!started) pin?.clear()
