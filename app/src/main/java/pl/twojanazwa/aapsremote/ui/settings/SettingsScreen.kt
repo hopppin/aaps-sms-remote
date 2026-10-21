@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -37,6 +38,11 @@ import pl.twojanazwa.aapsremote.ui.settings.number.AapsNumberViewModel
 import pl.twojanazwa.aapsremote.ui.settings.number.NumberSection
 import pl.twojanazwa.aapsremote.ui.settings.number.textRes
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
+import pl.twojanazwa.aapsremote.ui.settings.secret.PasteUriDialog
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecretInputMode
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecretSection
+import pl.twojanazwa.aapsremote.ui.settings.secret.TotpSecretViewModel
+import pl.twojanazwa.aapsremote.ui.settings.secret.textRes
 
 /** Ekran Ustawienia; sekcje dodają kolejne zadania spec 008. */
 @Composable
@@ -44,14 +50,19 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     numberViewModel: AapsNumberViewModel = hiltViewModel(),
     smsViewModel: SmsPermissionsViewModel = hiltViewModel(),
+    secretViewModel: TotpSecretViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val numberState by numberViewModel.uiState.collectAsStateWithLifecycle()
     val smsState by smsViewModel.uiState.collectAsStateWithLifecycle()
+    val secretState by secretViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { smsViewModel.onResume() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { secretViewModel.onStop() }
+    // Przy zmianie zakładki ON_STOP może nie dotrzeć przed usunięciem treści z kompozycji (UI-14); onStop jest idempotentne.
+    DisposableEffect(Unit) { onDispose { secretViewModel.onStop() } }
 
     val smsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         smsViewModel.onPermissionsResult { permission ->
@@ -67,6 +78,14 @@ fun SettingsScreen(
         }
     }
 
+    val secretMessage = secretState.message?.let { stringResource(it.textRes()) }
+    LaunchedEffect(secretMessage) {
+        if (secretMessage != null) {
+            snackbarHostState.showSnackbar(secretMessage)
+            secretViewModel.onMessageShown()
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -79,7 +98,7 @@ fun SettingsScreen(
                 text = stringResource(R.string.nav_settings),
                 style = MaterialTheme.typography.headlineMedium,
             )
-            if (numberState.commandActive) {
+            if (numberState.commandActive || secretState.commandActive) {
                 Text(
                     text = stringResource(R.string.settings_command_active),
                     style = MaterialTheme.typography.bodyMedium,
@@ -96,6 +115,18 @@ fun SettingsScreen(
                 onClearConfirmed = numberViewModel::onClearConfirmed,
                 onClearDismissed = numberViewModel::onClearDismissed,
             )
+            SecretSection(
+                state = secretState,
+                onScanClicked = secretViewModel::onScanClicked,
+                onPasteClicked = secretViewModel::onPasteClicked,
+                onDeleteClicked = secretViewModel::onDeleteClicked,
+                onReplaceConfirmed = secretViewModel::onReplaceConfirmed,
+                onReplaceDismissed = secretViewModel::onReplaceDismissed,
+                onDeleteConfirmed = secretViewModel::onDeleteConfirmed,
+                onDeleteDismissed = secretViewModel::onDeleteDismissed,
+                // Tymczasowo false: skaner (i włączenie tego parametru) dochodzi w #126.
+                scanAvailable = false,
+            )
             SmsPermissionsSection(
                 state = smsState,
                 onRequest = {
@@ -110,6 +141,15 @@ fun SettingsScreen(
                         ),
                     )
                 },
+            )
+        }
+        if (secretState.mode == SecretInputMode.PASTE) {
+            PasteUriDialog(
+                text = secretState.pasteText,
+                canSubmit = secretState.canSubmitPaste,
+                onTextChanged = secretViewModel::onPasteTextChanged,
+                onSubmit = secretViewModel::onPasteSubmitted,
+                onDismiss = secretViewModel::onPasteDismissed,
             )
         }
         SnackbarHost(hostState = snackbarHostState, modifier = Modifier.align(Alignment.BottomCenter))
