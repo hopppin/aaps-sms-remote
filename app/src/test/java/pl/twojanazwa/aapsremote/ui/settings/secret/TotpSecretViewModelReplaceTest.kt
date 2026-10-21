@@ -51,6 +51,17 @@ class TotpSecretViewModelReplaceTest {
     }
 
     @Test
+    fun `UI-08 UNKNOWN wklej i zastap otwiera pole`() = runTest(main.dispatcher) {
+        val f = fixture(SecretState.UNKNOWN)
+        f.viewModel.onPasteClicked()
+        f.viewModel.onReplaceConfirmed()
+        f.idle()
+        val s = f.viewModel.uiState.value
+        assertNull(s.confirmingReplace)
+        assertEquals(SecretInputMode.PASTE, s.mode)
+    }
+
+    @Test
     fun `UI-08 ABSENT wklej otwiera pole bez pytania`() = runTest(main.dispatcher) {
         val f = fixture(SecretState.ABSENT)
         f.viewModel.onPasteClicked()

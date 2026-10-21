@@ -65,6 +65,26 @@ class TotpSecretViewModelPasteTest {
     }
 
     @Test
+    fun `UI-16 w trakcie zapisu kolejne wklejanie nie woła save`() = runTest(main.dispatcher) {
+        val f = openPaste()
+        f.store.gate = CompletableDeferred()
+        f.viewModel.onPasteTextChanged(URI_RFC)
+        f.viewModel.onPasteSubmitted()
+        f.idle()
+        assertTrue(f.viewModel.uiState.value.busy)
+
+        f.viewModel.onPasteClicked()
+        f.viewModel.onPasteTextChanged(URI_RFC)
+        f.viewModel.onPasteSubmitted()
+        f.idle()
+        assertEquals(1, f.store.saveCount)
+        assertEquals(SecretInputMode.NONE, f.viewModel.uiState.value.mode)
+        f.store.gate!!.complete(Unit)
+        f.idle()
+        assertEquals(1, f.store.saveCount)
+    }
+
+    @Test
     fun `UI-11 hotp daje NOT_TOTP_QR bez zapisu i czysci pole`() = runTest(main.dispatcher) {
         val f = openPaste()
         f.viewModel.onPasteTextChanged("otpauth://hotp/AAPS?secret=GEZDGNBV")

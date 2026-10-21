@@ -126,8 +126,12 @@ class TotpSecretViewModel @Inject constructor(
             local.update { it.copy(message = SecretMessage.COMMAND_ACTIVE) }
             return
         }
-        if (local.value.busy) return
-        local.update { it.copy(busy = true) }
+        var acquired = false
+        local.update {
+            acquired = !it.busy
+            if (acquired) it.copy(busy = true) else it
+        }
+        if (!acquired) return
         viewModelScope.launch {
             var message = SecretMessage.SAVE_FAILED
             try {
