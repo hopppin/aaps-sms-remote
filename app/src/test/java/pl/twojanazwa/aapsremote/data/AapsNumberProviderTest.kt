@@ -7,7 +7,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
@@ -47,10 +46,16 @@ class AapsNumberProviderTest {
         val gate = java.util.concurrent.CountDownLatch(1)
         storage.writeGate = gate
         val save = async(Dispatchers.Default) { settings.save("+44 7700 900123") }
-        assertTrue(storage.writeEntered.await(10, TimeUnit.SECONDS))
-        val during = withContext(Dispatchers.Default) { settings.currentNumber() }
-        assertEquals("+447700900999", during)
-        gate.countDown()
+        val reader = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            assertTrue(storage.writeEntered.await(10, TimeUnit.SECONDS))
+            // Odczyt na osobnym wątku z limitem czasu: blokujący odczyt da porażkę, nie zawieszenie.
+            val during = reader.submit<String?> { settings.currentNumber() }.get(5, TimeUnit.SECONDS)
+            assertEquals("+447700900999", during)
+        } finally {
+            gate.countDown()
+            reader.shutdownNow()
+        }
         assertSame(SaveNumberResult.Saved, save.await())
         assertEquals("+447700900123", settings.currentNumber())
     }
