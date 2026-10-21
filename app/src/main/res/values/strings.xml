@@ -12,6 +12,23 @@
     <string name="action_delete">Usuń</string>
     <string name="action_open_app_settings">Otwórz ustawienia aplikacji</string>
 
+    <!-- 008: numer -->
+    <string name="settings_command_active">Trwa polecenie. Numer i sekret możesz zmienić po jego zakończeniu.</string>
+    <string name="msg_command_active">Trwa polecenie – spróbuj po jego zakończeniu.</string>
+    <string name="number_section_title">Numer telefonu AAPS</string>
+    <string name="number_loading">Wczytywanie…</string>
+    <string name="number_not_configured">Nie ustawiono numeru AAPS</string>
+    <string name="number_load_failed">Nie udało się wczytać numeru. Ustaw go ponownie.</string>
+    <string name="number_action_set">Ustaw numer</string>
+    <string name="number_action_change">Zmień</string>
+    <string name="number_field_label">Numer telefonu z AAPS</string>
+    <string name="number_error_invalid">Nieprawidłowy numer. Podaj co najmniej 9 cyfr, opcjonalnie z „+” na początku.</string>
+    <string name="number_clear_title">Usunąć numer AAPS?</string>
+    <string name="number_clear_text">Bez numeru aplikacja nie wyśle poleceń.</string>
+    <string name="number_msg_saved">Zapisano numer AAPS</string>
+    <string name="number_msg_save_failed">Nie udało się zapisać numeru. Spróbuj ponownie.</string>
+    <string name="number_msg_cleared">Usunięto numer AAPS</string>
+    <string name="number_msg_clear_failed">Nie udało się usunąć numeru. Spróbuj ponownie.</string>
     <!-- 008: uprawnienia SMS -->
     <string name="sms_section_title">Uprawnienia SMS</string>
     <string name="sms_all_granted">Wysyłanie i odbiór SMS dozwolone</string>
