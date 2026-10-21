@@ -47,6 +47,36 @@ class TotpSecretViewModelCameraPermissionTest {
     }
 
     @Test
+    fun `UI-15 przyznanie w trakcie polecenia nie otwiera skanera`() = runTest(main.dispatcher) {
+        val f = fixture()
+        f.viewModel.onScanClicked()
+        f.session.startCommand()
+        f.camera.granted = true
+        f.viewModel.onCameraPermissionResult(shouldShowRationale = false)
+        f.idle()
+        val s = f.viewModel.uiState.value
+        assertEquals(SecretInputMode.NONE, s.mode)
+        assertEquals(PermissionDenial.NONE, s.cameraDenial)
+    }
+
+    @Test
+    fun `UI-16 przyznanie w trakcie zapisu nie otwiera skanera`() = runTest(main.dispatcher) {
+        val f = fixture()
+        f.store.gate = kotlinx.coroutines.CompletableDeferred()
+        f.viewModel.onPasteClicked()
+        f.viewModel.onPasteTextChanged(URI_RFC)
+        f.viewModel.onPasteSubmitted()
+        f.idle()
+        assertTrue(f.viewModel.uiState.value.busy)
+        f.camera.granted = true
+        f.viewModel.onCameraPermissionResult(shouldShowRationale = false)
+        f.idle()
+        assertEquals(SecretInputMode.NONE, f.viewModel.uiState.value.mode)
+        f.store.gate!!.complete(Unit)
+        f.idle()
+    }
+
+    @Test
     fun `UI-10 odmowa z rationale to DENIED a bez rationale PERMANENTLY_DENIED`() = runTest(main.dispatcher) {
         val f = fixture()
         f.viewModel.onScanClicked()

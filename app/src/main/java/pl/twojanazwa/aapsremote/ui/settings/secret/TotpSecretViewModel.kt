@@ -121,7 +121,14 @@ class TotpSecretViewModel @Inject constructor(
 
     fun onCameraPermissionResult(shouldShowRationale: Boolean) {
         if (cameraPermission.isGranted()) {
-            local.update { it.copy(mode = SecretInputMode.SCANNER, cameraDenial = PermissionDenial.NONE) }
+            // Skaner tylko, gdy akcja jest nadal dozwolona (UI-15, UI-16); odmowę zapisujemy niezależnie.
+            val open = compose().canScan
+            local.update {
+                it.copy(
+                    mode = if (open) SecretInputMode.SCANNER else it.mode,
+                    cameraDenial = PermissionDenial.NONE,
+                )
+            }
         } else {
             val denial = PermissionDenialClassifier.classify(listOf(CameraPermission.CAMERA)) { shouldShowRationale }
             local.update { it.copy(cameraDenial = denial) }
