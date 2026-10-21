@@ -32,7 +32,20 @@ class UiNoLoggingTest {
     }
 
     @Test
-    fun `UI-21 zrodla ui i session-platform nie wywoluja API logowania`() {
+    fun `HISTUI-15 zrodla ui-history nie wywoluja API logowania`() {
+        val root = File("src/main/java/pl/twojanazwa/aapsremote/ui/history")
+        assertTrue(root.isDirectory, "Brak katalogu: ${root.path}")
+        val sources = root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue(sources.any { it.name == "HistoryEntryMapper.kt" }, "Brak HistoryEntryMapper.kt")
+        val violations = sources.flatMap { file ->
+            val text = file.readText()
+            forbidden.filter { it.containsMatchIn(text) }.map { "${file.name}: ${it.pattern}" }
+        }
+        assertTrue(violations.isEmpty(), "Użycie API logowania: $violations")
+    }
+
+    @Test
+    fun `UI-21zrodla ui i session-platform nie wywoluja API logowania`() {
         val base = "src/main/java/pl/twojanazwa/aapsremote"
         val roots = listOf(File("$base/ui"), File("$base/session/platform"))
         roots.forEach { assertTrue(it.isDirectory, "Brak katalogu: ${it.path}") }

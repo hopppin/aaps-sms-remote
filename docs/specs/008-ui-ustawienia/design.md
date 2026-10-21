@@ -287,6 +287,13 @@ fun SecureWindowEffect(secure: Boolean)
 
 Szkic `QrScanner` (wskazówka dla wykonawcy, nie wymaganie): `LifecycleCameraController(context)` z `cameraSelector = DEFAULT_BACK_CAMERA`, `setEnabledUseCases(IMAGE_ANALYSIS)` (podgląd jest włączony zawsze), `setImageAnalysisAnalyzer(mainExecutor, MlKitAnalyzer(listOf(scanner), COORDINATE_SYSTEM_ORIGINAL, mainExecutor) { … })`, gdzie `scanner = BarcodeScanning.getClient(BarcodeScannerOptions.Builder().setBarcodeFormats(Barcode.FORMAT_QR_CODE).build())`; z wyniku pierwszy kod z niepustym `rawValue` → `onQrValue`. `bindToLifecycle(lifecycleOwner)`, `PreviewView` w `AndroidView` z `controller`. Błąd `initializationFuture` albo `!hasCamera(DEFAULT_BACK_CAMERA)` → `onCameraError`. `DisposableEffect`: `unbind()` i `scanner.close()`. Bez zapisu klatek i bez logowania wartości.
 
+Zachowanie `QrScanner` w implementacji (zadanie 10):
+
+- `onQrValue` i `onCameraError` łącznie najwyżej raz na otwarcie skanera (wspólny znacznik dostawy): po pierwszej wartości albo pierwszym błędzie kolejne wyniki analizatora są pomijane; po `onDispose` nic nie jest zgłaszane.
+- Błąd detektora w wyniku `MlKitAnalyzer` (`getThrowable(scanner) != null`) dla pojedynczej klatki jest ignorowany (utracona klatka). 5 kolejnych klatek z błędem z rzędu → `onCameraError`; klatka bez błędu zeruje licznik.
+- Wyjątek (`RuntimeException`) z konfiguracji kontrolera albo z `bindToLifecycle` (np. brak tylnej kamery) → `onCameraError` raz (wywołanie przez główny executor, bez logowania i bez treści wyjątku).
+- `onDispose`: `clearImageAnalysisAnalyzer()`, `unbind()`, `scanner.close()`.
+
 ### Ekran Ustawień
 
 ```kotlin
@@ -300,9 +307,14 @@ fun SettingsScreen(
 )
 ```
 
-- `LifecycleEventEffect(ON_RESUME)` → `smsViewModel.onResume()`, `secretViewModel.onResume()`; `LifecycleEventEffect(ON_STOP)` → `secretViewModel.onStop()`.
+- `LifecycleEventEffect(ON_RESUME)` → `smsViewModel.onResume()`, `secretViewModel.onResume()`; `LifecycleEventEffect(ON_STOP)` → `secretViewModel.onStop()`. Dodatkowo `DisposableEffect(Unit) { onDispose { secretViewModel.onStop() } }`: przy zmianie zakładki `ON_STOP` może nie dotrzeć przed usunięciem ekranu z kompozycji (UI-14); `onStop()` jest idempotentne.
 - `mode == SCANNER` → zamiast listy sekcji `QrScanner` na całą treść zakładki + `BackHandler { onScannerClosed() }`.
-- Inaczej: przewijana kolumna: baner „polecenie w toku” (gdy `commandActive` w stanie numeru albo sekretu), `NumberSection`, `SecretSection`, `SmsPermissionsSection`; okna potwierdzeń i `PasteUriDialog`; `SnackbarHost` pokazujący `message` obu ViewModeli (po pokazaniu `onMessageShown()`).
+- Inaczej: przewijana kolumna: baner „polecenie w toku” (gdy `commandActive` w stanie numeru albo sekretu), `NumberSection`, `SecretSection`, `SmsPermissionsSection`; okna potwierdzeń i `PasteUriDialog`; `SnackbarHost` pokazujący `message` obu ViewModeli.
+- Snackbar: `LaunchedEffect(tekst komunikatu)` najpierw woła `onMessageShown()` (komunikat jest kasowany w stanie w chwili przekazania do paska), potem uruchamia `showSnackbar` w osobnej korutynie z `rememberCoroutineScope()`. Skutki: powtórzony identyczny komunikat (np. drugi `SAVE_FAILED`) pokazuje się ponownie, bo stan przeszedł przez `null`; po zmianie zakładki i powrocie stary komunikat nie wraca.
+- `NumberSection`: pole numeru i „Anuluj” edycji są nieaktywne przy `busy` (zgodnie z `onInputChanged`/`onEditCancelled` w ViewModelu).
+- „Otwórz ustawienia aplikacji” (CAMERA i SMS): `startActivity` w `try`; `ActivityNotFoundException` (system bez ekranu informacji o aplikacji) jest ignorowany bez komunikatu i bez logowania.
+- „Zezwól” (SMS): `permissionsToRequest()` niepuste → prośba systemowa; puste (uprawnienia nadane z zewnątrz, a `ON_RESUME` jeszcze nie przyszło) → `smsViewModel.onResume()` zamiast prośby.
+- `PasteUriDialog`: `DialogProperties(securePolicy = SecureFlagPolicy.SecureOn, dismissOnClickOutside = false)` – dialog jest osobnym oknem, którego `FLAG_SECURE` Activity może nie objąć (UI-23); dotknięcie poza oknem nie zamyka go i nie kasuje wpisu.
 - `SecureWindowEffect(secretState.secureWindow)` (UI-23).
 - `cameraPermissionRequest == true` → `LaunchedEffect` uruchamia prośbę o CAMERA i woła `onCameraPermissionRequestLaunched()`.
 - Pole numeru: `KeyboardOptions(keyboardType = KeyboardType.Phone)`. Pole wklejania: `singleLine = true`, `visualTransformation = PasswordVisualTransformation()`, `KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)`; stan pola wyłącznie z `uiState.pasteText` (bez `rememberSaveable`).
@@ -341,15 +353,17 @@ Miejsce zgodne z konwencją `<pakiet>/platform/<Nazwa>Module.kt` (`SmsModule`, `
 
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
-| `canSet` albo `canChange` | `onEditClicked` | `editing`, `input` = `destination` przy `Configured`, inaczej `""` | – | UI-05 |
-| `editing` | `onInputChanged(t)` | `input = t`, `inputError = null` | – | UI-05 |
+| `busy` = false, brak polecenia (`activeSession.value == null`) i stan magazynu ≠ `Loading` – liczone ze źródeł w chwili akcji (odpowiednik `canSet`/`canChange`) | `onEditClicked` | `editing`, `input` = `destination` przy `Configured`, inaczej `""` | – | UI-05, UI-15, UI-16 |
+| `busy` albo polecenie w toku albo `Loading` | `onEditClicked` | bez zmian | ignorowane (bez komunikatu) | UI-15, UI-16 |
+| `editing`, `busy` = false | `onInputChanged(t)` | `input = t`, `inputError = null` | – | UI-05 |
+| `busy` | `onInputChanged(t)` / `onEditCancelled` | bez zmian | ignorowane (wynik zapisu dotyczy tekstu przekazanego do magazynu) | UI-05, UI-16 |
 | `editing`, `busy` = false | `onSaveClicked`, `activeSession.value != null` | bez zmian, `message = COMMAND_ACTIVE` | brak wywołania magazynu | UI-15 |
 | `editing`, `busy` = false | `onSaveClicked`, brak polecenia | `busy` | `store.save(input)` | UI-05, UI-16 |
 | `busy` | `onSaveClicked` / `onClearConfirmed` | bez zmian | ignorowane | UI-16 |
 | `busy` | `Saved` | `busy = false`, `editing = false`, `input = ""`, `message = SAVED` | – | UI-05 |
 | `busy` | `Invalid` | `busy = false`, `inputError = INVALID` | – | UI-05 |
 | `busy` | `Failed` | `busy = false`, `message = SAVE_FAILED` | – | UI-05 |
-| `editing` | `onEditCancelled` | `editing = false`, `input = ""`, `inputError = null` | – | UI-05 |
+| `editing`, `busy` = false | `onEditCancelled` | `editing = false`, `input = ""`, `inputError = null` | – | UI-05 |
 | `canClear` | `onClearClicked` | `confirmingClear` (albo `COMMAND_ACTIVE` przy poleceniu) | – | UI-06, UI-15 |
 | `confirmingClear` | `onClearConfirmed`, `activeSession.value != null` | `confirmingClear = false`, `message = COMMAND_ACTIVE` | brak wywołania magazynu | UI-15 |
 | `confirmingClear`, `busy` = false | `onClearConfirmed`, brak polecenia | `confirmingClear = false`, `busy` | `store.clear()` | UI-06, UI-16 |
@@ -363,22 +377,26 @@ Miejsce zgodne z konwencją `<pakiet>/platform/<Nazwa>Module.kt` (`SmsModule`, `
 
 Wspólna procedura `accept(raw)` (wejście ze skanera albo z pola): (1) `activeSession.value != null` → `COMMAND_ACTIVE`, koniec; (2) `busy` → koniec; (3) `busy = true`; (4) `OtpauthParser.parse(raw)` – `Failure` → komunikat z tabeli UI-12, `busy = false`; `Success(secret)` → `store.save(secret)` → komunikat z tabeli, `busy = false`. `secret` i `raw` są tylko zmiennymi lokalnymi korutyny.
 
+`onPasteSubmitted` celowo nie sprawdza `canSubmitPaste` (zawiera `!commandActive` i `!busy`), tylko `mode = PASTE` i niepusty tekst (inaczej wywołanie jest ignorowane): przy wyścigu ze startem polecenia (kolektor jeszcze nie zamknął okna) `accept` zgłasza `COMMAND_ACTIVE` (UI-15) zamiast cichego zignorowania. Przy `busy` pole jest czyszczone i okno zamykane (UI-11, UI-14), a `accept` kończy się w kroku (2) bez komunikatu i bez wywołania parsera i magazynu (UI-16). Dziś ta ścieżka jest nieosiągalna: okno wklejania nie otwiera się przy `busy`, a przycisk „Zapisz” wymaga `canSubmitPaste`.
+
 | Stan | Zdarzenie | Nowy stan | Akcja | Wymaganie |
 | --- | --- | --- | --- | --- |
 | `canScan`, `display` ∈ {`CHECKING`, `PRESENT`} | `onScanClicked` | `confirmingReplace = SCAN` | – | UI-08 |
 | `canPaste`, `display` ∈ {`CHECKING`, `PRESENT`} | `onPasteClicked` | `confirmingReplace = PASTE` | – | UI-08 |
-| `canScan`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onScanClicked`) albo `confirmingReplace = SCAN` (`onReplaceConfirmed`) | sprawdzenie CAMERA = `true` | `confirmingReplace = null`, `mode = SCANNER`, `cameraDenial = NONE` | – | UI-08, UI-10 |
+| `canScan`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onScanClicked`) albo `confirmingReplace = SCAN` i `canScan` (`onReplaceConfirmed`) | sprawdzenie CAMERA = `true` | `confirmingReplace = null`, `mode = SCANNER`, `cameraDenial = NONE` | – | UI-08, UI-10 |
 | j.w. | sprawdzenie CAMERA = `false` | `confirmingReplace = null`, `cameraPermissionRequest = true` | – | UI-08, UI-10 |
-| `canPaste`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onPasteClicked`) albo `confirmingReplace = PASTE` (`onReplaceConfirmed`) | – | `confirmingReplace = null`, `mode = PASTE`, `pasteText = ""` | – | UI-08, UI-11 |
+| `canPaste`, `display` ∈ {`ABSENT`, `INVALIDATED`} (`onPasteClicked`) albo `confirmingReplace = PASTE` i `canPaste` (`onReplaceConfirmed`) | – | `confirmingReplace = null`, `mode = PASTE`, `pasteText = ""` | – | UI-08, UI-11 |
+| `confirmingReplace = SCAN` i `!canScan` albo `confirmingReplace = PASTE` i `!canPaste` (stan liczony ze źródeł w chwili akcji) | `onReplaceConfirmed` | `confirmingReplace = null`; skaner, prośba o CAMERA i okno wklejania nie są otwierane | bez komunikatu | UI-15, UI-16 |
 | `confirmingReplace ≠ null` | `onReplaceDismissed` | `confirmingReplace = null` | – | UI-08 |
 | `cameraPermissionRequest` | `onCameraPermissionRequestLaunched` | `cameraPermissionRequest = false` | – | UI-10 |
-| – | `onCameraPermissionResult(r)` | CAMERA = `true` → `mode = SCANNER`, `cameraDenial = NONE`; inaczej `cameraDenial = classify([CAMERA]) { r }` | – | UI-10 |
+| dowolny (nie wymaga oczekującej prośby ani `cameraPermissionRequest`) | `onCameraPermissionResult(r)` | CAMERA = `true` → `cameraDenial = NONE` oraz `mode = SCANNER` tylko przy `canScan` (liczonym ze źródeł w chwili wyniku), inaczej `mode` bez zmian; CAMERA = `false` → `cameraDenial = classify([CAMERA]) { r }` | – | UI-10, UI-15, UI-16 |
 | `mode = SCANNER` | `onQrScanned(raw)` | `mode = NONE` | `accept(raw)` | UI-09, UI-12 |
 | `mode ≠ SCANNER` | `onQrScanned(raw)` | bez zmian | ignorowane | UI-09 |
 | `mode = SCANNER` | `onCameraFailed` | `mode = NONE`, `message = CAMERA_UNAVAILABLE` | – | UI-09 |
+| `mode ≠ SCANNER` | `onCameraFailed` / `onScannerClosed` | bez zmian | ignorowane | UI-09 |
 | `mode = SCANNER` | `onScannerClosed` | `mode = NONE` | – | UI-09 |
 | `mode = PASTE` | `onPasteTextChanged(t)` | `pasteText = t` | – | UI-11 |
-| `mode = PASTE`, `canSubmitPaste` | `onPasteSubmitted` | `raw = pasteText`; `pasteText = ""`, `mode = NONE` | `clearClipboardIfPasted(clipboard, raw)`, potem `accept(raw)` | UI-11, UI-14, UI-24 |
+| `mode = PASTE`, `pasteText` niepusty po usunięciu znaków białych (bez sprawdzania `canSubmitPaste`) | `onPasteSubmitted` | `raw = pasteText`; `pasteText = ""`, `mode = NONE` | `clearClipboardIfPasted(clipboard, raw)`, potem `accept(raw)` | UI-11, UI-14, UI-24 |
 | `mode = PASTE` | `onPasteDismissed` | `text = pasteText`; `pasteText = ""`, `mode = NONE` | `clearClipboardIfPasted(clipboard, text)` | UI-11, UI-24 |
 | `canDelete` | `onDeleteClicked` | `confirmingDelete` (albo `COMMAND_ACTIVE`) | – | UI-13, UI-15 |
 | `confirmingDelete` | `onDeleteConfirmed`, `activeSession.value != null` | `confirmingDelete = false`, `message = COMMAND_ACTIVE` | brak wywołania magazynu | UI-15 |

@@ -21,7 +21,7 @@ class SecretTextsTest {
     }
 
     @Test
-    fun `UI-20 strings xml ma niepuste teksty sekretu`() {
+    fun `UI-20 UI-10 strings xml ma niepuste teksty sekretu i skanera`() {
         val xml = File("src/main/res/values/strings.xml").readText()
         val strings = Regex("""<string name="([^"]+)"[^>]*>([^<]*)</string>""")
             .findAll(xml).associate { it.groupValues[1] to it.groupValues[2] }
@@ -33,6 +33,7 @@ class SecretTextsTest {
             "secret_msg_key_generation_failed", "secret_msg_save_failed", "secret_msg_not_totp_qr",
             "secret_msg_unsupported_parameters", "secret_msg_invalid_secret", "secret_msg_deleted",
             "secret_msg_delete_failed", "secret_msg_camera_unavailable",
+            "secret_scanner_hint", "secret_camera_denied", "action_open_app_settings",
         ).forEach { assertTrue(!strings[it].isNullOrBlank(), "Brak niepustego tekstu: $it") }
     }
 }
