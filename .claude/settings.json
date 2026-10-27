@@ -11,7 +11,23 @@
       "Bash(git push:*)",
       "Bash(gh issue:*)",
       "Bash(gh pr:*)",
-      "Bash(adb:*)"
+      "Bash(adb:*)",
+      "Bash(scripts/sprawdz.sh:*)",
+      "Bash(bash scripts/sprawdz.sh:*)",
+      "Bash(gh api:*)",
+      "Bash(gh label:*)",
+      "Bash(rtk git status:*)",
+      "Bash(rtk git diff:*)",
+      "Bash(rtk git add:*)",
+      "Bash(rtk git commit:*)",
+      "Bash(rtk git checkout:*)",
+      "Bash(rtk git branch:*)",
+      "Bash(rtk git push:*)",
+      "Bash(rtk git log:*)",
+      "Bash(git log:*)",
+      "Bash(rtk gh issue:*)",
+      "Bash(rtk gh pr:*)",
+      "Bash(rtk ./gradlew:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
@@ -26,7 +42,21 @@
       "Bash(git push * *:main:*)",
       "Bash(git push origin HEAD:refs/heads/main:*)",
       "Bash(git push * refs/heads/main:*)",
-      "Bash(git push * *:refs/heads/main:*)"
+      "Bash(git push * *:refs/heads/main:*)",
+      "Bash(rtk git push --force:*)",
+      "Bash(rtk git push -f:*)",
+      "Bash(rtk git push --force-with-lease:*)",
+      "Bash(rtk git push * --force:*)",
+      "Bash(rtk git push * -f:*)",
+      "Bash(rtk git push * --force-with-lease:*)",
+      "Bash(rtk git push origin main:*)",
+      "Bash(rtk git push origin HEAD:main:*)",
+      "Bash(rtk git push * main:*)",
+      "Bash(rtk git push * *:main:*)",
+      "Bash(rtk git push origin HEAD:refs/heads/main:*)",
+      "Bash(rtk git push * refs/heads/main:*)",
+      "Bash(rtk git push * *:refs/heads/main:*)",
+      "Bash(rtk proxy:*)"
     ]
   }
 }

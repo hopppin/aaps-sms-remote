@@ -25,10 +25,20 @@ for n in <numery>; do echo "#$n: $(gh issue view $n --json body --jq .body | gre
 
 ## 3. Implementacja
 
-- Jeden `wykonawca` na issue, **zawsze** `isolation: "worktree"`, `run_in_background: true`.
+- Jeden wykonawca na issue, **zawsze** `isolation: "worktree"`, `run_in_background: true`. Agenta wybierz po etykietach:
+
+  | Etykiety issue | Agent |
+  | --- | --- |
+  | `bezpieczenstwo` (dowolna trudność) | `wykonawca` (Sonnet) |
+  | `trudnosc:trudne` | `wykonawca` (Sonnet) |
+  | `trudnosc:latwe` bez `bezpieczenstwo` | `wykonawca-lekki` (Haiku) – albo zostaw je Hermesowi: `codex-latwe.sh` co 2 h oddaje je Codexowi |
+
+  Gdy `wykonawca-lekki` przerwie zadanie („za trudne” w Stanie pracy), zmień etykietę na `trudnosc:trudne` i uruchom `wykonawca`.
 - Równolegle tylko issues bez zależności między sobą i **bez wspólnych plików** – rozdziel pliki w promptach (np. który agent dopisuje do wspólnej klasy testów). Inaczej drugi PR będzie miał konflikt.
 - W prompcie: numer issue, spec, zakres („tylko #N, X robi inny agent”), blok środowiska, „gdy spec niejasna – nie zgaduj, opisz w Stan pracy”.
 - Po raporcie sprawdź sam: `gh pr view <nr> --json additions,deletions,files`, brak logowania (`gh pr diff <nr> | grep -nE '^\+.*(Log\.|println|Timber|printStackTrace)'`), zgodność z design.md.
+- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` (i PR `Spec: ...`). Pozostałe PR recenzuje CodeRabbit.
+- Issues UI (spec 008–010): wykonawca korzysta ze skilla UI UX Pro Max (Jetpack Compose), jeśli jest zainstalowany.
 - Potem `/obsluga-pr <nr>`.
 
 ## Blok środowiska (wklejaj do promptów agentów)

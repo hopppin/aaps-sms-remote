@@ -8,6 +8,10 @@ argument-hint: <numer PR>
 
 Repo: `hopppin/aaps-sms-remote`. Numer PR z argumentu (`$ARGUMENTS`); bez argumentu – `gh pr list` i zapytaj.
 
+Tryb bez nadzoru (Hermes, `claude -p`): nie ma kogo zapytać, więc pytania i decyzje produktowe wypisz w raporcie końcowym i zakończ. Prośba o poprawki albo zgoda na scalenie musi być wprost w treści polecenia; bez niej – tylko raport.
+
+Agent `recenzent` (dodatkowo do CodeRabbita) tylko dla PR z etykietą `bezpieczenstwo` i PR `Spec: ...`.
+
 ## 1. Czekaj na kontrole (w tle, nie odpytuj w pętli na pierwszym planie)
 
 ```bash
