@@ -70,6 +70,10 @@
       "Bash(rtk git push -d:*)",
       "Bash(rtk git push * -d:*)",
       "Bash(rtk git push * :*:*)",
+      "Bash(git push --prune:*)",
+      "Bash(git push * --prune:*)",
+      "Bash(rtk git push --prune:*)",
+      "Bash(rtk git push * --prune:*)",
       "Bash(rtk proxy:*)"
     ]
   }

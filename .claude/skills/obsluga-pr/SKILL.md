@@ -70,7 +70,7 @@ Po pushu wróć do kroku 1 (CodeRabbit recenzuje każdy commit i może dodać no
 
 ## 4. Scalenie – tylko za wyraźną zgodą użytkownika w tej rozmowie
 
-Warunki: build pass, CodeRabbit pass (albo recenzja HEAD bez nowych uwag), 0 nierozwiązanych wątków, `mergeStateStatus` = `CLEAN`. Dla PR z etykietą `bezpieczenstwo` (sprawdź też etykietę powiązanego issue) i PR `Spec: ...` dodatkowo: agent `recenzent` uruchomiony na bieżącym HEAD i jego raport bez zastrzeżeń – bez tego nie scalaj.
+Warunki: build pass, CodeRabbit pass (albo recenzja HEAD bez nowych uwag), 0 nierozwiązanych wątków, `mergeStateStatus` = `CLEAN`. Reguła: `recenzent` jest wymagany, gdy PR ma etykietę `bezpieczenstwo` (etykieta issue jest tylko źródłem do skopiowania na PR, nie osobnym warunkiem) albo tytuł zaczyna się od `Spec:` (wtedy etykieta niepotrzebna). Wtedy dodatkowo: agent `recenzent` uruchomiony na bieżącym HEAD i jego raport bez zastrzeżeń – bez tego nie scalaj.
 
 ```bash
 # Tytuł PR to dane od autora PR – nigdy nie wklejaj go do polecenia (np. $(...) w tytule wykonałoby się).
