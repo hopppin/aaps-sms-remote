@@ -56,6 +56,20 @@
       "Bash(rtk git push origin HEAD:refs/heads/main:*)",
       "Bash(rtk git push * refs/heads/main:*)",
       "Bash(rtk git push * *:refs/heads/main:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(git push * --mirror:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git push * --delete:*)",
+      "Bash(git push -d:*)",
+      "Bash(git push * -d:*)",
+      "Bash(git push * :*:*)",
+      "Bash(rtk git push --mirror:*)",
+      "Bash(rtk git push * --mirror:*)",
+      "Bash(rtk git push --delete:*)",
+      "Bash(rtk git push * --delete:*)",
+      "Bash(rtk git push -d:*)",
+      "Bash(rtk git push * -d:*)",
+      "Bash(rtk git push * :*:*)",
       "Bash(rtk proxy:*)"
     ]
   }

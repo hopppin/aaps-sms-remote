@@ -37,7 +37,7 @@ for n in <numery>; do echo "#$n: $(gh issue view $n --json body --jq .body | gre
 - Równolegle tylko issues bez zależności między sobą i **bez wspólnych plików** – rozdziel pliki w promptach (np. który agent dopisuje do wspólnej klasy testów). Inaczej drugi PR będzie miał konflikt.
 - W prompcie: numer issue, spec, zakres („tylko #N, X robi inny agent”), blok środowiska, „gdy spec niejasna – nie zgaduj, opisz w Stan pracy”.
 - Po raporcie sprawdź sam: `gh pr view <nr> --json additions,deletions,files`, brak logowania (`gh pr diff <nr> | grep -nE '^\+.*(Log\.|println|Timber|printStackTrace)'`), zgodność z design.md.
-- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` (i PR `Spec: ...`). Pozostałe PR recenzuje CodeRabbit.
+- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` (i PR `Spec: ...`). CodeRabbit recenzuje każdy PR. Etykietę `bezpieczenstwo` z issue skopiuj na PR (`gh pr edit <nr> --add-label bezpieczenstwo`) – bez niej `/obsluga-pr` nie uruchomi `recenzent`.
 - Issues UI (spec 008–010): wykonawca korzysta ze skilla UI UX Pro Max (Jetpack Compose), jeśli jest zainstalowany.
 - Potem `/obsluga-pr <nr>`.
 

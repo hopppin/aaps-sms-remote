@@ -39,7 +39,7 @@ CI uruchamia się tylko na PR. Po scaleniu kilku PR sprawdź połączony `main` 
 - Skille w `.claude/skills/`: `/nowa-funkcja` (cały przepływ spec → issues → kod), `/obsluga-pr <nr>` (CI, CodeRabbit, scalenie), `/aktualizuj-stan` (odświeża `docs/stan-prac.md`).
 - Agenci `specyfikator`, `planista`, `wykonawca`, `wykonawca-lekki`, `recenzent` są globalni (`~/.claude/agents/`), nie w repo. Są ogólni – wszystko, co dotyczy tego projektu, jest w tym pliku.
 - Wybór wykonawcy: `bezpieczenstwo` lub `trudnosc:trudne` → `wykonawca` (Sonnet); `trudnosc:latwe` bez `bezpieczenstwo` → `wykonawca-lekki` (Haiku) albo Codex przez Hermesa (`codex-latwe.sh`).
-- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` i PR `Spec: ...`. Pozostałe PR recenzuje CodeRabbit.
+- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` i PR `Spec: ...`. CodeRabbit recenzuje każdy PR; `recenzent` jest dodatkowy dla tych dwóch przypadków.
 - Hermes (Telegram) może uruchamiać `/obsluga-pr` i `/aktualizuj-stan` bez nadzoru (`claude -p`). Obowiązują te same zasady: commit tylko na wyraźną prośbę, scalenie tylko za wyraźną zgodą użytkownika.
 - PR scala się (squash) dopiero za wyraźną zgodą użytkownika.
 
@@ -96,6 +96,7 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 Zadania dotykające tych obszarów dostają etykietę `bezpieczenstwo`, zawsze wykonuje je `wykonawca` (nie `wykonawca-lekki` ani Codex) i zawsze sprawdza je agent `recenzent`.
 
 - Pakiety `sms`, `otp`, `security`, `session`.
+- Pakiety z danymi AAPS (numer AAPS, ilość CARBS, treść odpowiedzi): `data`, `data.platform`, `ui.history` (zakaz ujawniania w `toString()` i logach, `FLAG_SECURE`, brak kopii zapasowej).
 - Sekret TOTP, kody TOTP i PIN AAPS (zasady w sekcji Bezpieczeństwo).
 - Decyzja o odesłaniu kodu: weryfikacja numeru nadawcy, polecenia, ilości i chwili odbioru odpowiedzi AAPS.
 - Uprawnienia Androida (`SEND_SMS`, `RECEIVE_SMS`) i manifest.
