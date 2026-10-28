@@ -19,6 +19,13 @@ class CurrentRunBindingTest {
     }
 
     @Test
+    fun `CMDUI-27 konstruktor CommandRunViewModel przyjmuje CurrentRun`() {
+        val constructor = CommandRunViewModel::class.java.declaredConstructors.single()
+        assertTrue(constructor.parameterTypes.any { it == CurrentRun::class.java })
+        assertNotNull(constructor.getAnnotation(Inject::class.java))
+    }
+
+    @Test
     fun `CMDUI-27 konstruktor CommandLauncher przyjmuje CurrentRun`() {
         val constructor = CommandLauncher::class.java.declaredConstructors.single()
         assertTrue(constructor.parameterTypes.any { it == CurrentRun::class.java })
