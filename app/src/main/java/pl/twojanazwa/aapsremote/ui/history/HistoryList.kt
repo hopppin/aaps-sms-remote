@@ -25,20 +25,21 @@ import pl.twojanazwa.aapsremote.ui.commands.ResultKind
 /** HISTUI-02 – HISTUI-05: wiersze od najnowszego; dotknięcie otwiera szczegóły. */
 @Composable
 fun HistoryList(items: List<HistoryItem>, onEntryClicked: (Long) -> Unit) {
+    val zone = rememberHistoryZone()
     LazyColumn {
         items(items, key = { it.id }) { item ->
-            HistoryRow(item, onClick = { onEntryClicked(item.id) })
+            HistoryRow(item, zone, onClick = { onEntryClicked(item.id) })
             HorizontalDivider()
         }
     }
 }
 
 @Composable
-private fun HistoryRow(item: HistoryItem, onClick: () -> Unit) {
+private fun HistoryRow(item: HistoryItem, zone: ZoneId, onClick: () -> Unit) {
     val result = item.result
     val command = historyCommandText(item.command, item.grams)
     val time = item.listTimeEpochMillis
-        ?.let { HistoryTimeFormat.row(it, ZoneId.systemDefault()) }
+        ?.let { HistoryTimeFormat.row(it, zone) }
         ?: stringResource(R.string.history_time_none)
     val message = result.messageArg
         ?.let { stringResource(result.messageRes(), it) }

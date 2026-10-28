@@ -13,16 +13,21 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import java.time.ZoneId
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import pl.twojanazwa.aapsremote.R
 
 /** HISTUI-05 – HISTUI-07: szczegóły wpisu; treść SMS jako zwykły tekst bez linków (HISTUI-06). */
 @Composable
 fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
-    val zone = ZoneId.systemDefault()
+    val zone = rememberHistoryZone()
     val result = details.result
     val messageText = result.messageArg
         ?.let { stringResource(result.messageRes(), it) }
@@ -75,6 +80,17 @@ fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
         }
         Button(onClick = onDetailsClosed) { Text(stringResource(R.string.result_close)) }
     }
+}
+
+/** HISTUI-05: strefa z chwili wyświetlenia – odświeżana po powrocie na ekran (np. po zmianie strefy w ustawieniach). */
+@Composable
+internal fun rememberHistoryZone(): ZoneId {
+    var zone by remember { mutableStateOf(ZoneId.systemDefault()) }
+    LifecycleResumeEffect(Unit) {
+        zone = ZoneId.systemDefault()
+        onPauseOrDispose {}
+    }
+    return zone
 }
 
 /** Nazwa polecenia z ilością dla CARBS (HISTUI-03). */

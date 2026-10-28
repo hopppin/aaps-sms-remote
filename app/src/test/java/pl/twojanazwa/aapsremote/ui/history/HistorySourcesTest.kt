@@ -31,6 +31,14 @@ class HistorySourcesTest {
     }
 
     @Test
+    fun `HISTUI-06 szczegoly bez zaznaczania i klikalnego tekstu treści SMS`() {
+        val src = File("$ui/history/HistoryDetailsView.kt").readText()
+        listOf("SelectionContainer", "ClickableText", "clickable", "LinkAnnotation").forEach { word ->
+            assertFalse(src.contains(word), word)
+        }
+    }
+
+    @Test
     fun `HISTUI-14 Compose w ui history bez literalow tekstowych widocznych dla uzytkownika`() {
         listOf("HistoryScreen.kt", "HistoryList.kt", "HistoryDetailsView.kt", "HistoryClearDialog.kt").forEach { name ->
             val src = File("$ui/history/$name").readText()

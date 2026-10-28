@@ -19,12 +19,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.data.HistoryLimits
 import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
@@ -37,13 +39,13 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     BackHandler(enabled = state.interceptsBack) { viewModel.onBack() }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
     val messageText = state.message?.let { stringResource(it.textRes()) }
-    // onMessageShown dopiero po zniknięciu Snackbara, inaczej zmiana klucza anulowałaby go od razu.
+    // Komunikat kasujemy od razu; Snackbar biegnie w scope kompozycji, więc zmiana klucza go nie anuluje.
     LaunchedEffect(state.message) {
-        if (messageText != null) {
-            snackbarHostState.showSnackbar(messageText)
-            viewModel.onMessageShown()
-        }
+        val text = messageText ?: return@LaunchedEffect
+        viewModel.onMessageShown()
+        snackbarScope.launch { snackbarHostState.showSnackbar(text) }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
