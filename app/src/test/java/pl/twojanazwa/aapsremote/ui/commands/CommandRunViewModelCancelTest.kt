@@ -126,4 +126,48 @@ class CommandRunViewModelCancelTest {
         assertFalse(viewModel.uiState.value.confirmingExit)
         assertFalse(viewModel.uiState.value.confirmingStopWaiting)
     }
+
+    @Test
+    fun `CMDUI-18 tryb z fazy sesji a nie ze spoznionego widoku - SENDING_CODE otwiera okno`() =
+        runTest(main.dispatcher) {
+            val env = CommandTestEnv(this)
+            env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+            env.launcher().launch(CommandTestFixtures.carbs(1), CommandTestFixtures.pin())
+            runCurrent()
+            requestCodeAt(env.incoming)
+            runCurrent()
+            // ViewModel utworzony po przejściu sesji, jego widok jeszcze nie zdążył się zaktualizować.
+            val viewModel = env.viewModel()
+            assertEquals(null, viewModel.uiState.value.view)
+
+            viewModel.onCancelClicked()
+
+            assertTrue(viewModel.uiState.value.confirmingStopWaiting)
+            assertTrue(env.coordinator.activeSession.value != null)
+            env.coordinator.activeSession.value?.cancel()
+            runCurrent()
+        }
+
+    @Test
+    fun `CMDUI-18 potwierdzenie okna po zakonczeniu sesji A nie anuluje nowej sesji B`() =
+        runTest(main.dispatcher) {
+            val env = CommandTestEnv(this)
+            val viewModel = env.startCarbs1()
+            runCurrent()
+            requestCodeAt(env.incoming)
+            runCurrent()
+            viewModel.onCancelClicked()
+            deliverAt(env.incoming, 120_000, AapsSamples.carbsDone)
+            runCurrent()
+            viewModel.onResultDismissed()
+            env.launcher().launch(Command.Bg, null)
+            runCurrent()
+            val sessionB = env.coordinator.activeSession.value!!
+
+            viewModel.onStopWaitingConfirmed()
+            runCurrent()
+
+            assertTrue(env.coordinator.activeSession.value === sessionB)
+            assertTrue(viewModel.uiState.value.view is RunView.Active)
+        }
 }

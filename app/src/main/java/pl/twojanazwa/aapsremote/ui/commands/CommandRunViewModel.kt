@@ -83,21 +83,33 @@ class CommandRunViewModel @Inject constructor(
         }
     }
 
-    /** CMDUI-18: przed kodem od razu `cancel()`, po kodzie najpierw okno; sesja z `activeSession` w chwili akcji. */
+    /** Przebieg, dla którego otwarto okno „Przestać czekać?”; potwierdzenie anuluje tylko jego sesję. */
+    private var stopWaitingRun: CurrentRunData? = null
+
+    /** CMDUI-18: tryb z bieżącej fazy `activeSession` (widok może się spóźniać); przed kodem `cancel()`, po kodzie okno. */
     fun onCancelClicked() {
-        when ((mutableState.value.view as? RunView.Active)?.cancelMode) {
-            CancelMode.CANCEL -> coordinator.activeSession.value?.cancel()
-            CancelMode.STOP_WAITING -> mutableState.update { it.copy(confirmingStopWaiting = true) }
-            CancelMode.NONE, null -> Unit
+        val session = coordinator.activeSession.value ?: return
+        when (session.state.value.phase.cancelMode()) {
+            CancelMode.CANCEL -> session.cancel()
+            CancelMode.STOP_WAITING -> {
+                stopWaitingRun = currentRun.state.value
+                mutableState.update { it.copy(confirmingStopWaiting = true) }
+            }
+            CancelMode.NONE -> Unit
         }
     }
 
     fun onStopWaitingConfirmed() {
         mutableState.update { it.copy(confirmingStopWaiting = false) }
-        coordinator.activeSession.value?.cancel()
+        val opened = stopWaitingRun
+        stopWaitingRun = null
+        val session = coordinator.activeSession.value ?: return
+        // Inna sesja niż ta, dla której otwarto okno, nie jest anulowana.
+        if (opened != null && opened.state === session.state) session.cancel()
     }
 
     fun onStopWaitingDismissed() {
+        stopWaitingRun = null
         mutableState.update { it.copy(confirmingStopWaiting = false) }
     }
 
