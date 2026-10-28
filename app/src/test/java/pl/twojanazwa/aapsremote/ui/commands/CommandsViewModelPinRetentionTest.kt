@@ -171,4 +171,34 @@ class CommandsViewModelPinRetentionTest {
         env.coordinator.activeSession.value?.cancel()
         settle()
     }
+
+    @Test
+    fun `CMDUI-11 dwukrotne onStop daje ten sam stan i nie wola launchera`() = runTest(main.dispatcher) {
+        val launcher = mockk<CommandLauncher>(relaxed = true)
+        val vm = env().viewModel(launcher)
+        vm.openSummary()
+        vm.onPinChanged("4321")
+        vm.onStop()
+        val first = vm.state()
+        vm.onStop()
+        assertEquals(first, vm.state())
+        assertEquals("", first.pinText)
+        assertNull(first.summaryGrams)
+        assertEquals("20", first.carbsInput)
+        coVerify(exactly = 0) { launcher.launch(any(), any()) }
+    }
+
+    @Test
+    fun `CMDUI-11 onStop zamyka tez okno Na pewno`() = runTest(main.dispatcher) {
+        val vm = env().viewModel()
+        vm.onCarbsInputChanged("45")
+        vm.onCarbsNextClicked()
+        settle()
+        assertEquals(45, vm.state().confirmingLargeGrams)
+        vm.onStop()
+        vm.onStop()
+        assertNull(vm.state().confirmingLargeGrams)
+        assertNull(vm.state().summaryGrams)
+        assertEquals("", vm.state().pinText)
+    }
 }

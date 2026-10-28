@@ -153,7 +153,7 @@ class CommandsViewModel @Inject constructor(
         if (local.value.confirmingLargeGrams != null) onLargeAmountDismissed() else onSummaryDismissed()
     }
 
-    /** Aplikacja schodzi z ekranu: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
+    /** Aplikacja schodzi z ekranu albo zmiana zakładki: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
     fun onStop() {
         local.update { it.copy(pinText = "", summaryGrams = null, confirmingLargeGrams = null) }
     }
