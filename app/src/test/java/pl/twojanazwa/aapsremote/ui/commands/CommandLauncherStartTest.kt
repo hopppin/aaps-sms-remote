@@ -103,6 +103,7 @@ class CommandLauncherStartTest {
         val result = env.launcher(coordinator).launch(CommandTestFixtures.carbs(20), pin)
         runCurrent()
 
+        verify(exactly = 1) { coordinator.start(any(), any(), any(), any()) }
         assertEquals(LaunchResult.Rejected(LaunchRejection.START_FAILED), result)
         assertTrue(pin.isCleared)
         assertEquals(null, env.currentRun.state.value)

@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -73,6 +74,8 @@ class CommandLauncher @Inject constructor(
             return synchronized(this) {
                 val result = try {
                     coordinator.start(scope, command, credentials)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: RuntimeException) {
                     return@synchronized LaunchResult.Rejected(LaunchRejection.START_FAILED)
                 }
