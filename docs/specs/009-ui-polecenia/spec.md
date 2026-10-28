@@ -623,7 +623,7 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
   - CMDUI-04: sekret wymagany dla każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu); CMDUI-05 obejmuje nowe przyciski.
   - CMDUI-07 – CMDUI-09: granica i próg `CARBS` z limitów (LIM-06 – LIM-08); dostępność zależna od stanu limitów (LIM-05).
   - CMDUI-10, CMDUI-11: podsumowanie z PIN-em uogólnione na `BOLUS` i zmianę profilu (BOL-15, PROF-15).
-  - CMDUI-12: nowe powody odrzucenia `LIMITS_UNAVAILABLE`, `AMOUNT_ABOVE_LIMIT` (LIM-09), `BOLUS_INTERVAL`, `BOLUS_HISTORY_UNAVAILABLE` (BOL-12).
+  - CMDUI-12: nowe powody odrzucenia `LIMITS_UNAVAILABLE`, `AMOUNT_ABOVE_LIMIT`, `EXTRA_CONFIRMATION_REQUIRED` (LIM-09; `launch` dostaje znacznik `extraConfirmed`), `BOLUS_INTERVAL`, `BOLUS_HISTORY_UNAVAILABLE` (BOL-12).
   - CMDUI-16, CMDUI-17, CMDUI-19: nagłówki, kroki (5 kroków dla każdego polecenia z kodem) i komunikaty nowych poleceń (BOL-16, PROF-16); wynik listy profili z wyborem pozycji (PROF-14).
   - CMDUI-23: `FLAG_SECURE` także dla okna „Na pewno X j.?” i formularza profilu (BOL-14, PROF-15).
 - **2026-10-28 – czyszczenie PIN-u przy zmianie zakładki (P13).**

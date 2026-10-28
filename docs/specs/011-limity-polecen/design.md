@@ -54,9 +54,19 @@ sealed interface LimitsValidation {
     data class Invalid(val errors: Map<LimitField, LimitValueError>) : LimitsValidation
 }
 
-/** LIM-03: tekst pól → LimitsValidation. Nigdy nie rzuca. Bolus – reguły BolusAmountText (Spec 012). */
+/** LIM-03: tekst pól → LimitsValidation. Nigdy nie rzuca. Pole bolusa – BolusAmountText (niżej). */
 object LimitsInput {
     fun parse(carbsMax: String, bolusMax: String, interval: String): LimitsValidation
+}
+
+/** Rodzaje błędów tekstu ilości insuliny (BOL-03). Powstaje w zad. 1 tej spec; Spec 012 używa go w BolusValidation. */
+enum class BolusAmountError { EMPTY, INVALID_CHARACTERS, TOO_MANY_DECIMALS, BELOW_MIN, ABOVE_MAX, NOT_STEP }
+
+/** BOL-03 kroki 1–4: tekst → setne albo błąd składni; BOL-05: setne → tekst SMS. Powstaje w zad. 1 tej spec. */
+object BolusAmountText {
+    sealed interface Parsed { data class Value(val centiUnits: Int) : Parsed; data class Error(val error: BolusAmountError) : Parsed }
+    fun parse(input: String): Parsed
+    fun toSms(centiUnits: Int): String
 }
 
 // Zmiana Spec 003 (LIM-06, LIM-07):
@@ -96,12 +106,13 @@ interface CommandLimitsStorage {
 package pl.twojanazwa.aapsremote.ui.commands
 // LaunchRejection: nowe wartości LIMITS_UNAVAILABLE, AMOUNT_ABOVE_LIMIT, EXTRA_CONFIRMATION_REQUIRED (LIM-09).
 // CommandLauncher.launch(command, pin, extraConfirmed: Boolean = false) – ViewModel przekazuje true tylko po „Tak” w oknie „Na pewno”.
+// LIM-09: jedno odczytanie `limitsStore.state.value` na wywołanie; z tej migawki liczone są stan, limit i próg.
 // CommandLauncher: nowa zależność CommandLimitsStore.
 ```
 
 ## Model danych i stany
 
-Wczytanie (`CommandLimitsSettings.load`): dla każdego klucza `readInt`; `null` → wartość domyślna; potem `CommandLimits.of(...)`: `Valid` → `Loaded`, `Invalid` → `LoadFailed`; wyjątek → `LoadFailed`. Wczytanie nie nadpisuje stanu, gdy wcześniej zakończył się zapis (jak DATA-02).
+Wczytanie (`CommandLimitsSettings.load`, LIM-04): `readInt` dla trzech kluczy; wszystkie trzy `null` (brak pliku albo kluczy) → `Loaded(CommandLimits.DEFAULT)`; część `null`, a część obecna → `LoadFailed` (zapis zawsze zapisuje trzy klucze naraz); wszystkie obecne → `CommandLimits.of(...)`: `Valid` → `Loaded`, `Invalid` → `LoadFailed`; wyjątek (w tym `ClassCastException`) → `LoadFailed`. Wczytanie nie nadpisuje stanu, gdy wcześniej zakończył się zapis (jak DATA-02).
 
 `CommandLimitsViewModel` (sekcja):
 
@@ -140,7 +151,8 @@ Pola nie są nadpisywane wartościami ze stanu po pierwszym wypełnieniu (edycja
 | LIM-04 | `CommandLimitsSettingsTest` – jednostkowy (atrapa `CommandLimitsStorage`, Turbine); W1 |
 | LIM-05 | `CommandsViewModelLimitsTest` – jednostkowy |
 | LIM-06, LIM-07, LIM-08 | `CarbsLimitsTest` (commands, w tym wszystkie kryteria CMD-03 – CMD-06 z limitami domyślnymi), `CommandsViewModelLimitsTest` |
-| LIM-09 | `CommandLauncherLimitsTest` – jednostkowy |
+| LIM-09 | `CommandLauncherLimitsTest` – jednostkowy (w tym jedna migawka stanu limitów na całe sprawdzenie) |
+| LIM-11 (start w trakcie zapisu) | `CommandLauncherLimitsTest` – `LIM-11 start w trakcie zapisu stosuje poprzednie limity`: zapis zawieszony w atrapie magazynu, `launch` w tym czasie sprawdza ilość według poprzedniego stanu `Loaded`; dokumentuje decyzję o braku wspólnej blokady |
 | LIM-10, LIM-11 | `CommandLimitsViewModelTest` – jednostkowy; W2 |
 | LIM-12 | `LimitsRedactionTest`, rozszerzenie `UiNoLoggingTest` i testów braku logowania `commands`/`data` |
 
@@ -148,7 +160,7 @@ Pola nie są nadpisywane wartościami ze stanu po pierwszym wypełnieniu (edycja
 
 Każde zadanie to jeden PR, ok. 200–400 linii z testami.
 
-1. **Limity w `commands` i `CARBS` z limitami** – `commands/CommandLimits.kt`, `LimitRanges.kt`, `LimitsInput.kt`, `BolusAmountText.kt` (reguły tekstu ilości insuliny z BOL-03, wspólne z polem bolusa w Spec 012), zmiany `Command.kt`, `CarbsLimits.kt`, `CommandParameter.kt`, `CommandCatalog.kt`; dostosowanie wywołań w `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` do `CommandLimits.DEFAULT` (bez zmiany zachowania); testy `CommandLimitsTest`, `LimitsInputTest`, `BolusAmountTextTest` (tabela BOL-03), `CarbsLimitsTest`, aktualizacja testów Spec 003. Wymagania: LIM-01 – LIM-03, LIM-06 – LIM-08 (logika), BOL-03 (reguły tekstu). Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
+1. **Limity w `commands` i `CARBS` z limitami** – `commands/CommandLimits.kt`, `LimitRanges.kt`, `LimitsInput.kt`, `BolusAmountError.kt`, `BolusAmountText.kt` (reguły tekstu ilości insuliny z BOL-03 i tekst SMS z BOL-05, wspólne z polem bolusa w Spec 012; jedyne definicje tych typów), zmiany `Command.kt`, `CarbsLimits.kt`, `CommandParameter.kt`, `CommandCatalog.kt`; dostosowanie wywołań w `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` do `CommandLimits.DEFAULT` (bez zmiany zachowania); testy `CommandLimitsTest`, `LimitsInputTest`, `BolusAmountTextTest` (tabela BOL-03 bez zakresu limitu, tabela BOL-05), `CarbsLimitsTest`, aktualizacja testów Spec 003. Wymagania: LIM-01 – LIM-03, LIM-06 – LIM-08 (logika), BOL-03 (reguły tekstu). Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
 2. **Zapis limitów** – `data/CommandLimitsState.kt`, `CommandLimitsStore.kt`, `CommandLimitsStorage.kt`, `CommandLimitsSettings.kt`, `data/platform/SharedPreferencesCommandLimitsStorage.kt`, wiązanie w `data/platform/DataModule.kt`; testy `CommandLimitsSettingsTest`. Wymagania: LIM-04, LIM-12 (część). Zależy od 1. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
 3. **Sekcja „Limity poleceń”** – `ui/settings/limits/CommandLimitsViewModel.kt`, `CommandLimitsUiState.kt`, `CommandLimitsSection.kt`, `LimitsTexts.kt`, wpięcie w `SettingsScreen.kt`, blok `<!-- 011: limity -->` w `strings.xml`; testy `CommandLimitsViewModelTest`, `LimitsTextsTest`. Wymagania: LIM-10, LIM-11, LIM-12 (część). PR opisuje W1, W2. Zależy od 2 i 4 – sekcja pozwala zmienić limit dopiero wtedy, gdy panel i launcher go stosują (inaczej obniżony limit byłby ignorowany). Etykiety `bezpieczenstwo` (jedyna droga zmiany limitów dawek), `trudnosc:latwe`.
 4. **Limity w panelu i przy starcie** – `ui/commands/CommandsViewModel.kt`, `CommandsUiState.kt`, `Readiness.kt` (baner limitów), `CommandsPanel.kt`, `CommandLauncher.kt`, `LaunchResult.kt`, `CommandMessage.kt`, `CommandTexts.kt`, teksty w `strings.xml`; testy `CommandsViewModelLimitsTest`, `CommandLauncherLimitsTest`. Wymagania: LIM-05 – LIM-09 (UI). PR opisuje W3. Zależy od 2. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.

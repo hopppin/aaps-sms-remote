@@ -32,15 +32,7 @@ sealed interface BolusValidation {
     data class Valid(val command: Command.Bolus) : BolusValidation
     data class Invalid(val error: BolusAmountError) : BolusValidation
 }
-enum class BolusAmountError { EMPTY, INVALID_CHARACTERS, TOO_MANY_DECIMALS, BELOW_MIN, ABOVE_MAX, NOT_STEP }
-
-/** BOL-03 kroki 1–4: tekst → setne albo błąd składni. Wspólne z LimitsInput (Spec 011). */
-object BolusAmountText {
-    sealed interface Parsed { data class Value(val centiUnits: Int) : Parsed; data class Error(val error: BolusAmountError) : Parsed }
-    fun parse(input: String): Parsed
-    /** 10 → "0.1", 200 → "2" (BOL-05). */
-    fun toSms(centiUnits: Int): String
-}
+// BolusAmountError i BolusAmountText (BOL-03, BOL-05) – zdefiniowane w zad. 1 Spec 011 (design 011, „Interfejsy”); tu tylko użycie.
 
 object BolusLimits { const val MIN_CENTI_UNITS = 5; const val STEP_CENTI_UNITS = 5 }
 
@@ -199,7 +191,7 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Warunek wstępny: zad
 
 **Miejsca, które przestają się kompilować po dodaniu `CommandId.BOLUS`, `Command.Bolus` i `ExpectedCommand.Bolus`** (sprawdzone na `main`): `commands/CommandCatalog.kt` (wpis), `commands/CommandExtensions.kt` (`smsText`, `toExpectedCommand`), `data/HistoryCodec.kt` (`encode(CommandId)`), `ui/commands/RunTexts.kt` (`CommandId.titleRes`), `ui/commands/ResultMapper.kt` (`when (command)` w `Completed`), `parser/AapsReplyParser.kt` (`when (expected)`). Zadanie 1 dodaje w nich gałęzie minimalne: `HistoryCodec` – tekst `BOLUS` (odczyt jako `UNRECOGNIZED` do zadania 4), `RunTexts` – nagłówek `run_title_bolus`, `ResultMapper` – `DETAILS_MISSING`, parser – `Unrecognized` (do zadania 2). Po zadaniu 1 bolusa nie da się uruchomić z UI.
 
-1. **Katalog: `Command.Bolus`** – `commands/Command.kt`, `CommandId.kt` (dodaje `BOLUS`), `CommandCatalog.kt`, `CommandParameter.kt`, `CommandExtensions.kt`, `BolusValidation.kt`, `BolusLimits.kt`; `parser/ExpectedCommand.kt` (`Bolus`), `parser/AapsReplyParser.kt` (gałąź `Bolus` → `Unrecognized`), `data/HistoryCodec.kt`, `ui/commands/RunTexts.kt`, `ui/commands/ResultMapper.kt`, `strings.xml` (`run_title_bolus`); testy `BolusCommandTest`, `CommandCatalogTest`. Wymagania: BOL-01, BOL-02, BOL-04 – BOL-06. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
+1. **Katalog: `Command.Bolus`** – `commands/Command.kt`, `CommandId.kt` (dodaje `BOLUS`), `CommandCatalog.kt`, `CommandParameter.kt`, `CommandExtensions.kt`, `BolusValidation.kt` (tylko `BolusValidation`; `BolusAmountError` i `BolusAmountText` są ze Spec 011, zad. 1), `BolusLimits.kt`; `parser/ExpectedCommand.kt` (`Bolus`), `parser/AapsReplyParser.kt` (gałąź `Bolus` → `Unrecognized`), `data/HistoryCodec.kt`, `ui/commands/RunTexts.kt`, `ui/commands/ResultMapper.kt`, `strings.xml` (`run_title_bolus`); testy `BolusCommandTest`, `CommandCatalogTest`. Wymagania: BOL-01, BOL-02, BOL-04 – BOL-06. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
 2. **Parser bolusa** – `parser/AapsReply.kt` (znaczniki, nowe warianty), `AapsPl3426Patterns.kt`, `AapsReplyParser.kt`; kopie plików `dane/` do `app/src/test/resources/parser/aaps-3.4.2.6-pl/`; testy `BolusReplyParserTest`, `ParserRedactionTest`. Wymagania: BOL-07 – BOL-09. Zależy od 1. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
 3. **Sesja bolusa** – `session/CommandSession.kt` (znaczniki zamiast klas `CARBS`, port parsera, funkcja zgodności), `session/ReplyMatch.kt`, `SessionState.kt` (`BolusConfirmed`); minimalne gałęzie `BolusConfirmed` w `ui/commands/ResultMapper.kt` i `data/HistoryCodec.kt` (pełne w zad. 4 i 5); testy `CommandSessionBolusTest`, `ReplyMatchTest`, regresja testów Spec 004. Wymagania: BOL-10, BOL-11, BOL-19. Zależy od 2. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
 4. **Historia bolusa i migracja** – `data/HistoryCommand.kt`, `HistoryOutcome.kt`, `HistoryRow.kt`, `HistoryEntry.kt`, `HistoryCodec.kt`, `data/platform/HistoryEntity.kt`, `AapsRemoteDatabase.kt` (wersja 2, `MIGRATION_1_2`, `addMigrations`), `DataModule.kt`, `app/schemas/…/2.json`; testy `HistoryCodecBolusTest`, `DatabaseSchemaV2Test`. Wymagania: BOL-17 (dane). Zależy od 3. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. **Warunek scalenia:** W3 sprawdzone na telefonie z prawdziwą bazą w wersji 1 (wynik w opisie PR).

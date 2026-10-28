@@ -182,7 +182,7 @@ Zmiana CMD-06 i CMDUI-08: panel pokazuje tylko te szybkie wartości z `10, 20, 3
 
 ### LIM-09: Ponowne sprawdzenie limitu przy starcie
 
-`CommandLauncher.launch` dla `CARBS` i `BOLUS` sprawdza ilość z aktualnym stanem limitów, po sprawdzeniu uprawnień SMS (krok 3 CMDUI-12), a przed odczytem sekretu: stan inny niż `Loaded` → odrzucenie `LIMITS_UNAVAILABLE`; ilość > aktualnego limitu → odrzucenie `AMOUNT_ABOVE_LIMIT`; polecenie wymaga dodatkowego potwierdzenia według aktualnych limitów (LIM-07, BOL-04), a użytkownik go nie udzielił (`launch` dostaje znacznik `extraConfirmed` = okno „Na pewno” zatwierdzone przyciskiem „Tak”) → odrzucenie `EXTRA_CONFIRMATION_REQUIRED`. Ilość nie jest przycinana. Przy odrzuceniu PIN jest czyszczony, brak startu (jak CMDUI-12). Komunikaty:
+`CommandLauncher.launch` dla `CARBS` i `BOLUS` sprawdza ilość z aktualnym stanem limitów, po sprawdzeniu uprawnień SMS (krok 3 CMDUI-12), a przed odczytem sekretu: stan inny niż `Loaded` → odrzucenie `LIMITS_UNAVAILABLE`; ilość > aktualnego limitu → odrzucenie `AMOUNT_ABOVE_LIMIT`; polecenie wymaga dodatkowego potwierdzenia według aktualnych limitów (LIM-07, BOL-04), a użytkownik go nie udzielił (`launch` dostaje znacznik `extraConfirmed` = okno „Na pewno” zatwierdzone przyciskiem „Tak”) → odrzucenie `EXTRA_CONFIRMATION_REQUIRED`. Ilość nie jest przycinana. Całe sprawdzenie (stan, limit, próg) korzysta z jednej migawki stanu limitów odczytanej raz na wywołanie `launch` – zmiana limitów w trakcie sprawdzenia nie daje mieszanki starych i nowych wartości. Przy odrzuceniu PIN jest czyszczony, brak startu (jak CMDUI-12). Komunikaty:
 
 | Powód | Komunikat | Akcja |
 | --- | --- | --- |
@@ -290,5 +290,6 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
 
 ## Historia zmian
 
+- **2026-10-28 – poprawki po ponownej recenzji PR #221.** LIM-09: jedna migawka stanu limitów na całe sprawdzenie. Design: wczytanie zgodne z LIM-04 (brak części kluczy = `LoadFailed`), `BolusAmountError` i `BolusAmountText` powstają w zadaniu 1 tej spec, test decyzji LIM-11 w mapowaniu.
 - **2026-10-28 – poprawki po recenzji PR #221 i zatwierdzenie.** LIM-04: brak części kluczy = `LoadFailed` (spójnie z LIM-05). LIM-09: ponowne liczenie progu „Na pewno” przy starcie (`EXTRA_CONFIRMATION_REQUIRED`). Design: zadanie 4 (limity w panelu i launcherze) przed zadaniem 3 (sekcja w Ustawieniach), zadanie 3 z etykietą `bezpieczenstwo`. Pytania P1–P5 zamknięte, status `zatwierdzona`.
 - **2026-10-28 – pierwsza wersja (szkic).** Razem ze Spec 012 i 013. Zmienia CMD-03 – CMD-06 (Spec 003), CMDUI-07 – CMDUI-09 i CMDUI-12 (Spec 009); dodaje sekcję do ekranu Ustawień (Spec 008).
