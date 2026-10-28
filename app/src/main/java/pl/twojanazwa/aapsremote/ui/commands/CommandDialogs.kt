@@ -23,3 +23,35 @@ fun LargeAmountDialog(grams: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) 
         },
     )
 }
+
+/** CMDUI-18: ostrzeżenie przed zakończeniem czekania po przekazaniu kodu. */
+@Composable
+fun StopWaitingDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.run_stop_title)) },
+        text = { Text(stringResource(R.string.run_stop_text)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.run_stop_waiting)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.run_stop_dismiss)) }
+        },
+    )
+}
+
+/** CMDUI-24: wyjście z aplikacji nie anuluje polecenia. */
+@Composable
+fun ExitDuringCommandDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.run_exit_title)) },
+        text = { Text(stringResource(R.string.run_exit_text)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.run_exit_leave)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.run_exit_stay)) }
+        },
+    )
+}
