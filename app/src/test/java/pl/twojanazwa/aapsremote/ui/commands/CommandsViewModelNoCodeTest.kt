@@ -4,11 +4,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import kotlinx.coroutines.test.runCurrent
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.commands.Command
@@ -56,8 +56,11 @@ class CommandsViewModelNoCodeTest {
         val t = setup()
         t.vm.onPumpClicked()
         t.settle()
+        val session = checkNotNull(t.env.coordinator.activeSession.value)
         assertEquals(listOf("PUMP"), t.env.sender.sentCommands)
-        t.env.coordinator.activeSession.value?.cancel()
+        assertEquals(Command.Pump, session.command)
+        assertEquals(0, t.env.secrets.loadCount)
+        session.cancel()
         t.settle()
     }
 
@@ -80,12 +83,15 @@ class CommandsViewModelNoCodeTest {
         runTest(main.dispatcher) {
             val t = setup()
             // Panel ma jeszcze zbuforowane uprawnienia (bez refreshPermissions), launcher czyta aktualne.
+            val readyBefore = t.vm.uiState.value.canSendNoCode
+            assertTrue(readyBefore)
             t.env.permissions.send = false
             t.vm.onBgClicked()
             t.settle()
             val state = t.vm.uiState.value
             assertEquals(CommandMessage.SMS_PERMISSIONS_MISSING, state.message)
             assertFalse(state.launching)
+            assertEquals(readyBefore, state.canSendNoCode)
             assertEquals(0, t.env.sender.sendCount)
         }
 

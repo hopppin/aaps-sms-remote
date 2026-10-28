@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import pl.twojanazwa.aapsremote.data.AapsNumberState
 import pl.twojanazwa.aapsremote.sms.FakeSmsPermissions
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 import pl.twojanazwa.aapsremote.ui.SessionDoubles
@@ -41,7 +42,7 @@ class CommandsViewModelLockTest {
     @Test
     fun `CMDUI-05 brak gotowosci bez polecenia w toku nie woluje launchera ani nie zmienia panelu`() =
         runTest(main.dispatcher) {
-            numbers.setState(pl.twojanazwa.aapsremote.data.AapsNumberState.NotConfigured)
+            numbers.setState(AapsNumberState.NotConfigured)
             val vm = viewModel()
             main.dispatcher.scheduler.advanceUntilIdle()
             vm.onBgClicked()
