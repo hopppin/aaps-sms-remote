@@ -71,8 +71,14 @@ class CommandLauncherRetentionTest {
             env.secrets.loadResults.add(LoadResult.Loaded(secret))
             val launcher = env.launcher()
             val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions)
-            assertEquals(LaunchResult.Started, launcher.launch(CommandTestFixtures.carbs(20), CommandTestFixtures.pin()))
-            runCurrent()
+            env.secrets.setState(pl.twojanazwa.aapsremote.security.SecretState.PRESENT)
+            main.dispatcher.scheduler.advanceUntilIdle()
+            vm.onCarbsInputChanged("20")
+            vm.onCarbsNextClicked()
+            vm.onPinChanged(CommandTestFixtures.PIN_TEXT)
+            vm.onSendClicked()
+            main.dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(env.coordinator.activeSession.value != null)
 
             val roots = listOf(launcher, vm, vm.uiState.value)
             for (root in roots) {
