@@ -12,6 +12,7 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandId
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 import pl.twojanazwa.aapsremote.security.LoadResult
+import pl.twojanazwa.aapsremote.session.SessionPhase
 import pl.twojanazwa.aapsremote.session.SessionTestFixtures
 import pl.twojanazwa.aapsremote.session.deliverAt
 import pl.twojanazwa.aapsremote.session.requestCodeAt
@@ -134,8 +135,13 @@ class CommandRunViewModelCancelTest {
             env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
             env.launcher().launch(CommandTestFixtures.carbs(1), CommandTestFixtures.pin())
             runCurrent()
+            env.sender.delayMillis = 10_000 // wysyłanie kodu trwa, więc sesja zostaje w SENDING_CODE
             requestCodeAt(env.incoming)
             runCurrent()
+            assertEquals(
+                SessionPhase.SENDING_CODE,
+                env.coordinator.activeSession.value!!.state.value.phase,
+            )
             // ViewModel utworzony po przejściu sesji, jego widok jeszcze nie zdążył się zaktualizować.
             val viewModel = env.viewModel()
             assertEquals(null, viewModel.uiState.value.view)
