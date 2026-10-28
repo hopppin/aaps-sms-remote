@@ -25,23 +25,21 @@ import pl.twojanazwa.aapsremote.ui.commands.ResultKind
 /** HISTUI-02 – HISTUI-05: wiersze od najnowszego; dotknięcie otwiera szczegóły. */
 @Composable
 fun HistoryList(items: List<HistoryItem>, onEntryClicked: (Long) -> Unit) {
+    val zone = rememberHistoryZone()
     LazyColumn {
         items(items, key = { it.id }) { item ->
-            HistoryRow(item, onClick = { onEntryClicked(item.id) })
+            HistoryRow(item, zone, onClick = { onEntryClicked(item.id) })
             HorizontalDivider()
         }
     }
 }
 
 @Composable
-private fun HistoryRow(item: HistoryItem, onClick: () -> Unit) {
+private fun HistoryRow(item: HistoryItem, zone: ZoneId, onClick: () -> Unit) {
     val result = item.result
-    val command = when (item.command) {
-        HistoryCommandLabel.CARBS -> stringResource(item.command.textRes(), item.grams ?: 0)
-        else -> stringResource(item.command.textRes())
-    }
+    val command = historyCommandText(item.command, item.grams)
     val time = item.listTimeEpochMillis
-        ?.let { HistoryTimeFormat.row(it, ZoneId.systemDefault()) }
+        ?.let { HistoryTimeFormat.row(it, zone) }
         ?: stringResource(R.string.history_time_none)
     val message = result.messageArg
         ?.let { stringResource(result.messageRes(), it) }
@@ -62,7 +60,7 @@ private fun HistoryRow(item: HistoryItem, onClick: () -> Unit) {
 
 /** Kolor rodzaju jak karta wyniku w Spec 009; nierozpoznany (null) jak anulowany. */
 @Composable
-private fun ResultKind?.color(): Color = when (this) {
+internal fun ResultKind?.color(): Color = when (this) {
     ResultKind.SUCCESS -> MaterialTheme.colorScheme.primary
     ResultKind.FAILURE -> MaterialTheme.colorScheme.error
     ResultKind.NO_RESPONSE, ResultKind.UNKNOWN -> MaterialTheme.colorScheme.tertiary

@@ -50,6 +50,17 @@ class HistoryViewModelClearTest {
     }
 
     @Test
+    fun `HISTUI-10 nowy wpis przy otwartym oknie nie zmienia liczby N z chwili otwarcia`() = runTest(main.dispatcher) {
+        val stream = history.enqueue(snapshot(3, 2, 1))
+        val vm = loaded()
+        vm.onClearClicked()
+        stream.emit(snapshot(4, 3, 2, 1))
+        idle()
+        assertEquals(3, vm.uiState.value.confirmingClearCount)
+        assertEquals(4, (vm.uiState.value.content as HistoryContent.Entries).items.size)
+    }
+
+    @Test
     fun `HISTUI-10 wielokrotne potwierdzenie daje jedno clearAll`() = runTest(main.dispatcher) {
         history.enqueue(snapshot(3, 2, 1))
         val gate = CompletableDeferred<Unit>()
