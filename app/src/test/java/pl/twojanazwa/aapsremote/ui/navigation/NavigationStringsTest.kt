@@ -17,11 +17,6 @@ class NavigationStringsTest {
     }
 
     @Test
-    fun `UI-03 zaslepka Polecenia ma niepusty tekst`() {
-        assertNotBlank("placeholder_commands_text")
-    }
-
-    @Test
     fun `UI-20 teksty nawigacji i wspolnych przyciskow sa niepuste`() {
         listOf(
             "nav_commands", "nav_history", "nav_settings",
