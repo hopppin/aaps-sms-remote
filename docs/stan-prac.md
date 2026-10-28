@@ -28,7 +28,7 @@ _Ostatnia aktualizacja: 2026-10-28_
 
 ## W toku
 
-Issue #146: implementacja logiki pola CARBS, szybkich wartości i potwierdzenia ilości > 40 g (CMDUI-07–CMDUI-09); testy i lint przechodzą. PR do utworzenia.
+Issue #152: ekran panelu Polecenia (CMDUI-01–04, CMDUI-07–08) zaimplementowany; PR #199 (draft). `bash scripts/sprawdz.sh` przechodzi (1239 testów i lint). Ręczna weryfikacja W1–W3 na urządzeniu pozostaje do wykonania w ramach przeglądu PR.
 
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 

@@ -5,7 +5,6 @@
     <string name="nav_commands">Polecenia</string>
     <string name="nav_history">Historia</string>
     <string name="nav_settings">Ustawienia</string>
-    <string name="placeholder_commands_text">Polecenia pojawią się w kolejnej wersji. Do tego czasu skonfiguruj aplikację w zakładce Ustawienia.</string>
     <string name="action_save">Zapisz</string>
     <string name="action_cancel">Anuluj</string>
     <string name="action_delete">Usuń</string>
