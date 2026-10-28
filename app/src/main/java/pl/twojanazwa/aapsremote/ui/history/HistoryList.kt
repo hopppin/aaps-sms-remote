@@ -36,10 +36,7 @@ fun HistoryList(items: List<HistoryItem>, onEntryClicked: (Long) -> Unit) {
 @Composable
 private fun HistoryRow(item: HistoryItem, onClick: () -> Unit) {
     val result = item.result
-    val command = when (item.command) {
-        HistoryCommandLabel.CARBS -> stringResource(item.command.textRes(), item.grams ?: 0)
-        else -> stringResource(item.command.textRes())
-    }
+    val command = historyCommandText(item.command, item.grams)
     val time = item.listTimeEpochMillis
         ?.let { HistoryTimeFormat.row(it, ZoneId.systemDefault()) }
         ?: stringResource(R.string.history_time_none)
@@ -62,7 +59,7 @@ private fun HistoryRow(item: HistoryItem, onClick: () -> Unit) {
 
 /** Kolor rodzaju jak karta wyniku w Spec 009; nierozpoznany (null) jak anulowany. */
 @Composable
-private fun ResultKind?.color(): Color = when (this) {
+internal fun ResultKind?.color(): Color = when (this) {
     ResultKind.SUCCESS -> MaterialTheme.colorScheme.primary
     ResultKind.FAILURE -> MaterialTheme.colorScheme.error
     ResultKind.NO_RESPONSE, ResultKind.UNKNOWN -> MaterialTheme.colorScheme.tertiary

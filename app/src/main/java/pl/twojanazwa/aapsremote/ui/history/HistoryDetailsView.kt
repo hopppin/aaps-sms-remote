@@ -1,0 +1,85 @@
+package pl.twojanazwa.aapsremote.ui.history
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import java.time.ZoneId
+import pl.twojanazwa.aapsremote.R
+
+/** HISTUI-05 – HISTUI-07: szczegóły wpisu; treść SMS jako zwykły tekst bez linków (HISTUI-06). */
+@Composable
+fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
+    val zone = ZoneId.systemDefault()
+    val result = details.result
+    val messageText = result.messageArg
+        ?.let { stringResource(result.messageRes(), it) }
+        ?: stringResource(result.messageRes())
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.history_details_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Text(
+            text = historyCommandText(details.command, details.grams),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(result.titleRes()),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = result.kind.color(),
+                )
+                Text(messageText, style = MaterialTheme.typography.bodyMedium)
+                if (result.codeNotSent) {
+                    Text(stringResource(R.string.result_code_not_sent), style = MaterialTheme.typography.bodyMedium)
+                }
+                if (result.unknownWarning) {
+                    Text(stringResource(R.string.result_unknown_warning), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+        details.times.forEach { (label, millis) ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(stringResource(label.textRes()), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = millis?.let { HistoryTimeFormat.details(it, zone) }
+                        ?: stringResource(R.string.history_time_none),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        details.replyText?.let { reply ->
+            Text(stringResource(R.string.result_reply_label), style = MaterialTheme.typography.labelLarge)
+            Text(reply, style = MaterialTheme.typography.bodyMedium)
+        }
+        details.unexpectedCount?.let { count ->
+            Text(stringResource(R.string.run_unexpected, count), style = MaterialTheme.typography.bodyMedium)
+        }
+        Button(onClick = onDetailsClosed) { Text(stringResource(R.string.result_close)) }
+    }
+}
+
+/** Nazwa polecenia z ilością dla CARBS (HISTUI-03). */
+@Composable
+internal fun historyCommandText(command: HistoryCommandLabel, grams: Int?): String = when (command) {
+    HistoryCommandLabel.CARBS -> stringResource(command.textRes(), grams ?: 0)
+    else -> stringResource(command.textRes())
+}
