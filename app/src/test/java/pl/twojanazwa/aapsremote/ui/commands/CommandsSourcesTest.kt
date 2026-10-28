@@ -31,7 +31,7 @@ class CommandsSourcesTest {
         assertTrue("PasswordVisualTransformation()" in summary)
         assertTrue("KeyboardType.NumberPassword" in summary)
         assertTrue("autoCorrectEnabled = false" in summary)
-        assertTrue("SecureWindowEffect(commands.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
+        assertTrue("SecureWindowEffect(commands.secureWindow || run.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
     }
 
     private fun withoutComments(source: String) =
