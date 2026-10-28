@@ -32,6 +32,7 @@ import pl.twojanazwa.aapsremote.ui.platform.KeepScreenOnEffect
 import pl.twojanazwa.aapsremote.ui.platform.LocalSecureWindow
 import pl.twojanazwa.aapsremote.ui.platform.SecureWindowCounter
 import pl.twojanazwa.aapsremote.ui.settings.SettingsScreen
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 
 /** Scaffold z NavigationBar (kolejność = AppDestination.entries) i NavHost(startDestination = START.route). */
 @Composable
@@ -62,6 +63,9 @@ private fun AppScaffoldContent(modifier: Modifier) {
     val runState by runViewModel.uiState.collectAsStateWithLifecycle()
     // CMDUI-22: na poziomie Activity, więc działa także na zakładce Ustawienia.
     KeepScreenOnEffect(runState.keepScreenOn)
+    // CMDUI-23: FLAG_SECURE na każdej zakładce, od startu polecenia do zamknięcia wyniku.
+    val commandsState by commandsViewModel.uiState.collectAsStateWithLifecycle()
+    SecureWindowEffect(commandsState.secureWindow || runState.secureWindow)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val navigateTo: (AppDestination) -> Unit = { destination ->

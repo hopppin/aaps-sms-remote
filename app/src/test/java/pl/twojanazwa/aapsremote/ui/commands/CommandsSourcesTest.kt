@@ -31,7 +31,22 @@ class CommandsSourcesTest {
         assertTrue("PasswordVisualTransformation()" in summary)
         assertTrue("KeyboardType.NumberPassword" in summary)
         assertTrue("autoCorrectEnabled = false" in summary)
-        assertTrue("SecureWindowEffect(commands.secureWindow || run.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
+    }
+
+    @Test
+    fun `CMDUI-23 SecureWindowEffect jest tylko w AppScaffold i obejmuje stan obu ViewModeli`() {
+        val scaffold = withoutComments(File("src/main/java/pl/twojanazwa/aapsremote/ui/navigation/AppScaffold.kt").readText())
+        assertTrue("SecureWindowEffect(commandsState.secureWindow || runState.secureWindow)" in scaffold)
+        for (name in listOf("CommandsScreen.kt", "RunScreen.kt", "ResultCard.kt")) {
+            assertFalse("SecureWindowEffect(" in withoutComments(File(commandsDirectory, name).readText()), name)
+        }
+    }
+
+    @Test
+    fun `CMDUI-09 okno Na pewno ma securePolicy SecureOn`() {
+        val dialogs = withoutComments(File(commandsDirectory, "CommandDialogs.kt").readText())
+        val large = dialogs.substringAfter("fun LargeAmountDialog").substringBefore("@Composable")
+        assertTrue("properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)" in large)
     }
 
     private fun withoutComments(source: String) =

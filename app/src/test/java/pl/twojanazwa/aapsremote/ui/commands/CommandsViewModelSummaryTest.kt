@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import pl.twojanazwa.aapsremote.session.deliverAt
+import pl.twojanazwa.aapsremote.parser.AapsSamples
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.security.LoadResult
 import pl.twojanazwa.aapsremote.security.SecretState
@@ -193,5 +195,74 @@ class CommandsViewModelSummaryTest {
             assertNull(vm.state().summaryGrams)
             assertEquals("", vm.state().pinText)
             assertFalse(vm.state().interceptsBack)
+        }
+
+    @Test
+    fun `CMDUI-23 onStop w trakcie load Loaded utrzymuje znacznik przez launching i runHandoff`() =
+        runTest(main.dispatcher) {
+            val env = env()
+            env.secrets.loadGate = CompletableDeferred()
+            env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+            val vm = env.viewModel()
+            vm.openSummary("1")
+            vm.onPinChanged("4321")
+            val flags = mutableListOf<Boolean>()
+            val job = launch(UnconfinedTestDispatcher(main.dispatcher.scheduler)) {
+                vm.uiState.collect { flags.add(it.secureWindow) }
+            }
+            vm.onSendClicked()
+            settle()
+            vm.onStop()
+            settle()
+            assertNull(vm.state().summaryGrams)
+            assertTrue(vm.state().launching)
+            assertTrue(vm.state().secureWindow)
+            env.secrets.loadGate!!.complete(Unit)
+            settle()
+            assertTrue(vm.state().runHandoff)
+            assertTrue(flags.all { it })
+            job.cancel()
+            env.coordinator.activeSession.value?.cancel()
+            settle()
+        }
+
+    @Test
+    fun `CMDUI-23 onStop w trakcie load Absent utrzymuje znacznik do zwolnienia i gasi po odmowie`() =
+        runTest(main.dispatcher) {
+            val env = env()
+            env.secrets.loadGate = CompletableDeferred()
+            val vm = env.viewModel()
+            vm.openSummary("1")
+            vm.onPinChanged("4321")
+            vm.onSendClicked()
+            settle()
+            vm.onStop()
+            settle()
+            assertTrue(vm.state().secureWindow)
+            env.secrets.loadGate!!.complete(Unit)
+            settle()
+            assertFalse(vm.state().secureWindow)
+        }
+
+    @Test
+    fun `CMDUI-23 onStop w trakcie BG utrzymuje ochrone obu ViewModeli do zamkniecia wyniku`() =
+        runTest(main.dispatcher) {
+            val env = env()
+            val vm = env.viewModel()
+            val run = CommandRunViewModel(env.currentRun, env.coordinator)
+            fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
+            vm.onBgClicked()
+            settle()
+            assertTrue(secure())
+            vm.onStop()
+            settle()
+            assertTrue(secure())
+            deliverAt(env.incoming, 1_000, AapsSamples.bg)
+            settle()
+            assertTrue(run.uiState.value.view is RunView.Finished)
+            assertTrue(secure())
+            run.onResultDismissed()
+            settle()
+            assertFalse(secure())
         }
 }
