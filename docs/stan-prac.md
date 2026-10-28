@@ -30,6 +30,8 @@ _Ostatnia aktualizacja: 2026-10-28_
 
 Issue #152: ekran panelu Polecenia (CMDUI-01–04, CMDUI-07–08) zaimplementowany; PR #199 (draft). `bash scripts/sprawdz.sh` przechodzi (1239 testów i lint). Ręczna weryfikacja W1–W3 na urządzeniu pozostaje do wykonania w ramach przeglądu PR.
 
+Issue #155: komponenty przebiegu i wyniku, okna anulowania oraz `KeepScreenOnEffect` zaimplementowane; PR w przygotowaniu. `bash scripts/sprawdz.sh --pelne` przechodzi (1242 testy, lint i assembleDebug). Ręczna weryfikacja ekranu pozostaje w zadaniu integracyjnym 7c.
+
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki

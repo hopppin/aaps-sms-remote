@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import androidx.annotation.StringRes
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.commands.CommandId
 
 /** CMDUI-25: jedna funkcja wartość → zasób na typ. */
 @StringRes
@@ -11,6 +12,14 @@ fun ResultKind.titleRes(): Int = when (this) {
     ResultKind.NO_RESPONSE -> R.string.result_kind_no_response
     ResultKind.UNKNOWN -> R.string.result_kind_unknown
     ResultKind.CANCELLED -> R.string.result_kind_cancelled
+}
+
+/** CMDUI-16: nagłówek przebiegu i wyniku. */
+@StringRes
+fun CommandId.titleRes(): Int = when (this) {
+    CommandId.BG -> R.string.run_title_bg
+    CommandId.PUMP -> R.string.run_title_pump
+    CommandId.CARBS -> R.string.run_title_carbs
 }
 
 @StringRes
