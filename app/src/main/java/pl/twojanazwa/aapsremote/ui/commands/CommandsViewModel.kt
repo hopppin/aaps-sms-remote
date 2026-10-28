@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -118,7 +119,7 @@ class CommandsViewModel @Inject constructor(
     }
 
     fun onPinChanged(text: String) {
-        if (local.value.summaryGrams == null) return
+        if (local.value.summaryGrams == null || local.value.launching) return
         if (text.length > PIN_MAX_LENGTH || !text.all { it in '0'..'9' }) return
         local.update { it.copy(pinText = text) }
     }
@@ -176,7 +177,8 @@ class CommandsViewModel @Inject constructor(
             return
         }
         local.update { it.copy(launching = true) }
-        viewModelScope.launch {
+        // ATOMIC: korutyna rusza nawet po anulowaniu zakresu, więc launcher zawsze czyści PIN (CMDUI-11).
+        viewModelScope.launch(start = CoroutineStart.ATOMIC) {
             val result = try {
                 launcher.launch(command, pin)
             } finally {

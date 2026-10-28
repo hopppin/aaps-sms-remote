@@ -62,6 +62,22 @@ class CommandsViewModelPinRetentionTest {
     }
 
     @Test
+    fun `CMDUI-11 PIN wpisany w trakcie uruchamiania nie zostaje w stanie`() = runTest(main.dispatcher) {
+        val env = env()
+        env.secrets.loadGate = CompletableDeferred()
+        val vm = env.viewModel()
+        vm.openSummary()
+        vm.onPinChanged("4321")
+        vm.onSendClicked()
+        settle()
+        vm.onPinChanged("9999")
+        assertEquals("", vm.state().pinText)
+        env.secrets.loadGate!!.complete(Unit)
+        settle()
+        assertEquals("", vm.state().pinText)
+    }
+
+    @Test
     fun `CMDUI-11 onStop z PIN-em zamyka podsumowanie i nie wola launchera`() = runTest(main.dispatcher) {
         val launcher = mockk<CommandLauncher>(relaxed = true)
         val vm = env().viewModel(launcher)
