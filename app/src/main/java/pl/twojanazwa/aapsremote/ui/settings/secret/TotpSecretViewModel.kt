@@ -28,7 +28,7 @@ import pl.twojanazwa.aapsremote.ui.permissions.PermissionDenialClassifier
 /**
  * Sekcja „Sekret TOTP” (UI-07, UI-08, UI-11). Sekret i wejście (URI) są wyłącznie zmiennymi
  * lokalnymi korutyny w [accept]; w stanie jest tylko tekst pola wklejania (czyszczony przed zapisem).
- * Skaner, usuwanie, blokady i schowek dochodzą w kolejnych zadaniach.
+ * Obsługuje też wynik skanera QR, usuwanie, blokadę polecenia w toku i schowek.
  */
 @HiltViewModel
 class TotpSecretViewModel @Inject constructor(

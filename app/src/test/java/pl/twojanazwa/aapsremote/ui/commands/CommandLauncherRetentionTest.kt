@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
+import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 import pl.twojanazwa.aapsremote.otp.TotpSecret
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.LoadResult
@@ -17,6 +19,9 @@ import java.lang.reflect.Modifier
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandLauncherRetentionTest {
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private val forbidden = listOf<Class<*>>(
         TotpSecret::class.java,
@@ -57,4 +62,37 @@ class CommandLauncherRetentionTest {
         env.coordinator.activeSession.value?.cancel()
         runCurrent()
     }
+
+    @Test
+    fun `CMDUI-15 po Started pola CommandsViewModel i jego stanu o jeden poziom w glab nie wskazuja na sekret`() =
+        runTest(main.dispatcher) {
+            val env = CommandTestEnv(this)
+            val secret = SessionTestFixtures.secret()
+            env.secrets.loadResults.add(LoadResult.Loaded(secret))
+            val launcher = env.launcher()
+            val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions)
+            assertEquals(LaunchResult.Started, launcher.launch(CommandTestFixtures.carbs(20), CommandTestFixtures.pin()))
+            runCurrent()
+
+            val roots = listOf(launcher, vm, vm.uiState.value)
+            for (root in roots) {
+                for (field in instanceFields(root.javaClass)) {
+                    field.isAccessible = true
+                    val value = field.get(root)
+                    assertTrue(value !== secret, "${root.javaClass.simpleName}.${field.name}")
+                    // Poziom drugi tylko dla klas aplikacji (bez refleksji w JDK).
+                    if (value != null && value.javaClass.name.startsWith("pl.twojanazwa.aapsremote")) {
+                        for (inner in instanceFields(value.javaClass)) {
+                            inner.isAccessible = true
+                            assertTrue(inner.get(value) !== secret, "${field.name}.${inner.name}")
+                        }
+                    }
+                }
+            }
+            env.coordinator.activeSession.value?.cancel()
+            runCurrent()
+        }
+
+    private fun instanceFields(type: Class<*>) =
+        type.declaredFields.filter { !it.isSynthetic && !Modifier.isStatic(it.modifiers) }
 }

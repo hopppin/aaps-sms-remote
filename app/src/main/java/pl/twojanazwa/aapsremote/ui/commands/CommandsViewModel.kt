@@ -198,7 +198,12 @@ class CommandsViewModel @Inject constructor(
         }
     }
 
-    private fun readPermissions(): Boolean = permissions.canSend() && permissions.canReceive()
+    // Oba odczyty zawsze (bez skrótu &&), żeby liczba wywołań nie zależała od wartości.
+    private fun readPermissions(): Boolean {
+        val send = permissions.canSend()
+        val receive = permissions.canReceive()
+        return send && receive
+    }
 
     /** Aktualny stan liczony od razu ze źródeł (bez opóźnienia `stateIn`). */
     private fun compose(): CommandsUiState =

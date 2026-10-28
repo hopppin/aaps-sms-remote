@@ -34,7 +34,7 @@ class CommandLauncher @Inject constructor(
 ) {
     /**
      * [pin] != null dokładnie dla CommandCatalog.definitionOf(command.id).requiresCode. Każdy Rejected i anulowanie
-     * korutyny = pin wyczyszczony. Nie rzuca poza CancellationException.
+     * korutyny = pin wyczyszczony. Nie rzuca poza CancellationException (wyjątek ze startu sesji = START_FAILED).
      */
     suspend fun launch(command: Command, pin: AapsPin?): LaunchResult {
         var started = false
@@ -73,7 +73,7 @@ class CommandLauncher @Inject constructor(
             return synchronized(this) {
                 val result = try {
                     coordinator.start(scope, command, credentials)
-                } catch (e: IllegalArgumentException) {
+                } catch (e: RuntimeException) {
                     return@synchronized LaunchResult.Rejected(LaunchRejection.START_FAILED)
                 }
                 when (result) {

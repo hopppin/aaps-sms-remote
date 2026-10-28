@@ -25,4 +25,5 @@ class SecureWindowCounter(private val onChange: (Boolean) -> Unit) {
 }
 
 val LocalSecureWindow: ProvidableCompositionLocal<SecureWindowCounter> =
-    staticCompositionLocalOf { error("Brak SecureWindowCounter – ustaw LocalSecureWindow w AppScaffold") }
+    // Domyślnie licznik bez skutku (podgląd/test poza AppScaffold); AppScaffold podstawia prawdziwy.
+    staticCompositionLocalOf { SecureWindowCounter { } }

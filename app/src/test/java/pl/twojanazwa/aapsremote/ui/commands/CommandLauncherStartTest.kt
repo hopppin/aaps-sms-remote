@@ -92,6 +92,24 @@ class CommandLauncherStartTest {
     }
 
     @Test
+    fun `CMDUI-13 dowolny RuntimeException ze start daje START_FAILED i wyczyszczony PIN bez publikacji`() = runTest {
+        val env = CommandTestEnv(this)
+        env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+        val coordinator = mockk<SessionCoordinator>()
+        every { coordinator.activeSession } returns MutableStateFlow(null)
+        every { coordinator.start(any(), any(), any(), any()) } throws IllegalStateException("blad")
+        val pin = CommandTestFixtures.pin()
+
+        val result = env.launcher(coordinator).launch(CommandTestFixtures.carbs(20), pin)
+        runCurrent()
+
+        assertEquals(LaunchResult.Rejected(LaunchRejection.START_FAILED), result)
+        assertTrue(pin.isCleared)
+        assertEquals(null, env.currentRun.state.value)
+        assertTrue(env.history.recorded.isEmpty())
+    }
+
+    @Test
     fun `CMDUI-13 niepoprawny zestaw polecenia i PIN-u daje START_FAILED bez wyjatku i bez odczytu sekretu`() = runTest {
         val env = CommandTestEnv(this)
         val launcher = env.launcher()
