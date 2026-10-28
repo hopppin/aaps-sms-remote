@@ -70,9 +70,21 @@ sealed interface AapsReply {
     data class CarbsAmountMismatch(/* bez zmian */) : CommandMismatch
     data class CarbsDone(val grams: Int, val text: String) : MatchingDone
 
-    data class BolusCodeRequest(val centiUnits: Int, val text: String) : MatchingCodeRequest   // toString "AapsReply.BolusCodeRequest(***)"
-    data class BolusAmountMismatch(val expectedCentiUnits: Int, val receivedCentiUnits: Int, val stage: CarbsStage, val text: String) : CommandMismatch
-    data class BolusDone(val centiUnits: Int, val text: String) : MatchingDone
+    // Każdy wariant jawnie nadpisuje toString() – bez ilości i treści SMS (BOL-09, PARSER-10).
+    data class BolusCodeRequest(val centiUnits: Int, val text: String) : MatchingCodeRequest {
+        override fun toString(): String = "AapsReply.BolusCodeRequest(***)"
+    }
+    data class BolusAmountMismatch(
+        val expectedCentiUnits: Int,
+        val receivedCentiUnits: Int,
+        val stage: CarbsStage,
+        val text: String,
+    ) : CommandMismatch {
+        override fun toString(): String = "AapsReply.BolusAmountMismatch(stage=$stage, ***)"
+    }
+    data class BolusDone(val centiUnits: Int, val text: String) : MatchingDone {
+        override fun toString(): String = "AapsReply.BolusDone(***)"
+    }
     // …
 }
 // CarbsStage zostaje nazwą etapu także dla bolusa (CODE_REQUEST, CONFIRMATION) – bez zmiany nazwy, żeby nie ruszać Spec 002.

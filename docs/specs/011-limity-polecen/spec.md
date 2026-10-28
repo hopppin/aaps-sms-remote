@@ -227,6 +227,8 @@ A i B to granice z LIM-02 dla danego pola (bolus: `0,05` i `10,00`).
 
 Jak UI-15 i UI-16 w Spec 008: gdy polecenie jest w toku, „Zapisz limity” jest niedostępne, a nad sekcją jest tekst „Trwa polecenie. Limity możesz zmienić po jego zakończeniu.”; akcja zapisu sprawdza `activeSession.value` w chwili wywołania (polecenie w toku → komunikat `msg_command_active`, brak wywołania magazynu). Pola można edytować. Od wywołania zapisu do wyniku „Zapisz limity” jest niedostępne, a ponowne wywołanie ignorowane.
 
+Zapis i start polecenia nie są wzajemnie blokowane (jak UI-15: operacja już przekazana do magazynu kończy się normalnie). Gdy start polecenia nastąpi w trakcie zapisu, `CommandLauncher` sprawdza ilość według stanu limitów w chwili sprawdzenia (LIM-09), czyli według limitów sprzed zakończenia zapisu, które użytkownik sam wcześniej ustawił; nowe limity dotyczą kolejnych poleceń. Okno trwa tyle, co `commit()` pliku: zapis jest wywoływany na zakładce Ustawienia, a start na zakładce Polecenia, po ponownym otwarciu podsumowania (zmiana zakładki je zamyka, CMDUI-11).
+
 **Kryteria akceptacji:**
 
 - **Zakładając** `activeSession` ustawione na sesję bez wykonania zadań dyspozytora, **gdy** wywołano „Zapisz limity” z poprawnymi tekstami, **wtedy** magazyn nie dostał zapisu, a komunikat = polecenie w toku.

@@ -128,6 +128,7 @@ Pola nie są nadpisywane wartościami ze stanu po pierwszym wypełnieniu (edycja
 | Próg `CARBS` = 80% limitu | połowa limitu, stała 40 | Bez zmiany zachowania przy limicie domyślnym (P1). |
 | Szybkie wartości ≤ progu | wszystkie ≤ limitu | Szybka wartość ma od razu otwierać podsumowanie (CMDUI-08) – bez okna „Na pewno”. |
 | Sprawdzenie w `CommandLauncher` przed odczytem sekretu | tylko przy „Dalej” | Limit mógł się zmienić między „Dalej” a „Wyślij” (P3); odczyt sekretu jest dopiero po wszystkich sprawdzeniach (CMDUI-12). |
+| Brak wspólnej blokady zapisu limitów i startu polecenia | mutex między `CommandLimitsSettings.save` a `CommandLauncher` | Start w trakcie zapisu stosuje poprzednie limity ustawione przez użytkownika (LIM-11); dodatkowa blokada wiązałaby `data` z `ui.commands` bez zysku bezpieczeństwa. Zgodne z UI-15 (operacja przekazana do magazynu kończy się normalnie). |
 | Sekcja bez `FLAG_SECURE` | z `FLAG_SECURE` | Limity to konfiguracja, nie dane z AAPS ani PIN; spójnie z resztą Ustawień (UI-23 chroni tylko sekret). |
 
 ## Mapowanie wymagań na testy
