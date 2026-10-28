@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -27,6 +28,7 @@ import pl.twojanazwa.aapsremote.ui.commands.CommandRunViewModel
 import pl.twojanazwa.aapsremote.ui.commands.CommandsScreen
 import pl.twojanazwa.aapsremote.ui.commands.CommandsViewModel
 import pl.twojanazwa.aapsremote.ui.history.HistoryScreen
+import pl.twojanazwa.aapsremote.ui.platform.KeepScreenOnEffect
 import pl.twojanazwa.aapsremote.ui.platform.LocalSecureWindow
 import pl.twojanazwa.aapsremote.ui.platform.SecureWindowCounter
 import pl.twojanazwa.aapsremote.ui.settings.SettingsScreen
@@ -57,6 +59,9 @@ private fun AppScaffoldContent(modifier: Modifier) {
     // ViewModele pozostają w zakresie Activity, także po przejściu do innej zakładki.
     val commandsViewModel: CommandsViewModel = hiltViewModel()
     val runViewModel: CommandRunViewModel = hiltViewModel()
+    val runState by runViewModel.uiState.collectAsStateWithLifecycle()
+    // CMDUI-22: na poziomie Activity, więc działa także na zakładce Ustawienia.
+    KeepScreenOnEffect(runState.keepScreenOn)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val navigateTo: (AppDestination) -> Unit = { destination ->

@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +28,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
@@ -43,8 +46,10 @@ fun CommandsScreen(
     val context = LocalContext.current
     val activity = LocalActivity.current
     val commands by commandsViewModel.uiState.collectAsStateWithLifecycle()
+    val run by runViewModel.uiState.collectAsStateWithLifecycle()
     val permissions by smsPermissionsViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         commandsViewModel.refreshPermissions()
@@ -66,13 +71,21 @@ fun CommandsScreen(
     } else {
         null
     }
-    LaunchedEffect(message, actionLabel) {
-        if (message != null) {
-            commandsViewModel.onMessageShown()
-            val result = snackbarHostState.showSnackbar(message, actionLabel)
-            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed && actionLabel != null) {
-                onOpenSettings()
-            }
+    // Komunikat kasujemy od razu; Snackbar biegnie w scope kompozycji, więc zmiana klucza go nie anuluje.
+    LaunchedEffect(commands.message) {
+        val text = message ?: return@LaunchedEffect
+        val action = actionLabel
+        commandsViewModel.onMessageShown()
+        snackbarScope.launch {
+            val result = snackbarHostState.showSnackbar(text, action)
+            if (result == SnackbarResult.ActionPerformed && action != null) onOpenSettings()
+        }
+    }
+    // CMDUI-24: jednorazowe żądanie zamknięcia aplikacji po „Wyjdź”.
+    LaunchedEffect(run.exitRequested) {
+        if (run.exitRequested) {
+            activity?.finish()
+            runViewModel.onExitHandled()
         }
     }
 
@@ -86,9 +99,16 @@ fun CommandsScreen(
         }
     }
 
-    // CMDUI-23: znacznik obejmuje też przekazanie do przebiegu (runHandoff).
-    SecureWindowEffect(commands.secureWindow)
-    BackHandler(enabled = commands.interceptsBack) { commandsViewModel.onBack() }
+    // CMDUI-23: jedno żądanie dla podsumowania, przekazania (runHandoff), przebiegu i wyniku.
+    SecureWindowEffect(commands.secureWindow || run.secureWindow)
+    BackHandler(enabled = run.interceptsBack) { runViewModel.onBack() }
+    BackHandler(enabled = !run.interceptsBack && commands.interceptsBack) { commandsViewModel.onBack() }
+    if (run.confirmingStopWaiting) {
+        StopWaitingDialog(onConfirm = runViewModel::onStopWaitingConfirmed, onDismiss = runViewModel::onStopWaitingDismissed)
+    }
+    if (run.confirmingExit) {
+        ExitDuringCommandDialog(onConfirm = runViewModel::onExitConfirmed, onDismiss = runViewModel::onExitDismissed)
+    }
     commands.confirmingLargeGrams?.let { grams ->
         LargeAmountDialog(
             grams = grams,
@@ -99,7 +119,13 @@ fun CommandsScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         val summaryGrams = commands.summaryGrams
-        if (summaryGrams != null) {
+        // Treść chroniona wybierana z tego samego pola, z którego liczona jest flaga (run.secureWindow).
+        val runView = run.view
+        if (runView is RunView.Active) {
+            RunScreen(run = runView, onCancel = runViewModel::onCancelClicked)
+        } else if (runView is RunView.Finished) {
+            ResultCard(result = runView.result, onResultDismissed = runViewModel::onResultDismissed)
+        } else if (summaryGrams != null) {
             CarbsSummary(
                 grams = summaryGrams,
                 pinText = commands.pinText,
