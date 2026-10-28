@@ -23,7 +23,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import pl.twojanazwa.aapsremote.ui.commands.CommandsPlaceholderScreen
-import pl.twojanazwa.aapsremote.ui.history.HistoryPlaceholderScreen
+import pl.twojanazwa.aapsremote.ui.history.HistoryScreen
 import pl.twojanazwa.aapsremote.ui.platform.LocalSecureWindow
 import pl.twojanazwa.aapsremote.ui.platform.SecureWindowCounter
 import pl.twojanazwa.aapsremote.ui.settings.SettingsScreen
@@ -82,7 +82,7 @@ private fun AppScaffoldContent(modifier: Modifier) {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(AppDestination.COMMANDS.route) { CommandsPlaceholderScreen() }
-            composable(AppDestination.HISTORY.route) { HistoryPlaceholderScreen() }
+            composable(AppDestination.HISTORY.route) { HistoryScreen() }
             composable(AppDestination.SETTINGS.route) { SettingsScreen() }
         }
     }
