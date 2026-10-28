@@ -104,6 +104,7 @@ fun CommandsScreen(
                 grams = summaryGrams,
                 pinText = commands.pinText,
                 canSubmit = commands.canSubmitPin,
+                launching = commands.launching,
                 onPinChanged = commandsViewModel::onPinChanged,
                 onSend = commandsViewModel::onSendClicked,
                 onCancel = commandsViewModel::onSummaryDismissed,

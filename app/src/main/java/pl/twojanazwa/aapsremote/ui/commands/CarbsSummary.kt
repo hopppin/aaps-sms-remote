@@ -27,6 +27,7 @@ fun CarbsSummary(
     grams: Int,
     pinText: String,
     canSubmit: Boolean,
+    launching: Boolean,
     onPinChanged: (String) -> Unit,
     onSend: () -> Unit,
     onCancel: () -> Unit,
@@ -51,7 +52,7 @@ fun CarbsSummary(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+            TextButton(onClick = onCancel, enabled = !launching) { Text(stringResource(R.string.action_cancel)) }
             Button(onClick = onSend, enabled = canSubmit) { Text(stringResource(R.string.commands_send)) }
         }
     }
