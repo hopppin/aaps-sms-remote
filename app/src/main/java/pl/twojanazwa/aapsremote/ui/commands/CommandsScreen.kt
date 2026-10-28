@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +28,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
 
 /** Panel Polecenia i odświeżanie uprawnień przy powrocie z ustawień systemu. */
@@ -84,8 +86,29 @@ fun CommandsScreen(
         }
     }
 
+    // CMDUI-23: znacznik obejmuje też przekazanie do przebiegu (runHandoff).
+    SecureWindowEffect(commands.secureWindow)
+    BackHandler(enabled = commands.interceptsBack) { commandsViewModel.onBack() }
+    commands.confirmingLargeGrams?.let { grams ->
+        LargeAmountDialog(
+            grams = grams,
+            onConfirm = commandsViewModel::onLargeAmountConfirmed,
+            onDismiss = commandsViewModel::onLargeAmountDismissed,
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
-        CommandsPanel(
+        val summaryGrams = commands.summaryGrams
+        if (summaryGrams != null) {
+            CarbsSummary(
+                grams = summaryGrams,
+                pinText = commands.pinText,
+                canSubmit = commands.canSubmitPin,
+                onPinChanged = commandsViewModel::onPinChanged,
+                onSend = commandsViewModel::onSendClicked,
+                onCancel = commandsViewModel::onSummaryDismissed,
+            )
+        } else CommandsPanel(
             state = commands,
             onBgClicked = commandsViewModel::onBgClicked,
             onPumpClicked = commandsViewModel::onPumpClicked,
