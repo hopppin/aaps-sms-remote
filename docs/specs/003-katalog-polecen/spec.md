@@ -222,7 +222,7 @@ Fikcyjne ilości i teksty z kryteriów akceptacji (CMD-03 – CMD-09). Brak plik
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
   - CMD-01: katalog ma 7 wpisów (`BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH`); słowo kluczowe może mieć pojedyncze spacje między słowami (BOL-01, PROF-01).
   - CMD-03, CMD-04: górna granica `CARBS` = limit z ustawień, domyślnie 50 g (LIM-06); CMD-05: próg = 80% limitu, przy 50 g nadal 40 g (LIM-07); CMD-06: szybkie wartości tylko ≤ progu (LIM-08). Przy limitach domyślnych zachowanie bez zmian.
   - CMD-07, CMD-08: treść SMS i kontekst parsera dla nowych poleceń (BOL-05, BOL-06, PROF-04, PROF-05). „Poza zakresem” (bolus, profile, ustawianie zakresu) – przeniesione do Spec 011 – 013.

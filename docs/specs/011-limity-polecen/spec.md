@@ -1,6 +1,6 @@
 # Spec 011: Limity poleceń w ustawieniach
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `LIM`
 - **Pakiety:** `commands` (limity jako dane, walidacja), `data` / `data.platform` (zapis limitów), `ui.settings` (sekcja „Limity poleceń”), `ui.commands` (użycie limitów przy `CARBS` i `BOLUS`, sprawdzenie przy starcie)
 - **Powiązane:** [docs/plan.md](../../plan.md#ekrany-aplikacji); [Spec 003: Katalog poleceń](../003-katalog-polecen/spec.md) (CMD-01, CMD-03 – CMD-06 – zmieniane tą specyfikacją); [Spec 007: Dane](../007-dane/spec.md) (wzorzec `SharedPreferences` + `commit()`, DATA-06, DATA-15 – DATA-17); [Spec 008: UI – ustawienia](../008-ui-ustawienia/spec.md) (UI-15, UI-16, UI-20, UI-21); [Spec 009: UI – polecenia](../009-ui-polecenia/spec.md) (CMDUI-07 – CMDUI-09, CMDUI-12); [Spec 012: Bolus](../012-bolus/spec.md) (limit ilości i odstęp między bolusami – użycie); [Spec 013: Profil](../013-profil/spec.md)
@@ -64,7 +64,7 @@ Każdy limit ma zakres (włącznie z granicami) i krok. Utworzenie limitów z wa
 | `BOLUS` (j.) | 0,05 (5) | 10,00 (1000) | 0,05 (5) | 5,00 (500) |
 | Odstęp między bolusami (min) | 0 | 60 | 1 | 15 |
 
-Zakresy są propozycją (otwarte pytanie P2).
+Zakresy przyjęte decyzją użytkownika (P2).
 
 **Kryteria akceptacji:**
 
@@ -118,7 +118,8 @@ Stan zaczyna jako `Loading`; wczytanie rusza raz przy utworzeniu singletonu, w z
 | Zawartość pliku | Stan |
 | --- | --- |
 | brak wszystkich trzech kluczy | `Loaded(domyślne)` |
-| brak części kluczy, obecne wartości poprawne (LIM-02) | `Loaded` – brakujące klucze z wartościami domyślnymi |
+| wszystkie trzy klucze z wartościami poprawnymi (LIM-02) | `Loaded(wartości z pliku)` |
+| brak części kluczy (obecny co najmniej jeden, brak co najmniej jednego) | `LoadFailed` (zapis zawsze zapisuje trzy klucze naraz, więc taki plik jest uszkodzony) |
 | którakolwiek wartość spoza zakresu, niezgodna z krokiem albo innego typu niż `Int` | `LoadFailed` |
 | odczyt rzucił wyjątek (poza `CancellationException`) | `LoadFailed` |
 
@@ -126,7 +127,8 @@ Zapis przyjmuje poprawne limity (LIM-02): `commit()` = `true` → `Saved`, stan 
 
 **Kryteria akceptacji:**
 
-- **Zakładając** magazyn z `carbs_max_grams` = 30, **gdy** wczytanie się zakończyło, **wtedy** stan = `Loaded` z `CARBS` 30, `BOLUS` 500, odstępem 15.
+- **Zakładając** magazyn z `carbs_max_grams` = 30, `bolus_max_centi_units` = 250, `bolus_min_interval_minutes` = 20, **gdy** wczytanie się zakończyło, **wtedy** stan = `Loaded` z tymi wartościami.
+- **Zakładając** magazyn z samym `carbs_max_grams` = 30 (brak dwóch kluczy), **gdy** wczytanie się zakończyło, **wtedy** stan = `LoadFailed`, a `CARBS` i `BOLUS` są niedostępne (LIM-05).
 - **Zakładając** magazyn z `bolus_max_centi_units` = 252 (osobno: `carbs_max_grams` = 500; osobno: `bolus_min_interval_minutes` zapisany jako `String`), **gdy** wczytanie się zakończyło, **wtedy** stan = `LoadFailed`, a magazyn nie otrzymał zapisu.
 - **Zakładając** magazyn rzucający `ClassCastException` przy odczycie, **gdy** wczytanie się zakończyło, **wtedy** stan = `LoadFailed`, bez wyjątku.
 - **Zakładając** stan `LoadFailed`, **gdy** zapisano limity (40 g, 300, 20 min), **wtedy** wynik = `Saved`, stan = `Loaded` z tymi wartościami, a magazyn otrzymał jeden zapis z trzema kluczami.
@@ -155,7 +157,7 @@ Zmiana CMD-03 i CMD-04: polecenie `CARBS` można utworzyć z ilością od 1 g do
 
 ### LIM-07: Próg „Na pewno” dla CARBS
 
-Zmiana CMD-05: `CARBS` wymaga dodatkowego potwierdzenia, gdy ilość > `⌊carbsMaxGrams × 4 / 5⌋` (80% limitu, zaokrąglone w dół). Przy limicie domyślnym 50 g próg = 40 g, czyli zachowanie jak dziś. Tekst okna (CMDUI-09) bierze próg z limitów: „To więcej niż P g. Sprawdź ilość, zanim wpiszesz PIN.” (propozycja, otwarte pytanie P1).
+Zmiana CMD-05: `CARBS` wymaga dodatkowego potwierdzenia, gdy ilość > `⌊carbsMaxGrams × 4 / 5⌋` (80% limitu, zaokrąglone w dół). Przy limicie domyślnym 50 g próg = 40 g, czyli zachowanie jak dziś. Tekst okna (CMDUI-09) bierze próg z limitów: „To więcej niż P g. Sprawdź ilość, zanim wpiszesz PIN.” (decyzja użytkownika, P1).
 
 **Kryteria akceptacji:**
 
@@ -180,12 +182,13 @@ Zmiana CMD-06 i CMDUI-08: panel pokazuje tylko te szybkie wartości z `10, 20, 3
 
 ### LIM-09: Ponowne sprawdzenie limitu przy starcie
 
-`CommandLauncher.launch` dla `CARBS` i `BOLUS` sprawdza ilość z aktualnym stanem limitów, po sprawdzeniu uprawnień SMS (krok 3 CMDUI-12), a przed odczytem sekretu: stan inny niż `Loaded` → odrzucenie `LIMITS_UNAVAILABLE`; ilość > aktualnego limitu → odrzucenie `AMOUNT_ABOVE_LIMIT`. Ilość nie jest przycinana. Przy odrzuceniu PIN jest czyszczony, brak startu (jak CMDUI-12). Komunikaty:
+`CommandLauncher.launch` dla `CARBS` i `BOLUS` sprawdza ilość z aktualnym stanem limitów, po sprawdzeniu uprawnień SMS (krok 3 CMDUI-12), a przed odczytem sekretu: stan inny niż `Loaded` → odrzucenie `LIMITS_UNAVAILABLE`; ilość > aktualnego limitu → odrzucenie `AMOUNT_ABOVE_LIMIT`; polecenie wymaga dodatkowego potwierdzenia według aktualnych limitów (LIM-07, BOL-04), a użytkownik go nie udzielił (`launch` dostaje znacznik `extraConfirmed` = okno „Na pewno” zatwierdzone przyciskiem „Tak”) → odrzucenie `EXTRA_CONFIRMATION_REQUIRED`. Ilość nie jest przycinana. Przy odrzuceniu PIN jest czyszczony, brak startu (jak CMDUI-12). Komunikaty:
 
 | Powód | Komunikat | Akcja |
 | --- | --- | --- |
 | `LIMITS_UNAVAILABLE` | „Nie udało się wczytać limitów poleceń. Zapisz je ponownie w Ustawieniach.” | Ustawienia |
 | `AMOUNT_ABOVE_LIMIT` | „Ilość przekracza limit z Ustawień. Popraw ilość i spróbuj ponownie.” | – |
+| `EXTRA_CONFIRMATION_REQUIRED` | „Limit w Ustawieniach się zmienił i ta ilość wymaga potwierdzenia. Sprawdź ilość i spróbuj ponownie.” | – |
 
 Pozostałe polecenia nie przechodzą tego sprawdzenia.
 
@@ -194,6 +197,7 @@ Pozostałe polecenia nie przechodzą tego sprawdzenia.
 - **Zakładając** polecenie `CARBS 40` utworzone przy limicie 50 i limit zmieniony potem na 30, **gdy** wywołano `launch(CARBS 40, PIN 4321)`, **wtedy** wynik = `AMOUNT_ABOVE_LIMIT`, PIN wyczyszczony, `load()` sekretu nie był wywołany, brak startu.
 - **Zakładając** stan limitów `LoadFailed`, **gdy** wywołano `launch(CARBS 20, PIN)`, **wtedy** wynik = `LIMITS_UNAVAILABLE`, PIN wyczyszczony, brak startu.
 - **Zakładając** stan limitów `LoadFailed`, **gdy** wywołano `launch(BG, null)`, **wtedy** wynik = `Started`.
+- **Zakładając** polecenie `CARBS 35` zatwierdzone bez okna „Na pewno” przy limicie 50 (próg 40) i limit zmieniony potem na 40 (próg 32), **gdy** wywołano `launch(CARBS 35, PIN, extraConfirmed = false)`, **wtedy** wynik = `EXTRA_CONFIRMATION_REQUIRED`, PIN wyczyszczony, brak startu; z `extraConfirmed = true` – `Started`.
 - **Zakładając** każdą nową wartość `LaunchRejection`, **gdy** odwzorowano ją na komunikat, **wtedy** komunikat i akcja odpowiadają tabeli.
 
 ### LIM-10: Sekcja „Limity poleceń” w Ustawieniach
@@ -274,14 +278,15 @@ Fikcyjne wartości z kryteriów. Brak plików w `dane/`.
 
 ## Otwarte pytania
 
-Propozycje do decyzji użytkownika (specyfikacja do tego czasu ma status `szkic`):
+Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
 
-- [ ] **P1. Próg „Na pewno” dla `CARBS` przy zmienionym limicie.** Propozycja: 80% limitu zaokrąglone w dół (LIM-07) – przy 50 g zostaje 40 g jak dziś. Alternatywa: połowa limitu jak przy bolusie (przy 50 g pytanie już od 26 g – zmiana zachowania).
-- [ ] **P2. Zakresy ustawień.** Propozycja (LIM-02): `CARBS` 10–100 g co 1 g; `BOLUS` 0,05–10,00 j. co 0,05 j.; odstęp 0–60 min co 1 min (0 = bez sprawdzania w aplikacji). Do potwierdzenia: górne granice 100 g i 10 j. (świadomie niewysokie dla zdalnego SMS), dolna granica `CARBS` 10 g.
-- [ ] **P3. Limit zmniejszony poniżej wpisanej ilości.** Propozycja: brak przycinania; błąd przy „Dalej” (LIM-06) i drugie sprawdzenie przy starcie (`AMOUNT_ABOVE_LIMIT`, LIM-09). Otwarte podsumowanie i tak zamyka się przy przejściu do Ustawień (CMDUI-11).
-- [ ] **P4. Limity nieodczytane.** Propozycja: `CARBS` i `BOLUS` niedostępne do ponownego zapisu limitów, bez użycia wartości domyślnych (LIM-05).
-- [ ] **P5. Potwierdzenie podniesienia limitu.** Propozycja: bez dodatkowego okna przy zwiększaniu limitów (zapis jednym przyciskiem). Alternatywa: okno „Zwiększyć limit bolusa do X j.?”.
+- [x] **P1. Próg „Na pewno” dla `CARBS` przy zmienionym limicie.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – 80% limitu zaokrąglone w dół (LIM-07) – przy 50 g zostaje 40 g jak dziś. Alternatywa: połowa limitu jak przy bolusie (przy 50 g pytanie już od 26 g – zmiana zachowania).
+- [x] **P2. Zakresy ustawień.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – (LIM-02) `CARBS` 10–100 g co 1 g; `BOLUS` 0,05–10,00 j. co 0,05 j.; odstęp 0–60 min co 1 min (0 = bez sprawdzania w aplikacji). Do potwierdzenia: górne granice 100 g i 10 j. (świadomie niewysokie dla zdalnego SMS), dolna granica `CARBS` 10 g.
+- [x] **P3. Limit zmniejszony poniżej wpisanej ilości.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – brak przycinania; błąd przy „Dalej” (LIM-06) i drugie sprawdzenie przy starcie (`AMOUNT_ABOVE_LIMIT`, LIM-09). Otwarte podsumowanie i tak zamyka się przy przejściu do Ustawień (CMDUI-11).
+- [x] **P4. Limity nieodczytane.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – `CARBS` i `BOLUS` niedostępne do ponownego zapisu limitów, bez użycia wartości domyślnych (LIM-05).
+- [x] **P5. Potwierdzenie podniesienia limitu.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – bez dodatkowego okna przy zwiększaniu limitów (zapis jednym przyciskiem). Alternatywa: okno „Zwiększyć limit bolusa do X j.?”.
 
 ## Historia zmian
 
+- **2026-10-28 – poprawki po recenzji PR #221 i zatwierdzenie.** LIM-04: brak części kluczy = `LoadFailed` (spójnie z LIM-05). LIM-09: ponowne liczenie progu „Na pewno” przy starcie (`EXTRA_CONFIRMATION_REQUIRED`). Design: zadanie 4 (limity w panelu i launcherze) przed zadaniem 3 (sekcja w Ustawieniach), zadanie 3 z etykietą `bezpieczenstwo`. Pytania P1–P5 zamknięte, status `zatwierdzona`.
 - **2026-10-28 – pierwsza wersja (szkic).** Razem ze Spec 012 i 013. Zmienia CMD-03 – CMD-06 (Spec 003), CMDUI-07 – CMDUI-09 i CMDUI-12 (Spec 009); dodaje sekcję do ekranu Ustawień (Spec 008).

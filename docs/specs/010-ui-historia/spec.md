@@ -304,7 +304,7 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
   - HISTUI-03: etykiety „BOLUS X j.”, „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%” (BOL-17, PROF-17).
   - HISTUI-04: wynik `BolusConfirmed` → „AAPS potwierdził podanie X j.” (BOL-17); komunikaty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16.
 - **2026-10-28 – doprecyzowanie po przeglądzie jakości UI (razem ze zmianą Spec 009, P11, P12).**

@@ -1,6 +1,6 @@
 # Spec 012: Polecenie BOLUS
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `BOL`
 - **Pakiety:** `commands`, `parser`, `session`, `data` / `data.platform` (historia), `ui.commands`, `ui.history`
 - **Powiązane:** [docs/plan.md](../../plan.md#cel-i-zakres); [Spec 002: Parser](../002-parser-odpowiedzi/spec.md) (PARSER-01, PARSER-02, PARSER-08 – PARSER-10); [Spec 003: Katalog](../003-katalog-polecen/spec.md) (CMD-01, CMD-02, CMD-07 – CMD-09); [Spec 004: Sesja](../004-sesja-polecenia/spec.md) (fakty A1 – A7, SESSION-08 – SESSION-15, SESSION-20); [Spec 007: Dane](../007-dane/spec.md) (DATA-07, DATA-09, DATA-14); [Spec 009: UI – polecenia](../009-ui-polecenia/spec.md) (CMDUI-04, CMDUI-09 – CMDUI-12, CMDUI-17, CMDUI-19, CMDUI-23); [Spec 010: UI – historia](../010-ui-historia/spec.md) (HISTUI-03, HISTUI-04); [Spec 011: Limity poleceń](../011-limity-polecen/spec.md) (limit ilości bolusa, odstęp)
@@ -27,7 +27,7 @@ Użytkownik zleca z aplikacji bolus `BOLUS <j>`. Aplikacja wysyła polecenie tyl
 
 ## Fakty o AAPS (źródło)
 
-Źródło: SMS-y z telefonu użytkownika (AAPS po polsku, bez znaków diakrytycznych; pliki w [dane/](dane/README.md)) i kod `SmsCommunicatorPlugin` (AndroidAPS), przekazane przez użytkownika. Wersja AAPS – jak w Spec 002 (3.4.2.6), do potwierdzenia (P9).
+Źródło: SMS-y z telefonu użytkownika (AAPS po polsku, bez znaków diakrytycznych; pliki w [dane/](dane/README.md)) i kod `SmsCommunicatorPlugin` (AndroidAPS), przekazane przez użytkownika. Wersja AAPS – jak w Spec 002 (3.4.2.6) (P9).
 
 | Nr | Fakt | Źródło | Skutek |
 | --- | --- | --- | --- |
@@ -254,7 +254,13 @@ Dodatkowy bezpiecznik aplikacji (AAPS i tak stosuje własny odstęp, B4). `Comma
 - Gdy istnieje liczący się wpis z chwilą odniesienia `t`, dla której `teraz − t < odstęp × 60 000 ms` albo `t > teraz` (zegar cofnięty) → odrzucenie `BOLUS_INTERVAL` z liczbą minut do końca odstępu (zaokrągloną w górę, najmniej 1; dla `t > teraz` – pełny odstęp).
 - „teraz” = `EpochClock` aplikacji.
 
-Przy odrzuceniu PIN jest czyszczony, brak startu. Komunikaty:
+Przy odrzuceniu PIN jest czyszczony, brak startu.
+
+Decyzja: wpis `Failed(WRONG_CODE)` ma wysłany kod, więc liczy się do odstępu – literówka w PIN-ie blokuje ponowną próbę z aplikacji do końca odstępu. To strona bezpieczna (aplikacja nie wie na pewno, czy AAPS odrzucił kod); w razie potrzeby użytkownik ustawia odstęp 0 albo podaje bolus w AAPS.
+
+Ryzyko szczątkowe (świadomie przyjęte, AAPS ma własną kontrolę odstępu – B4): sprawdzenie nie widzi bolusa, którego wpis nie zapisał się w historii (`RecordResult.Failed`, DATA-13), bolusów sprzed „Wyczyść historię” (HISTUI-10) ani bolusów podanych w AAPS ręcznie albo z innych numerów; zegar telefonu przestawiony do przodu skraca odstęp (cofnięty – blokuje, kryterium niżej).
+
+Komunikaty:
 
 | Powód | Komunikat | Akcja |
 | --- | --- | --- |
@@ -321,7 +327,7 @@ Przebieg `BOLUS` ma 5 kroków jak `CARBS` (CMDUI-17; tabela kroków obejmuje ka�
 | Wynik | Rodzaj | Komunikat |
 | --- | --- | --- |
 | `BolusConfirmed(X)` | sukces | „AAPS potwierdził podanie X j.” (X z wyniku) |
-| `Failed(AMOUNT_MISMATCH)` | błąd | „AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS).” (jak `CARBS`) |
+| `Failed(AMOUNT_MISMATCH)` | błąd | „AAPS poprosił o kod dla innej ilości niż wysłana (np. obciętej przez limit w AAPS). Kod nie został wysłany.” – osobny tekst, żeby nie sugerować podania insuliny |
 | `Unknown(UNRECOGNIZED_REPLY)` | nieznany | „Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS. Przeczytaj treść SMS i sprawdź w AAPS.” |
 
 Pozostałe wyniki – jak CMDUI-19. Dla każdego `Unknown` bolusa ostrzeżenie brzmi „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.” (zamiast ogólnego). „Kod nie został wysłany.” – jak dla `CARBS`.
@@ -331,10 +337,11 @@ Pozostałe wyniki – jak CMDUI-19. Dla każdego `Unknown` bolusa ostrzeżenie b
 - **Zakładając** wynik `BolusConfirmed(120)` dla polecenia `BOLUS 1,20 j.`, **gdy** odwzorowano, **wtedy** sukces, argument ilości = 120, treść = `bolus-sukces-1-20.txt`.
 - **Zakładając** `BOLUS` i każdy `UnknownReason`, **gdy** odwzorowano, **wtedy** ostrzeżenie = bolusowe; dla `CARBS` – ogólne.
 - **Zakładając** `BOLUS` i każdą fazę, **gdy** wyliczono kroki, **wtedy** są takie jak dla `CARBS`.
+- **Zakładając** `BOLUS` z `Failed(AMOUNT_MISMATCH)`, **gdy** odwzorowano, **wtedy** komunikat to tekst bolusowy (inny klucz niż dla `CARBS`).
 
 ### BOL-17: Historia
 
-Zmiana DATA-07, DATA-09, DATA-14 i HISTUI-03/04: wpis ma pole „ilość bolusa (setne)” – `Command.Bolus.centiUnits` dla `BOLUS`, inaczej brak. Nowe stałe teksty: polecenie `BOLUS`, rodzaj wyniku `BOLUS_CONFIRMED`. Baza w wersji 2: migracja 1 → 2 dodaje kolumnę `bolus_centi_units INTEGER` (dopuszcza `NULL`), istniejące wiersze zostają bez zmian; brak migracji destrukcyjnych; plik schematu `2.json` w repo. Odczyt: `bolus_centi_units` przy poleceniu innym niż `BOLUS` → brak. Etykieta wpisu: „BOLUS X j.” (X z przecinkiem, 2 miejsca), przy braku ilości „BOLUS (ilość nieznana)”. Wynik wpisu `BolusConfirmed` z ilością → „AAPS potwierdził podanie X j.”; bez ilości → „Brak szczegółów wyniku …”.
+Zmiana DATA-07, DATA-09, DATA-14 i HISTUI-03/04: wpis ma pole „ilość bolusa (setne)” – `Command.Bolus.centiUnits` dla `BOLUS`, inaczej brak. Nowe stałe teksty: polecenie `BOLUS`, rodzaj wyniku `BOLUS_CONFIRMED`. Baza w wersji 2: migracja 1 → 2 dodaje kolumnę `bolus_centi_units INTEGER` (dopuszcza `NULL`), istniejące wiersze zostają bez zmian; brak migracji destrukcyjnych; plik schematu `2.json` w repo. Wszystkie migracje są rejestrowane jednym wywołaniem `addMigrations(...)` (po Spec 013: `MIGRATION_1_2, MIGRATION_2_3`). Zadanie z migracją można scalić dopiero po ręcznym sprawdzeniu W3 na prawdziwej bazie (wynik w opisie PR). Odczyt: `bolus_centi_units` przy poleceniu innym niż `BOLUS` → brak. Etykieta wpisu: „BOLUS X j.” (X z przecinkiem, 2 miejsca), przy braku ilości „BOLUS (ilość nieznana)”. Wynik wpisu `BolusConfirmed` z ilością → „AAPS potwierdził podanie X j.”; bez ilości → „Brak szczegółów wyniku …”.
 
 **Kryteria akceptacji:**
 
@@ -353,6 +360,17 @@ Ilość bolusa, PIN, kod i treść SMS nie trafiają do logów, wyjątków, `toS
 - **Zakładając** stan `CommandsViewModel` z tekstem pola bolusa `"2,35"`, podsumowaniem dla 235 i PIN-em `4321`, **gdy** wywołano `toString()`, **wtedy** tekst nie zawiera `2,35`, `235` ani `4321`.
 - **Zakładając** źródła zmienionych pakietów, **gdy** test JVM je przeczytał, **wtedy** nie zawierają wywołań API logowania.
 
+### BOL-19: Rodzaj prośby o kod zgodny z poleceniem
+
+Sesja odsyła kod tylko wtedy, gdy rodzaj prośby o kod odpowiada poleceniu sesji: `CodeRequest` – `CARBS`, `BolusCodeRequest` – `BOLUS`, `ProfileCodeRequest` – zmiana profilu ([Spec 013](../013-profil/spec.md)). To samo dotyczy potwierdzenia (`CarbsDone` – `CARBS`, `BolusDone` – `BOLUS`). Wynik parsera innego rodzaju (możliwy tylko przy błędzie parsera, bo kontekst ogranicza wyniki – PARSER-01) jest traktowany jak `Unrecognized`: przed kodem `Failed(UNRECOGNIZED_REPLY)` bez kodu, po kodzie `Unknown(UNRECOGNIZED_REPLY)`. Sprawdzenie robi jedna czysta funkcja w `session` z wyczerpującym `when` po `CommandId`.
+
+**Kryteria akceptacji:**
+
+- **Zakładając** każdą parę (polecenie, rodzaj prośby o kod) i (polecenie, rodzaj potwierdzenia), **gdy** wywołano funkcję zgodności, **wtedy** zwraca prawdę tylko dla par z opisu.
+- **Zakładając** sesję `CARBS 1`, **gdy** w `AWAITING_CODE_REQUEST` przychodzi `bolus-prosba-o-kod-0-10.txt`, **wtedy** wynik = `Failed(UNRECOGNIZED_REPLY)` i żaden SMS z kodem nie jest wysyłany.
+- **Zakładając** sesję `BOLUS 0,10 j.`, **gdy** przychodzi `carbs-prosba-o-kod.txt` (osobno: `profile-prosba-o-kod.txt` ze Spec 013), **wtedy** `Failed(UNRECOGNIZED_REPLY)`, bez kodu.
+- **Zakładając** sesję `BOLUS 0,10 j.` z podstawionym parserem (port parsera w sesji, design) zwracającym `CodeRequest(1, …)`, **gdy** przyszła wiadomość, **wtedy** `Failed(UNRECOGNIZED_REPLY)`, bez kodu; zwracającym `CarbsDone(1, …)` po kodzie – `Unknown(UNRECOGNIZED_REPLY)`.
+
 ## Przypadki błędów
 
 | Sytuacja | Oczekiwane zachowanie | Wymaganie |
@@ -365,7 +383,8 @@ Ilość bolusa, PIN, kod i treść SMS nie trafiają do logów, wyjątków, `toS
 | AAPS obciął ilość (prośba o kod z inną ilością) | `Failed(AMOUNT_MISMATCH)`, kod nie jest wysyłany | BOL-08, BOL-10 |
 | Odmowa AAPS przed kodem (kolejka, odstęp, pętla, zdalne wyłączone) | `Failed(UNRECOGNIZED_REPLY)` z treścią, kod nie jest wysyłany | BOL-10 |
 | Brak prośby o kod w 3 min | `TimedOut`, bez kodu | BOL-10 |
-| Zły kod | `Failed(WRONG_CODE)` | BOL-11 |
+| Zły kod | `Failed(WRONG_CODE)`; kolejny bolus z aplikacji dopiero po odstępie | BOL-11, BOL-12 |
+| Prośba o kod innego polecenia (np. `CARBS`) w sesji `BOLUS` | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | BOL-19 |
 | Potwierdzenie z inną ilością po kodzie | `Unknown(AMOUNT_MISMATCH)` | BOL-11 |
 | Nierozpoznana wiadomość po kodzie (np. błąd bolusa) | `Unknown(UNRECOGNIZED_REPLY)` z treścią i ostrzeżeniem | BOL-11, BOL-16 |
 | Brak potwierdzenia w 6 min / anulowanie po kodzie / błąd wysyłania kodu | `Unknown(...)`, nigdy ponowienie | BOL-11, SESSION-15 – SESSION-17 |
@@ -401,16 +420,19 @@ Tylko AAPS z wirtualną pompą. Wyniki opisuje PR zadania, które wprowadza ekra
 
 ## Otwarte pytania
 
-- [ ] **P1. Format SMS.** Propozycja: kropka dziesiętna bez końcowych zer (`BOLUS 0.1`, `BOLUS 2`, `BOLUS 1.25`), BOL-05. Potwierdzone tylko `0.1` i `99`; `1.25` i `0.05` – do sprawdzenia na wirtualnej pompie.
-- [ ] **P2. Format ilości w odpowiedziach AAPS.** Propozycja: tylko przecinek i dokładnie 2 miejsca (`0,10U` w prośbie, `1,20 U` w potwierdzeniu); inny zapis → nierozpoznana (stop/nieznany). Pompy z krokiem 0,01/0,025 j. mogłyby dać 3 miejsca – poza zakresem.
-- [ ] **P3. Odmowy przed kodem** (bolus w kolejce, minimalny odstęp, pętla zawieszona) i błąd bolusa po kodzie – treści nieznane. Propozycja: „nierozpoznana” → przed kodem `Failed(UNRECOGNIZED_REPLY)`, po kodzie `Unknown`; treść zawsze pokazana. Osobne wzorce po zebraniu SMS-ów (W4).
-- [ ] **P4. „Zly kod” dla bolusa.** Propozycja: jak A2 → `Failed(WRONG_CODE)` (wspólny kod AAPS `AuthRequest`); do potwierdzenia na wirtualnej pompie (W5). Alternatywa ostrożniejsza: `Unknown(UNRECOGNIZED_REPLY)`.
-- [ ] **P5. Krok ilości.** Propozycja: wielokrotności 0,05 j. (BOL-02). Gdy pompa ma większy krok, AAPS zaokrągli i poprosi o kod z inną ilością → stop (bezpiecznie, ale polecenie się nie uda).
-- [ ] **P6. Odstęp w aplikacji.** Propozycja (BOL-12): aplikacja sama pilnuje odstępu na podstawie własnej historii (bolusy z wysłanym kodem, potwierdzone albo nieznane), mierzonego od wysłania kodu; historia niedostępna → blokada; zegar cofnięty → blokada; 0 = wyłączone. Alternatywa: tylko zapis ustawienia bez sprawdzania (AAPS i tak odmówi). Uwaga: wyczyszczenie historii usuwa dane do sprawdzenia.
-- [ ] **P7. Potwierdzenie do wszystkich numerów.** Nie wiemy, czy AAPS wysyła potwierdzenie bolusa także na inne dozwolone numery. Propozycja: przyjmować je jak `CARBS` (tylko po kodzie, prezentacja „AAPS potwierdził”).
-- [ ] **P8. Ostrzeżenie dla `Unknown` bolusa.** Propozycja: osobny tekst „Nie ponawiaj bolusa…” (BOL-16).
-- [ ] **P9. Wersja AAPS** dla nowych SMS-ów – zakładamy 3.4.2.6 jak w Spec 002; do potwierdzenia.
+Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
+
+- [x] **P1. Format SMS.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – kropka dziesiętna bez końcowych zer (`BOLUS 0.1`, `BOLUS 2`, `BOLUS 1.25`), BOL-05. Potwierdzone tylko `0.1` i `99`; `1.25` i `0.05` – do sprawdzenia na wirtualnej pompie.
+- [x] **P2. Format ilości w odpowiedziach AAPS.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – tylko przecinek i dokładnie 2 miejsca (`0,10U` w prośbie, `1,20 U` w potwierdzeniu); inny zapis → nierozpoznana (stop/nieznany). Pompy z krokiem 0,01/0,025 j. mogłyby dać 3 miejsca – poza zakresem.
+- [x] **P3. Odmowy przed kodem** (bolus w kolejce, minimalny odstęp, pętla zawieszona) i błąd bolusa po kodzie – treści nieznane. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – „nierozpoznana” → przed kodem `Failed(UNRECOGNIZED_REPLY)`, po kodzie `Unknown`; treść zawsze pokazana. Osobne wzorce po zebraniu SMS-ów (W4).
+- [x] **P4. „Zly kod” dla bolusa.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – jak A2 → `Failed(WRONG_CODE)` (wspólny kod AAPS `AuthRequest`); do potwierdzenia na wirtualnej pompie (W5). Alternatywa ostrożniejsza: `Unknown(UNRECOGNIZED_REPLY)`.
+- [x] **P5. Krok ilości.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – wielokrotności 0,05 j. (BOL-02). Gdy pompa ma większy krok, AAPS zaokrągli i poprosi o kod z inną ilością → stop (bezpiecznie, ale polecenie się nie uda).
+- [x] **P6. Odstęp w aplikacji.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – (BOL-12) aplikacja sama pilnuje odstępu na podstawie własnej historii (bolusy z wysłanym kodem, potwierdzone albo nieznane), mierzonego od wysłania kodu; historia niedostępna → blokada; zegar cofnięty → blokada; 0 = wyłączone. Alternatywa: tylko zapis ustawienia bez sprawdzania (AAPS i tak odmówi). Doprecyzowanie: `Failed(WRONG_CODE)` liczy się do odstępu (decyzja w BOL-12); nieudany zapis historii, „Wyczyść historię” i przestawiony zegar to ryzyko szczątkowe opisane w BOL-12.
+- [x] **P7. Potwierdzenie do wszystkich numerów.** Nie wiemy, czy AAPS wysyła potwierdzenie bolusa także na inne dozwolone numery. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – przyjmować je jak `CARBS` (tylko po kodzie, prezentacja „AAPS potwierdził”).
+- [x] **P8. Ostrzeżenie dla `Unknown` bolusa.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – osobny tekst „Nie ponawiaj bolusa…” (BOL-16).
+- [x] **P9. Wersja AAPS** dla nowych SMS-ów. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – 3.4.2.6 jak w Spec 002.
 
 ## Historia zmian
 
+- **2026-10-28 – poprawki po recenzji PR #221 i zatwierdzenie.** BOL-12: ryzyko szczątkowe (nieudany zapis historii, wyczyszczona historia, zegar) i decyzja o `Failed(WRONG_CODE)`; BOL-16: osobny tekst niezgodnej ilości bolusa przed kodem; BOL-17: jedno `addMigrations`, W3 warunkiem scalenia; nowe BOL-19 (rodzaj prośby o kod zgodny z poleceniem). Design: zadanie z kontrolą odstępu i tekstami wyniku przed zadaniem z „Wyślij”, pełna lista plików zadania 1. Pytania P1–P9 zamknięte, status `zatwierdzona`.
 - **2026-10-28 – pierwsza wersja (szkic).** Uwzględnia potwierdzenie bolusa przesłane przez użytkownika (fakt B3). Zmienia CMD-01 (Spec 003), PARSER-01 (Spec 002, nowy kontekst), SESSION-08, SESSION-11 – SESSION-13 (Spec 004, rozszerzenie tabel na bolus), DATA-07, DATA-09, DATA-14 (Spec 007, kolumna i migracja), CMDUI-04, CMDUI-12, CMDUI-17, CMDUI-19 (Spec 009), HISTUI-03, HISTUI-04 (Spec 010).

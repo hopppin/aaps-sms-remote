@@ -1,6 +1,6 @@
 # Spec 013: Profil – stan, lista i zmiana profilu
 
-- **Status:** szkic
+- **Status:** zatwierdzona
 - **Prefiks wymagań:** `PROF`
 - **Pakiety:** `commands`, `parser`, `session`, `data` / `data.platform` (historia), `ui.commands`, `ui.history`
 - **Powiązane:** [Spec 002: Parser](../002-parser-odpowiedzi/spec.md); [Spec 003: Katalog](../003-katalog-polecen/spec.md); [Spec 004: Sesja](../004-sesja-polecenia/spec.md) (A1 – A7, SESSION-06, SESSION-08, SESSION-11, SESSION-13, SESSION-22); [Spec 007: Dane](../007-dane/spec.md); [Spec 009: UI – polecenia](../009-ui-polecenia/spec.md); [Spec 010: UI – historia](../010-ui-historia/spec.md); [Spec 012: Bolus](../012-bolus/spec.md) (interfejsy znacznikowe parsera, migracja 1 → 2)
@@ -72,7 +72,7 @@ Polecenie zmiany profilu powstaje tylko z wyboru profilu (numer, nazwa) i procen
 
 - numer 1–99 (z listy; aplikacja nigdy nie wysyła 0, liczby ujemnej ani numeru spoza listy, R4);
 - nazwa niepusta, bez LF (z listy);
-- procent 50–200 włącznie (propozycja, P3) – „poniżej minimum” / „powyżej maksimum”.
+- procent 50–200 włącznie (decyzja użytkownika, P3) – „poniżej minimum” / „powyżej maksimum”.
 
 Brak wyjątku dla danych od użytkownika; nie ma innej drogi utworzenia polecenia.
 
@@ -136,14 +136,20 @@ W kontekście „stan profilu” wynik „stan profilu” (z treścią) powstaje
 
 ### PROF-07: Lista profili
 
-W kontekście „lista profili” wynik „lista profili” powstaje, gdy treść po normalizacji ma n ≥ 1 linii, linia i (od 1) ma postać `<i>. <nazwa>` (numer dokładnie równy i, kropka, spacja, nazwa ≥ 1 znak), n ≤ 99, a nazwy są parami różne. Wynik zawiera listę (numer, nazwa) i treść. Inaczej – „nierozpoznana”.
+W kontekście „lista profili” wynik „lista profili” powstaje, gdy treść po normalizacji ma n ≥ 1 linii, linia i (od 1) ma postać `<i>. <nazwa>` (numer dokładnie równy i, kropka, spacja, nazwa ≥ 1 znak), n ≤ 99, a nazwy są parami różne. Nazwa to cała reszta linii po `<i>. ` (do końca linii, także gdy zawiera spacje, cyfry i kropki). Wynik zawiera listę (numer, nazwa) i treść. Inaczej – „nierozpoznana”.
+
+Skutek dla listy podanej w jednej linii (np. `1. A 2. B`): parser zwraca jedną pozycję (1, `A 2. B`). Jest to bezpieczne – po wyborze tej pozycji AAPS poprosi o kod dla profilu `A`, nazwa się nie zgodzi i sesja kończy się bez kodu (PROF-09, PROF-12).
+
+Ograniczenie: treść dłuższa niż 2000 znaków jest od razu nierozpoznana (PARSER-02, `ReplyNormalizer`), więc bardzo długa lista profili da wynik „nierozpoznana” z treścią i bez wyboru.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** `profile-list.txt`, **gdy** kontekst = lista profili, **wtedy** wynik = lista [(1, `LocalProfile1`), (2, `LocalProfile2`)] z treścią równą wejściu.
 - **Zakładając** `profile-list.txt` z końcami linii `\r\n`, **gdy** kontekst = lista profili, **wtedy** ta sama lista.
 - **Zakładając** wariant syntetyczny `1. Dzien roboczy` (jedna linia), **gdy** kontekst = lista profili, **wtedy** lista [(1, `Dzien roboczy`)].
-- **Zakładając** warianty `2. A` (zaczyna od 2), `1. A\n3. B` (luka), `1. A\n1. B`, `1.A`, `1. A\n2. A` (powtórzona nazwa), `1. A 2. B` (jedna linia), `Brak profili`, **gdy** kontekst = lista profili, **wtedy** nierozpoznana.
+- **Zakładając** warianty `2. A` (zaczyna od 2), `1. A\n3. B` (luka), `1. A\n1. B`, `1.A`, `1. A\n2. A` (powtórzona nazwa), `Brak profili`, **gdy** kontekst = lista profili, **wtedy** nierozpoznana.
+- **Zakładając** wariant `1. A 2. B` (jedna linia), **gdy** kontekst = lista profili, **wtedy** lista [(1, `A 2. B`)]; **zakładając** sesję zmiany (1, `A 2. B`, 100) i syntetyczną prośbę `Aby przelaczyc profil na A 100% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em`, **gdy** prośba przyszła, **wtedy** `Failed(AMOUNT_MISMATCH)` i bez kodu.
+- **Zakładając** listę o długości 2001 znaków (np. 99 pozycji z długimi nazwami), **gdy** kontekst = lista profili, **wtedy** nierozpoznana, bez wyjątku.
 
 ### PROF-08: Prośba o kod zmiany profilu
 
@@ -191,6 +197,7 @@ Sesje `PROFILE STATUS` i `PROFILE LIST` przebiegają jak `BG` (SESSION-03, SESSI
 
 - **Zakładając** sesję `PROFILE LIST`, **gdy** przychodzi `profile-list.txt`, **wtedy** wynik = `Completed` z listą 2 pozycji; port wysyłania dostał dokładnie `PROFILE LIST`.
 - **Zakładając** sesję `PROFILE STATUS`, **gdy** przychodzi `profile-status.txt`, **wtedy** `Completed`; gdy przychodzi `profile-bledny-format.txt` – `Failed(UNRECOGNIZED_REPLY)` z tą treścią.
+- **Zakładając** sesję `PROFILE STATUS`, **gdy** przychodzi `profile-list.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` (lista nie jest odpowiedzią na stan); **zakładając** sesję `PROFILE LIST`, **gdy** przychodzi `profile-status.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)`.
 - **Zakładając** aktywną sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** wystartowano `PROFILE LIST`, **wtedy** wynik startu = „zajęte”, port nie dostał `PROFILE LIST`, a sesja `CARBS` trwa dalej.
 
 ### PROF-12: Zmiana profilu – przed kodem i po kodzie
@@ -204,7 +211,7 @@ Sesja zmiany profilu przebiega jak `CARBS`/`BOLUS` (fazy, limity, SESSION-08 –
 | zły kod | `Failed(UNEXPECTED_REPLY)` | `Failed(WRONG_CODE)` (P4) |
 | nierozpoznana (np. `Bledny format`, nieznane potwierdzenie) | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | `Unknown(UNRECOGNIZED_REPLY)` z treścią |
 
-Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_MISMATCH` obejmuje dla profilu niezgodną nazwę albo procent (bez nowego powodu w `FailureReason`).
+Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_MISMATCH` obejmuje dla profilu niezgodną nazwę albo procent (bez nowego powodu w `FailureReason`). Kod jest odsyłany tylko na `ProfileCodeRequest` w sesji zmiany profilu; prośba o kod innego polecenia daje stop bez kodu (BOL-19).
 
 **Kryteria akceptacji:**
 
@@ -212,6 +219,7 @@ Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_M
 - **Zakładając** sesję zmiany (1, `LocalProfile2`, 100) (lista zmieniła się w AAPS po jej pobraniu), **gdy** przychodzi `profile-prosba-o-kod.txt`, **wtedy** `Failed(AMOUNT_MISMATCH)` i bez kodu.
 - **Zakładając** sesję zmiany (1, `LocalProfile1`, 115), **gdy** przychodzi `profile-bledny-format.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i bez kodu.
 - **Zakładając** sesję zmiany po kodzie, **gdy** przychodzi syntetyczny `Profil zmieniony`, **wtedy** `Unknown(UNRECOGNIZED_REPLY)` z tą treścią; gdy `zly-kod.txt` – `Failed(WRONG_CODE)`.
+- **Zakładając** sesję zmiany (1, `LocalProfile1`, 100), **gdy** przychodzi `bolus-prosba-o-kod-0-10.txt` albo `carbs-prosba-o-kod.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i bez kodu (BOL-19).
 
 ### UI
 
@@ -264,14 +272,15 @@ Nagłówki: „Polecenie PROFILE STATUS”, „Polecenie PROFILE LIST”, „Zmi
 
 ### PROF-17: Historia
 
-Zmiana DATA-07, DATA-09, DATA-14, HISTUI-03: nowe stałe teksty poleceń `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH`; pola wpisu „numer profilu” i „procent profilu” (tylko `PROFILE_SWITCH`, inaczej brak). Nazwa profilu nie jest osobnym polem (jest w treści odpowiedzi). Baza w wersji 3: migracja 2 → 3 dodaje kolumny `profile_number INTEGER` i `profile_percent INTEGER` (obie dopuszczają `NULL`); plik `3.json` w repo. Etykiety: „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%”, przy braku pól „Zmiana profilu (szczegóły nieznane)”.
+Zmiana DATA-07, DATA-09, DATA-14, HISTUI-03: nowe stałe teksty poleceń `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH`; pola wpisu „numer profilu” i „procent profilu” (tylko `PROFILE_SWITCH`, inaczej brak). Nazwa profilu nie jest osobnym polem (jest w treści odpowiedzi). Baza w wersji 3: migracja 2 → 3 dodaje kolumny `profile_number INTEGER` i `profile_percent INTEGER` (obie dopuszczają `NULL`); plik `3.json` w repo. Obie migracje są rejestrowane jednym wywołaniem `addMigrations(MIGRATION_1_2, MIGRATION_2_3)`, więc baza w wersji 1 przechodzi do 3 kolejno przez 2. Zadanie z migracją można scalić dopiero po ręcznym sprawdzeniu W3 na prawdziwej bazie (wynik w opisie PR). Etykiety: „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%”, przy braku pól „Zmiana profilu (szczegóły nieznane)”.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** wynik zmiany (2, `LocalProfile2`, 115) `Unknown(UNRECOGNIZED_REPLY)`, **gdy** utworzono wpis, **wtedy** polecenie = `PROFILE_SWITCH`, numer = 2, procent = 115, a żadne pole poza treścią nie zawiera `LocalProfile2`.
 - **Zakładając** wiersz `PROFILE_LIST` z numerem 3, **gdy** go odczytano, **wtedy** numer i procent = brak.
 - **Zakładając** `3.json`, **gdy** test JVM go przeczytał, **wtedy** wersja = 3, kolumny wersji 2 i dwie nowe bez `NOT NULL`; migracja 2 → 3 ma dokładnie dwa `ALTER TABLE command_history ADD COLUMN …`.
-- **Zakładając** telefon z bazą w wersji 2 (W3), **gdy** zainstalowano nową wersję, **wtedy** wpisy zachowane.
+- **Zakładając** źródło `AapsRemoteDatabase.kt`/`DataModule.kt`, **gdy** test JVM je przeczytał, **wtedy** jest dokładnie jedno wywołanie `addMigrations(` z `MIGRATION_1_2` i `MIGRATION_2_3`; **zakładając** listę migracji, **gdy** test wyliczył ścieżkę 1 → 3, **wtedy** to `MIGRATION_1_2`, `MIGRATION_2_3` (łącznie 3 polecenia `ALTER TABLE`).
+- **Zakładając** telefon z bazą w wersji 2 (W3), **gdy** zainstalowano nową wersję, **wtedy** wpisy zachowane; **zakładając** telefon z bazą w wersji 1 (wersja aplikacji sprzed Spec 012), **gdy** zainstalowano od razu wersję z bazą 3, **wtedy** wpisy zachowane, a nowe wpisy bolusa i profilu mają swoje pola.
 
 ### PROF-18: Brak ujawniania danych
 
@@ -320,16 +329,24 @@ Nazwy profili, numer, procent, PIN, kod i treść SMS nie trafiają do logów, w
 
 ## Otwarte pytania
 
+Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
+
 - [x] **Literówka w `PROFILE STATUS`.** Rozstrzygnięte (użytkownik): treść to `LocalProfile1 (115%)`; „LocalPofile1” było literówką.
-- [ ] **P1. Podział linii w `PROFILE LIST`.** Potwierdzona jest tylko lista numerowana „N. nazwa”. Propozycja: każda pozycja w osobnej linii (LF/CR/CRLF, PARSER-02); inny układ → nierozpoznana (treść pokazana, bez wyboru). Do sprawdzenia: czy jest dodatkowy nagłówek lub końcowy tekst, co przy pustej liście.
-- [ ] **P2. Format `PROFILE STATUS`.** Propozycja: tylko `<nazwa> (<P>%)`. Nie wiemy, czy przy 100% AAPS pomija nawias i czy dopisuje przesunięcie czasu; inny format → `Failed(UNRECOGNIZED_REPLY)` z treścią (użytkownik i tak ją widzi).
-- [ ] **P3. Zakres procentu.** Propozycja: 50–200%, liczby całkowite, bez dodatkowego pytania „Na pewno” (procent i nazwa są w podsumowaniu). Uzasadnienie: AAPS nie ogranicza procentu (R5); 50–200% obejmuje typowe zmiany (choroba, wysiłek), a wartości skrajne (np. 10% albo 500%) przez SMS byłyby groźne. Alternatywa: zakres jak w oknie zmiany profilu AAPS albo pytanie „Na pewno” poza 80–120%.
-- [ ] **P4. Odpowiedzi po kodzie.** Treść po poprawnym kodzie nieznana → `Unknown(UNRECOGNIZED_REPLY)` z treścią. „Zly kod” → `Failed(WRONG_CODE)` (wspólny kod AAPS, A2) – do potwierdzenia (W2). Po zebraniu SMS-a – wzorzec potwierdzenia jak dla bolusa.
-- [ ] **P5. Powtórzone nazwy na liście.** Propozycja: lista nierozpoznana (nie da się sprawdzić prośby o kod po nazwie).
-- [ ] **P6. Wersja AAPS** – zakładamy 3.4.2.6.
-- [ ] **P7. Historia.** Propozycja: numer i procent w kolumnach, nazwa tylko w treści odpowiedzi.
-- [ ] **P8. Wybór porzucany przy wyjściu z zakładki** (PROF-15) – propozycja dla prostoty i aktualności listy.
+- [x] **P1. Podział linii w `PROFILE LIST`.** Potwierdzona jest tylko lista numerowana „N. nazwa”. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – każda pozycja w osobnej linii (LF/CR/CRLF, PARSER-02); inny układ → nierozpoznana (treść pokazana, bez wyboru). Do sprawdzenia: czy jest dodatkowy nagłówek lub końcowy tekst, co przy pustej liście.
+- [x] **P2. Format `PROFILE STATUS`.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – tylko `<nazwa> (<P>%)`. Nie wiemy, czy przy 100% AAPS pomija nawias i czy dopisuje przesunięcie czasu; inny format → `Failed(UNRECOGNIZED_REPLY)` z treścią (użytkownik i tak ją widzi).
+- [x] **P3. Zakres procentu.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – 50–200%, liczby całkowite, bez dodatkowego pytania „Na pewno” (procent i nazwa są w podsumowaniu). Uzasadnienie: AAPS nie ogranicza procentu (R5); 50–200% obejmuje typowe zmiany (choroba, wysiłek), a wartości skrajne (np. 10% albo 500%) przez SMS byłyby groźne. Alternatywa: zakres jak w oknie zmiany profilu AAPS albo pytanie „Na pewno” poza 80–120%.
+- [x] **P4. Odpowiedzi po kodzie.** Treść po poprawnym kodzie nieznana → `Unknown(UNRECOGNIZED_REPLY)` z treścią. „Zly kod” → `Failed(WRONG_CODE)` (wspólny kod AAPS, A2) – do potwierdzenia (W2). Po zebraniu SMS-a – wzorzec potwierdzenia jak dla bolusa. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – zgodnie z opisem.
+- [x] **P5. Powtórzone nazwy na liście.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – lista nierozpoznana (nie da się sprawdzić prośby o kod po nazwie).
+- [x] **P6. Wersja AAPS.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – 3.4.2.6 jak w Spec 002.
+- [x] **P7. Historia.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – numer i procent w kolumnach, nazwa tylko w treści odpowiedzi.
+- [x] **P8. Wybór porzucany przy wyjściu z zakładki** (PROF-15) – propozycja dla prostoty i aktualności listy. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – zgodnie z opisem.
+
+## Przyszłe zmiany (nie blokują)
+
+- Okno „Na pewno P%?” dla procentu spoza 80–120% (sugestia z recenzji PR #221; dziś procent i nazwa są tylko w podsumowaniu).
+- Wzorzec potwierdzenia zmiany profilu po zebraniu SMS-a z W2 – zadanie uzupełniające (zmiana tej spec), zamiast wyniku „nieznany”.
 
 ## Historia zmian
 
+- **2026-10-28 – poprawki po recenzji PR #221 i zatwierdzenie.** PROF-07: nazwa = cała reszta linii, lista w jednej linii daje jedną pozycję i kończy się niezgodnością nazwy (stop), ograniczenie 2000 znaków; PROF-11: kryteria odpowiedzi innego rodzaju; PROF-12: odwołanie do BOL-19; PROF-17: jedno `addMigrations`, ścieżka 1 → 3, W3 warunkiem scalenia; „Przyszłe zmiany”. Design: pełna lista plików zadania 1 (dodaje `PROFILE_*` do `CommandId`), zadanie końcowe scalenia wpisów planowanych w spec 002–010. Pytania P1–P8 zamknięte, status `zatwierdzona`.
 - **2026-10-28 – pierwsza wersja (szkic).** Zmienia CMD-01 (Spec 003: 7 wpisów, słowa kluczowe ze spacją), PARSER-01 (Spec 002), SESSION-06, SESSION-08, SESSION-11, SESSION-13 (Spec 004), DATA-07, DATA-09, DATA-14 (Spec 007), CMDUI-01, CMDUI-06, CMDUI-16, CMDUI-17, CMDUI-19, CMDUI-21, CMDUI-23 (Spec 009), HISTUI-03 (Spec 010).

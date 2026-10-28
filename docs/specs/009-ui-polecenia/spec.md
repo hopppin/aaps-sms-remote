@@ -618,7 +618,7 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
   - CMDUI-01: panel ma też sekcje „Bolus” (BOL-13) i „Profil” (PROF-13).
   - CMDUI-04: sekret wymagany dla każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu); CMDUI-05 obejmuje nowe przyciski.
   - CMDUI-07 – CMDUI-09: granica i próg `CARBS` z limitów (LIM-06 – LIM-08); dostępność zależna od stanu limitów (LIM-05).

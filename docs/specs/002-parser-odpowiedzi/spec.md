@@ -258,6 +258,6 @@ Warianty oznaczone w kryteriach jako „syntetyczne” to modyfikacje tych wiado
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
   - PARSER-01: nowe konteksty – `BOLUS` ([Spec 012](../012-bolus/spec.md), BOL-06 – BOL-09) oraz stan profilu, lista profili i zmiana profilu ([Spec 013](../013-profil/spec.md), PROF-05 – PROF-10) – z nowymi rodzajami wyników opisanymi tam. Wyniki dla `BG`, `PUMP` i `CARBS` bez zmian.
   - Design: wspólne interfejsy znacznikowe `AapsReply` (prośba o kod zgodna z poleceniem, niezgodność, potwierdzenie) – [design 012](../012-bolus/design.md#interfejsy); istniejące typy dostają nadtyp, bez zmiany pól i `toString()`.

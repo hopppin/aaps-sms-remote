@@ -94,7 +94,8 @@ interface CommandLimitsStorage {
 
 ```kotlin
 package pl.twojanazwa.aapsremote.ui.commands
-// LaunchRejection: nowe wartości LIMITS_UNAVAILABLE, AMOUNT_ABOVE_LIMIT (LIM-09).
+// LaunchRejection: nowe wartości LIMITS_UNAVAILABLE, AMOUNT_ABOVE_LIMIT, EXTRA_CONFIRMATION_REQUIRED (LIM-09).
+// CommandLauncher.launch(command, pin, extraConfirmed: Boolean = false) – ViewModel przekazuje true tylko po „Tak” w oknie „Na pewno”.
 // CommandLauncher: nowa zależność CommandLimitsStore.
 ```
 
@@ -148,7 +149,7 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami.
 
 1. **Limity w `commands` i `CARBS` z limitami** – `commands/CommandLimits.kt`, `LimitRanges.kt`, `LimitsInput.kt`, `BolusAmountText.kt` (reguły tekstu ilości insuliny z BOL-03, wspólne z polem bolusa w Spec 012), zmiany `Command.kt`, `CarbsLimits.kt`, `CommandParameter.kt`, `CommandCatalog.kt`; dostosowanie wywołań w `ui/commands/CommandsViewModel.kt` i `CommandsUiState.kt` do `CommandLimits.DEFAULT` (bez zmiany zachowania); testy `CommandLimitsTest`, `LimitsInputTest`, `BolusAmountTextTest` (tabela BOL-03), `CarbsLimitsTest`, aktualizacja testów Spec 003. Wymagania: LIM-01 – LIM-03, LIM-06 – LIM-08 (logika), BOL-03 (reguły tekstu). Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
 2. **Zapis limitów** – `data/CommandLimitsState.kt`, `CommandLimitsStore.kt`, `CommandLimitsStorage.kt`, `CommandLimitsSettings.kt`, `data/platform/SharedPreferencesCommandLimitsStorage.kt`, wiązanie w `data/platform/DataModule.kt`; testy `CommandLimitsSettingsTest`. Wymagania: LIM-04, LIM-12 (część). Zależy od 1. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
-3. **Sekcja „Limity poleceń”** – `ui/settings/limits/CommandLimitsViewModel.kt`, `CommandLimitsUiState.kt`, `CommandLimitsSection.kt`, `LimitsTexts.kt`, wpięcie w `SettingsScreen.kt`, blok `<!-- 011: limity -->` w `strings.xml`; testy `CommandLimitsViewModelTest`, `LimitsTextsTest`. Wymagania: LIM-10, LIM-11, LIM-12 (część). PR opisuje W1, W2. Zależy od 2. Etykieta `trudnosc:latwe` (sekcja bez PIN-u i danych AAPS).
+3. **Sekcja „Limity poleceń”** – `ui/settings/limits/CommandLimitsViewModel.kt`, `CommandLimitsUiState.kt`, `CommandLimitsSection.kt`, `LimitsTexts.kt`, wpięcie w `SettingsScreen.kt`, blok `<!-- 011: limity -->` w `strings.xml`; testy `CommandLimitsViewModelTest`, `LimitsTextsTest`. Wymagania: LIM-10, LIM-11, LIM-12 (część). PR opisuje W1, W2. Zależy od 2 i 4 – sekcja pozwala zmienić limit dopiero wtedy, gdy panel i launcher go stosują (inaczej obniżony limit byłby ignorowany). Etykiety `bezpieczenstwo` (jedyna droga zmiany limitów dawek), `trudnosc:latwe`.
 4. **Limity w panelu i przy starcie** – `ui/commands/CommandsViewModel.kt`, `CommandsUiState.kt`, `Readiness.kt` (baner limitów), `CommandsPanel.kt`, `CommandLauncher.kt`, `LaunchResult.kt`, `CommandMessage.kt`, `CommandTexts.kt`, teksty w `strings.xml`; testy `CommandsViewModelLimitsTest`, `CommandLauncherLimitsTest`. Wymagania: LIM-05 – LIM-09 (UI). PR opisuje W3. Zależy od 2. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
 
-Zależności: 1 → 2 → {3, 4} równolegle. Spec 012 i 013 zależą od zadania 1 (typ `CommandLimits`, `BolusAmountText`).
+Zależności: 1 → 2 → 4 → 3. Do scalenia zadania 4 panel używa `CommandLimits.DEFAULT` (zachowanie jak dziś), a sekcji zmiany limitów jeszcze nie ma. Spec 012 i 013 zależą od zadania 1 (typ `CommandLimits`, `BolusAmountText`).

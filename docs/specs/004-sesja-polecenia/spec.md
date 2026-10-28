@@ -488,6 +488,6 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
   - SESSION-06: `AWAITING_REPLY` przyjmuje też odpowiedź na `PROFILE STATUS` i `PROFILE LIST` (PROF-11).
   - SESSION-08, SESSION-11 – SESSION-13: reguły dla `CARBS` obejmują każde polecenie z kodem – prośba o kod i niezgodność rozpoznawane po wspólnych typach parsera; tabele dla `BOLUS` (BOL-10, BOL-11) i zmiany profilu (PROF-12). Nowy wynik `BolusConfirmed` (jak `CarbsConfirmed`). Fazy, limity czasu i A1 – A7 bez zmian.

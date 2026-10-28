@@ -121,9 +121,23 @@ Sesja (`CommandSession.processMessage`) – zmiana bez nowych faz:
 | `AWAITING_CONFIRMATION` | `CommandMismatch` | `Unknown(AMOUNT_MISMATCH)` | BOL-11 |
 | `AWAITING_CONFIRMATION` | `MatchingCodeRequest` | `Unknown(UNEXPECTED_REPLY)` | BOL-11 |
 
+Przed tabelą działa funkcja zgodności (BOL-19): wynik `MatchingCodeRequest`/`MatchingDone` niezgodny z `command.id` jest zamieniany na `Unrecognized`.
+
+```kotlin
+package pl.twojanazwa.aapsremote.session
+
+internal object ReplyMatch {
+    /** BOL-19, PROF-12. Wyczerpujący when po CommandId; BG/PUMP/PROFILE_STATUS/PROFILE_LIST → false. */
+    fun isCodeRequestFor(id: CommandId, reply: AapsReply.MatchingCodeRequest): Boolean
+    fun isDoneFor(id: CommandId, reply: AapsReply.MatchingDone): Boolean
+}
+// CommandSession: nowy parametr konstruktora (domyślny – prawdziwy parser), tylko do testów BOL-19:
+//   private val parse: (String, ExpectedCommand) -> AapsReply = AapsReplyParser::parse
+```
+
 Pozostałe wiersze SESSION-11/SESSION-13 bez zmian (`WrongCode`, `Unrecognized`). `ui` i `data` odwzorowują `BolusConfirmed` wyczerpującym `when`.
 
-Historia: `HistoryRow`/`HistoryEntity`/`HistoryEntry` + pole `bolusCentiUnits: Int?` (kolumna `bolus_centi_units`); `HistoryCommand.BOLUS` (tekst `BOLUS`), `HistoryOutcome.BolusConfirmed` (tekst `BOLUS_CONFIRMED`). `AapsRemoteDatabase` wersja 2, `MIGRATION_1_2` z jednym `ALTER TABLE`.
+Historia: `HistoryRow`/`HistoryEntity`/`HistoryEntry` + pole `bolusCentiUnits: Int?` (kolumna `bolus_centi_units`); `HistoryCommand.BOLUS` (tekst `BOLUS`), `HistoryOutcome.BolusConfirmed` (tekst `BOLUS_CONFIRMED`). `AapsRemoteDatabase` wersja 2, `MIGRATION_1_2` z jednym `ALTER TABLE`, rejestrowana w jednym `addMigrations(...)` (Spec 013 dopisuje tam `MIGRATION_2_3`).
 
 Sprawdzenie odstępu (`CommandLauncher`, czysta funkcja do testów):
 
@@ -146,6 +160,8 @@ Kolejność w `launch` dla `BOLUS`: kroki 0–3 CMDUI-12 → LIM-09 → BOL-12 �
 | Odstęp z historii aplikacji w `CommandLauncher` | osobna tabela „ostatni bolus”; brak sprawdzania | Bez nowych danych – historia już ma polecenie, wynik i chwile (P6). |
 | Kolumna `bolus_centi_units` + migracja 1 → 2 | wspólna kolumna „ilość” | DATA-09 i istniejące wiersze bez zmian; brak migracji destrukcyjnej (DATA-14). |
 | Migracja sprawdzana testem JVM (SQL + `2.json`) i ręcznie (W3) | `MigrationTestHelper` | Projekt nie używa `androidTest` ani Robolectric (decyzja użytkownika w Spec 007 – 009). |
+| `Failed(WRONG_CODE)` liczy się do odstępu | pomijać wpisy ze złym kodem | Kod był wysłany; aplikacja nie ma pewności, czy AAPS go odrzucił – strona bezpieczna (BOL-12). |
+| Port parsera w `CommandSession` (parametr z wartością domyślną) | testy tylko na prawdziwym parserze | BOL-19 da się sprawdzić tylko przy wyniku, którego prawdziwy parser w danym kontekście nie zwraca. |
 | Brak szybkich wartości bolusa | jak `CARBS` | Ilość insuliny zawsze wpisywana świadomie; użytkownik nie prosił. |
 
 ## Mapowanie wymagań na testy
@@ -156,6 +172,7 @@ Kolejność w `launch` dla `BOLUS`: kroki 0–3 CMDUI-12 → LIM-09 → BOL-12 �
 | BOL-03 | `BolusAmountTextTest` (Spec 011, zad. 1), `BolusCommandTest` (tekst z limitem) |
 | BOL-07 – BOL-09 | `BolusReplyParserTest` (pliki z `dane/`, warianty syntetyczne), `ParserRedactionTest` |
 | BOL-10, BOL-11 | `CommandSessionBolusTest` (czas wirtualny, `FakeSmsSender`, `FakeIncomingSmsSource`) |
+| BOL-19 | `ReplyMatchTest` (wszystkie pary), `CommandSessionBolusTest` (pliki innych poleceń, podstawiony parser) |
 | BOL-12 | `BolusIntervalTest` (czysta funkcja), `CommandLauncherBolusTest` |
 | BOL-13 – BOL-15 | `CommandsViewModelBolusTest`, test źródła okna (`DialogProperties`) |
 | BOL-16 | `ResultMapperBolusTest`, `ProgressStepsTest` |
@@ -164,13 +181,17 @@ Kolejność w `launch` dla `BOLUS`: kroki 0–3 CMDUI-12 → LIM-09 → BOL-12 �
 
 ## Podział na zadania
 
-Każde zadanie to jeden PR, ok. 200–400 linii z testami. Warunek wstępny: zadanie 1 Spec 011.
+Każde zadanie to jeden PR, ok. 200–400 linii z testami. Warunek wstępny: zadania 1 i 4 Spec 011.
 
-1. **Katalog: `Command.Bolus`** – `commands/Command.kt`, `CommandId.kt`, `CommandCatalog.kt`, `CommandParameter.kt`, `CommandExtensions.kt`, `BolusValidation.kt`, `BolusLimits.kt`; `ExpectedCommand.Bolus` (tylko typ) w `parser/ExpectedCommand.kt`; testy `BolusCommandTest`, `CommandCatalogTest`. Wymagania: BOL-01, BOL-02, BOL-04 – BOL-06. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
+**Zasada kolejności:** żaden scalony stan nie pozwala wysłać `BOLUS` bez sprawdzenia limitu i odstępu, bez kroków przebiegu, tekstów wyniku i ostrzeżenia „Nie ponawiaj bolusa…”. Sekcja Bolus z przyciskiem „Wyślij” (zadanie 6) jest ostatnia.
+
+**Miejsca, które przestają się kompilować po dodaniu `CommandId.BOLUS`, `Command.Bolus` i `ExpectedCommand.Bolus`** (sprawdzone na `main`): `commands/CommandCatalog.kt` (wpis), `commands/CommandExtensions.kt` (`smsText`, `toExpectedCommand`), `data/HistoryCodec.kt` (`encode(CommandId)`), `ui/commands/RunTexts.kt` (`CommandId.titleRes`), `ui/commands/ResultMapper.kt` (`when (command)` w `Completed`), `parser/AapsReplyParser.kt` (`when (expected)`). Zadanie 1 dodaje w nich gałęzie minimalne: `HistoryCodec` – tekst `BOLUS` (odczyt jako `UNRECOGNIZED` do zadania 4), `RunTexts` – nagłówek `run_title_bolus`, `ResultMapper` – `DETAILS_MISSING`, parser – `Unrecognized` (do zadania 2). Po zadaniu 1 bolusa nie da się uruchomić z UI.
+
+1. **Katalog: `Command.Bolus`** – `commands/Command.kt`, `CommandId.kt` (dodaje `BOLUS`), `CommandCatalog.kt`, `CommandParameter.kt`, `CommandExtensions.kt`, `BolusValidation.kt`, `BolusLimits.kt`; `parser/ExpectedCommand.kt` (`Bolus`), `parser/AapsReplyParser.kt` (gałąź `Bolus` → `Unrecognized`), `data/HistoryCodec.kt`, `ui/commands/RunTexts.kt`, `ui/commands/ResultMapper.kt`, `strings.xml` (`run_title_bolus`); testy `BolusCommandTest`, `CommandCatalogTest`. Wymagania: BOL-01, BOL-02, BOL-04 – BOL-06. Etykiety `bezpieczenstwo`, `trudnosc:latwe`.
 2. **Parser bolusa** – `parser/AapsReply.kt` (znaczniki, nowe warianty), `AapsPl3426Patterns.kt`, `AapsReplyParser.kt`; kopie plików `dane/` do `app/src/test/resources/parser/aaps-3.4.2.6-pl/`; testy `BolusReplyParserTest`, `ParserRedactionTest`. Wymagania: BOL-07 – BOL-09. Zależy od 1. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
-3. **Sesja bolusa** – `session/CommandSession.kt` (znaczniki zamiast klas `CARBS`), `SessionState.kt` (`BolusConfirmed`); minimalne gałęzie `BolusConfirmed` w `ui/commands/ResultMapper.kt` i `data/HistoryCodec.kt`, żeby kod się kompilował (pełne teksty w zad. 5 i 4); testy `CommandSessionBolusTest`, regresja testów Spec 004. Wymagania: BOL-10, BOL-11. Zależy od 2. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
-4. **Historia bolusa i migracja** – `data/HistoryCommand.kt`, `HistoryOutcome.kt`, `HistoryRow.kt`, `HistoryEntry.kt`, `HistoryCodec.kt`, `data/platform/HistoryEntity.kt`, `AapsRemoteDatabase.kt` (wersja 2, `MIGRATION_1_2`), `DataModule.kt`, `app/schemas/…/2.json`; testy `HistoryCodecBolusTest`, `DatabaseSchemaV2Test`. Wymagania: BOL-17 (dane). Zależy od 3. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
-5. **UI: sekcja Bolus, okno, podsumowanie** – `ui/commands/CommandsViewModel.kt`, `CommandsUiState.kt`, `CommandsPanel.kt`, `CommandDialogs.kt`, `CarbsSummary.kt` → uogólnione podsumowanie, `CommandTexts.kt`, `strings.xml`; testy `CommandsViewModelBolusTest`. Wymagania: BOL-13 – BOL-15, BOL-18 (część). Zależy od 1 oraz zadania 4 Spec 011. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. PR opisuje W1, W5.
-6. **Launcher: odstęp + przebieg/wynik/historia UI** – `ui/commands/CommandLauncher.kt`, `BolusInterval.kt`, `LaunchResult.kt`, `CommandMessage.kt`, `ProgressSteps.kt`, `ResultMapper.kt`, `ResultMessages.kt`, `RunTexts.kt`, `ui/history/HistoryLabels.kt`, `HistoryEntryMapper.kt`, `strings.xml`; testy `BolusIntervalTest`, `CommandLauncherBolusTest`, `ResultMapperBolusTest`, `HistoryEntryMapperBolusTest`. Wymagania: BOL-12, BOL-16, BOL-17 (UI). Zależy od 3, 4, 5. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. PR opisuje W2 – W4. Jeśli przekroczy 400 linii – podział na 6a (odstęp) i 6b (przebieg, wynik, historia).
+3. **Sesja bolusa** – `session/CommandSession.kt` (znaczniki zamiast klas `CARBS`, port parsera, funkcja zgodności), `session/ReplyMatch.kt`, `SessionState.kt` (`BolusConfirmed`); minimalne gałęzie `BolusConfirmed` w `ui/commands/ResultMapper.kt` i `data/HistoryCodec.kt` (pełne w zad. 4 i 5); testy `CommandSessionBolusTest`, `ReplyMatchTest`, regresja testów Spec 004. Wymagania: BOL-10, BOL-11, BOL-19. Zależy od 2. Etykiety `bezpieczenstwo`, `trudnosc:trudne`.
+4. **Historia bolusa i migracja** – `data/HistoryCommand.kt`, `HistoryOutcome.kt`, `HistoryRow.kt`, `HistoryEntry.kt`, `HistoryCodec.kt`, `data/platform/HistoryEntity.kt`, `AapsRemoteDatabase.kt` (wersja 2, `MIGRATION_1_2`, `addMigrations`), `DataModule.kt`, `app/schemas/…/2.json`; testy `HistoryCodecBolusTest`, `DatabaseSchemaV2Test`. Wymagania: BOL-17 (dane). Zależy od 3. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. **Warunek scalenia:** W3 sprawdzone na telefonie z prawdziwą bazą w wersji 1 (wynik w opisie PR).
+5. **Launcher: odstęp + przebieg/wynik/historia UI** – `ui/commands/CommandLauncher.kt`, `BolusInterval.kt`, `LaunchResult.kt`, `CommandMessage.kt`, `ProgressSteps.kt`, `ResultMapper.kt`, `ResultMessages.kt`, `RunTexts.kt`, `ui/history/HistoryLabels.kt`, `HistoryEntryMapper.kt`, `strings.xml`; testy `BolusIntervalTest`, `CommandLauncherBolusTest`, `ResultMapperBolusTest`, `HistoryEntryMapperBolusTest`. Wymagania: BOL-12, BOL-16, BOL-17 (UI). Zależy od 3, 4 i zadania 4 Spec 011. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. Jeśli przekroczy 400 linii – podział na 5a (odstęp) i 5b (przebieg, wynik, historia); oba przed zadaniem 6.
+6. **UI: sekcja Bolus, okno, podsumowanie z „Wyślij”** – `ui/commands/CommandsViewModel.kt`, `CommandsUiState.kt`, `CommandsPanel.kt`, `CommandDialogs.kt`, `CarbsSummary.kt` → uogólnione podsumowanie, `CommandTexts.kt`, `strings.xml`; testy `CommandsViewModelBolusTest`. Wymagania: BOL-13 – BOL-15, BOL-18 (część). Zależy od 5. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. PR opisuje W1, W2, W4, W5.
 
-Zależności: 1 → 2 → 3 → 4 → 6; 5 równolegle z 2–4 (po 1).
+Zależności: 1 → 2 → 3 → 4 → 5 → 6.

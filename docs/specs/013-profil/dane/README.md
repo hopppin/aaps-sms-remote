@@ -1,6 +1,6 @@
 # Dane testowe: odpowiedzi SMS z AAPS dla PROFILE
 
-- **Wersja AAPS:** jak w [Spec 002](../../002-parser-odpowiedzi/dane/README.md) (3.4.2.6) – do potwierdzenia (P6 w [spec.md](../spec.md#otwarte-pytania)).
+- **Wersja AAPS:** jak w [Spec 002](../../002-parser-odpowiedzi/dane/README.md) (3.4.2.6) – decyzja użytkownika (P6 w [spec.md](../spec.md#otwarte-pytania)).
 - **Język:** polski, bez znaków diakrytycznych.
 - **Źródło:** SMS-y z telefonu użytkownika, przepisane znak w znak. Nazwy profili (`LocalProfile1`, `LocalProfile2`) to domyślne nazwy AAPS, nie dane osobowe.
 - **Anonimizacja:** imię z nazwy konta Authenticatora zastąpione fikcyjnym `Jan`. Brak numerów telefonu, PIN-ów i kodów TOTP.
