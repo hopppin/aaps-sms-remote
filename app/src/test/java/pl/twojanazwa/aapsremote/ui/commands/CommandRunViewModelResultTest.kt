@@ -110,6 +110,11 @@ class CommandRunViewModelResultTest {
             val state = viewModel.uiState.value
 
             val types = reachableTypes(RunUiState::class.java) + reachableTypes(CommandRunViewModel::class.java)
+            // Gdy brak PermittedSubclasses, przejście po podtypach RunView cicho by się skróciło.
+            assertTrue(
+                types.containsAll(listOf(RunView.Active::class.java, RunView.Finished::class.java, ResultView::class.java)),
+                "reachableTypes nie objęło podtypów RunView",
+            )
             for (type in types) {
                 for (field in instanceFields(type)) {
                     if (type == CommandRunViewModel::class.java && field.name == "coordinator") continue
