@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
+import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
 import pl.twojanazwa.aapsremote.sms.SmsPermissions
@@ -27,6 +29,7 @@ import pl.twojanazwa.aapsremote.sms.SmsPermissions
 class CommandsViewModel @Inject constructor(
     private val launcher: CommandLauncher,
     private val coordinator: SessionCoordinator,
+    private val currentRun: CurrentRun,
     private val numbers: AapsNumberSettingsStore,
     private val secrets: TotpSecretStore,
     private val permissions: SmsPermissions,
@@ -49,6 +52,12 @@ class CommandsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { secrets.refreshState() }
+        // Kolektor tylko wyłącza przekazanie; drugi warunek chroni przed spóźnioną wartością null (CMDUI-23).
+        viewModelScope.launch {
+            currentRun.state.collect { run ->
+                if (run == null && currentRun.state.value == null) local.update { it.copy(runHandoff = false) }
+            }
+        }
     }
 
     /** ON_RESUME zakładki i po wyniku prośby o uprawnienia (CMDUI-03). */
@@ -61,9 +70,9 @@ class CommandsViewModel @Inject constructor(
         local.update { it.copy(message = null) }
     }
 
-    fun onBgClicked() = startCommand(Command.Bg)
+    fun onBgClicked() = startNoCode(Command.Bg)
 
-    fun onPumpClicked() = startCommand(Command.Pump)
+    fun onPumpClicked() = startNoCode(Command.Pump)
 
     fun onCarbsInputChanged(text: String) {
         local.update { it.copy(carbsInput = text, carbsError = null) }
@@ -109,27 +118,79 @@ class CommandsViewModel @Inject constructor(
         local.update { it.copy(confirmingLargeGrams = null) }
     }
 
+    fun onPinChanged(text: String) {
+        if (local.value.summaryGrams == null || local.value.launching) return
+        if (text.length > PIN_MAX_LENGTH || !text.all { it in '0'..'9' }) return
+        local.update { it.copy(pinText = text) }
+    }
+
+    /** PIN trafia z pola do [AapsPin] i pole jest czyszczone przed `launch` (CMDUI-11). */
+    fun onSendClicked() {
+        val state = compose()
+        val grams = state.summaryGrams
+        if (grams == null || !state.canSubmitPin) return
+        val chars = state.pinText.toCharArray()
+        local.update { it.copy(pinText = "") }
+        val pin = AapsPin.fromChars(chars)
+        val carbs = (Command.Carbs.of(grams) as? CarbsValidation.Valid)?.command
+        if (carbs == null) {
+            pin.clear()
+            local.update { it.copy(summaryGrams = null) }
+            return
+        }
+        startCommand(carbs, pin)
+    }
+
+    fun onSummaryDismissed() {
+        local.update { it.copy(summaryGrams = null, pinText = "") }
+    }
+
+    /** Okno „Na pewno” -> zamknij; podsumowanie -> jak „Anuluj” (CMDUI-24). */
+    fun onBack() {
+        if (local.value.confirmingLargeGrams != null) onLargeAmountDismissed() else onSummaryDismissed()
+    }
+
+    /** Aplikacja schodzi z ekranu: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
+    fun onStop() {
+        local.update { it.copy(pinText = "", summaryGrams = null, confirmingLargeGrams = null) }
+    }
+
+    private fun startNoCode(command: Command) {
+        if (local.value.launching) return
+        if (coordinator.activeSession.value == null && !compose().canSendNoCode) return
+        startCommand(command, null)
+    }
+
     /**
      * Procedura wspólna (design 009): `launching` i `activeSession` sprawdzane synchronicznie na głównym wątku,
      * więc podwójne dotknięcie nie woła launchera drugi raz. Sesję uruchamia launcher w zakresie aplikacji,
      * nie `viewModelScope` (CMDUI-13).
      */
-    private fun startCommand(command: Command) {
-        if (local.value.launching) return
+    private fun startCommand(command: Command, pin: AapsPin?) {
+        if (local.value.launching) {
+            pin?.clear()
+            return
+        }
         if (coordinator.activeSession.value != null) {
+            pin?.clear()
             local.update { it.copy(message = CommandMessage.COMMAND_ACTIVE) }
             return
         }
-        if (!compose().canSendNoCode) return
         local.update { it.copy(launching = true) }
-        viewModelScope.launch {
+        // ATOMIC: korutyna rusza nawet po anulowaniu zakresu, więc launcher zawsze czyści PIN (CMDUI-11).
+        viewModelScope.launch(start = CoroutineStart.ATOMIC) {
             val result = try {
-                launcher.launch(command, null)
+                launcher.launch(command, pin)
             } finally {
                 local.update { it.copy(launching = false) }
             }
-            if (result is LaunchResult.Rejected) {
-                local.update { it.copy(message = result.reason.toMessage()) }
+            local.update {
+                when (result) {
+                    LaunchResult.Started -> it.copy(
+                        summaryGrams = null, carbsInput = "", carbsError = null, runHandoff = true,
+                    )
+                    is LaunchResult.Rejected -> it.copy(summaryGrams = null, message = result.reason.toMessage())
+                }
             }
         }
     }
@@ -144,3 +205,6 @@ class CommandsViewModel @Inject constructor(
             commandActive = coordinator.activeSession.value != null,
         )
 }
+
+/** Najdłuższy PIN AAPS w polu (decyzja użytkownika, spec 009 P2). */
+internal const val PIN_MAX_LENGTH = 12
