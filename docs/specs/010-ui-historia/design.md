@@ -211,6 +211,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel())
 | `Entries` | `onEntryClicked(id)` na liście | szczegóły `id` | – | HISTUI-07 |
 | szczegóły | `onDetailsClosed` / `onBack` | lista | – | HISTUI-07, HISTUI-12 |
 | `Entries`, `!clearing` | `onClearClicked` | okno (N = liczba wierszy) | – | HISTUI-10 |
+| okno | `Entries(≥ 1)` ze strumienia (np. nowy wpis) | okno otwarte, N bez zmian, lista z nowymi wierszami | – | HISTUI-10 (P6) |
 | okno | `onClearDismissed` / `onBack` | lista | – | HISTUI-10, HISTUI-12 |
 | okno | `onClearConfirmed` | `clearing = true`, okno zamknięte | `clearAll()` raz | HISTUI-10 |
 | `clearing` | `Cleared` | `clearing = false`, komunikat `CLEARED` | – | HISTUI-11 |
@@ -277,6 +278,8 @@ Blok `<!-- 010: historia -->`. Kolumna „Arg.”: `d` – `%1$d`. Używane pono
 | Ponowienie odczytu tylko przyciskiem | automatyczne ponawianie | strumień po `Unavailable` jest zakończony (DATA-11); zasada „bez automatycznego ponawiania” w duchu AGENTS.md; brak pętli przy trwałym błędzie |
 | Czyszczenie bez blokady w trakcie polecenia | blokada jak UI-15 | brak wpływu na sesję i bezpieczeństwo kodu (P2) |
 | `FLAG_SECURE` przez `SecureWindowEffect(true)` na całej zakładce | tylko szczegóły | dane zdrowotne także w wierszach (ilość, komunikat); spójnie z CMDUI-23 (P3) |
+| Bez zmian w `HistoryScreen` po rozszerzeniu CMDUI-23 na wszystkie zakładki (2026-10-28) | zdejmowanie żądania Historii zależne od stanu polecenia | licznik ze Spec 009 sumuje żądania Historii i `AppScaffold`; Historia nie musi znać stanu polecenia, a flaga spada dopiero przy zerze żądań |
+| N w oknie czyszczenia z chwili otwarcia, `clearAll()` usuwa wszystko, także wpis zapisany przy otwartym oknie (2026-10-28, P6) | aktualizacja N przy każdej emisji; usuwanie tylko wpisów do identyfikatora z chwili otwarcia | najprostsze rozwiązanie bez zmiany kodu i `data` (`clearAll()` bez argumentów, Spec 007); okno ostrzega o usunięciu wszystkich wpisów; wynik nowego polecenia był widoczny na zakładce Polecenia |
 | Treść jako zwykły `Text(String)` | `AnnotatedString` z linkami, zaznaczanie | nierozpoznana treść może pochodzić z dowolnego SMS z numeru AAPS – bez aktywnych linków |
 
 ## Mapowanie wymagań na testy
@@ -294,10 +297,10 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`; identyfikat
 | HISTUI-07 | `ui/history/HistoryViewModelDetailsTest` |
 | HISTUI-08 | `HistoryViewModelStateTest` |
 | HISTUI-09 | `HistoryViewModelStateTest` (z `ControllableCommandHistory`, czas wirtualny) |
-| HISTUI-10 | `ui/history/HistoryViewModelClearTest` (bramka, refleksja konstruktora); W4 |
+| HISTUI-10 | `ui/history/HistoryViewModelClearTest` (bramka, refleksja konstruktora; od zadania 5: nowy wpis przy otwartym oknie – N bez zmian, jedno `clearAll()`); W4 |
 | HISTUI-11 | `HistoryViewModelClearTest`; W4 |
 | HISTUI-12 | `HistoryViewModelDetailsTest` (`onBack`, `interceptsBack`); W4 |
-| HISTUI-13 | `HistorySourcesTest` (`SecureWindowEffect(true)`); W6 |
+| HISTUI-13 | `HistorySourcesTest` (`SecureWindowEffect(true)`); ciągłość po zejściu z Historii w trakcie polecenia – testy CMDUI-23 (Spec 009, zadanie 9); W6 |
 | HISTUI-14 | `ui/history/HistoryTextsTest` (odwzorowania, klucze, `%1$d`, brak kopii treści `result_*`); W1–W8 |
 | HISTUI-15 | `ui/history/HistoryRedactionTest`; `UiNoLoggingTest` (Spec 008) |
 
@@ -315,3 +318,7 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami.
 2. **`HistoryViewModel`** – `ui/history/HistoryUiState.kt` (z `HistoryContent`), `HistoryViewModel.kt`; testy `ControllableCommandHistory`, `HistoryViewModelStateTest`, `HistoryViewModelDetailsTest`, `HistoryViewModelClearTest`, rozszerzenie `HistoryRedactionTest` (stan). Wymagania: HISTUI-01 (stany), HISTUI-02, HISTUI-07 – HISTUI-12, HISTUI-15 (część). Zależy od 1; równolegle z 3.
 3. **Teksty historii** – `ui/history/HistoryTexts.kt`, blok `<!-- 010: historia -->` w `strings.xml`; test `HistoryTextsTest`. Wymagania: HISTUI-14 (część: odwzorowania i klucze). Zależy od 1 i zadania 7 ze Spec 009; równolegle z 2.
 4. **Ekran Historia** – `ui/history/HistoryScreen.kt`, `HistoryList.kt`, `HistoryDetailsView.kt`, `HistoryClearDialog.kt`; `AppScaffold.kt` (trasa `history` → `HistoryScreen()`); usunięcie `HistoryPlaceholderScreen.kt` i `placeholder_history_text`, aktualizacja `NavigationStringsTest`; test `HistorySourcesTest`. Wymagania: HISTUI-01 (ekran), HISTUI-03 – HISTUI-12 (widok), HISTUI-13, HISTUI-14 (część). PR opisuje W1–W8 tej spec, w tym punkty Spec 007: W3, W4, W5 i W6 (część historii). Zależy od 2, 3 oraz zadań 6, 7 ze Spec 009 i 10 ze Spec 008.
+
+Zadanie po zmianie spec 2026-10-28 (zadania 1–4 są scalone):
+
+5. **Test przypadku brzegowego czyszczenia** – tylko test, bez zmian kodu aplikacji: `ui/history/HistoryViewModelClearTest.kt` (kryterium 3 HISTUI-10: emisja 4 wpisów przy otwartym oknie z N = 3, jedno `clearAll()`), w razie potrzeby `ControllableCommandHistory.kt` (emisja do bieżącego strumienia). Etykiety `trudnosc:latwe` i `bezpieczenstwo` (pakiet `ui.history` jest obszarem wrażliwym wg AGENTS.md, choć zmiana dotyczy tylko testu). Wymagania: HISTUI-10 (kryterium 3). Ok. 30–60 linii. Bez zależności. Zmiana HISTUI-13 nie ma osobnego zadania: realizuje ją zadanie 9 Spec 009 (`AppScaffold.kt`), a jego PR opisuje W6 tej spec.

@@ -14,7 +14,7 @@ Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `
 - Zakładka Polecenia: przyciski `BG`, `PUMP`, sekcja `CARBS` (pole ilości, szybkie wartości 10/20/30 g, przycisk „Dalej”), banery gotowości (numer AAPS, uprawnienia SMS, sekret TOTP) z przejściem do Ustawień.
 - Dostępność przycisków: polecenie w toku, uruchamianie polecenia, stan numeru AAPS, uprawnienia SMS, stan sekretu (dla `CARBS`).
 - Dodatkowe pytanie „Na pewno X g?” dla ilości > 40 g.
-- Podsumowanie `CARBS` z polem PIN-u AAPS (maskowane), PIN tylko w pamięci; `FLAG_SECURE` na podsumowaniu, przebiegu i wyniku.
+- Podsumowanie `CARBS` z polem PIN-u AAPS (maskowane), PIN tylko w pamięci; `FLAG_SECURE` na oknie „Na pewno X g?”, podsumowaniu oraz od startu polecenia do zamknięcia wyniku (na każdej zakładce).
 - Odczyt sekretu (`TotpSecretProvider.load`) tuż przed startem polecenia z kodem i komunikaty jego wyników.
 - Start przez `SessionCoordinator` w zakresie korutyn aplikacji (moduł Hilt), `SessionHistoryRecorder.track` zaraz po starcie.
 - Ekran przebiegu: kroki według fazy sesji, anulowanie (przed kodem i po kodzie), wynik z komunikatem dla każdego `SessionOutcome`, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych, zamknięcie wyniku.
@@ -174,13 +174,15 @@ Sekcja „CARBS” ma przyciski „10 g”, „20 g”, „30 g” z `CarbsLimit
 
 ### CMDUI-09: Dodatkowe potwierdzenie powyżej 40 g
 
-Gdy poprawne polecenie ma `requiresExtraConfirmation` = `true` (41–50 g, CMD-05), „Dalej” najpierw otwiera okno „Na pewno X g?” z tekstem „To więcej niż 40 g. Sprawdź ilość, zanim wpiszesz PIN.” i przyciskami „Tak, X g” i „Nie”. „Tak” zamyka okno i otwiera podsumowanie dla X g; „Nie” zamyka okno bez podsumowania, tekst pola bez zmian. Dla 1–40 g podsumowanie otwiera się od razu.
+Gdy poprawne polecenie ma `requiresExtraConfirmation` = `true` (41–50 g, CMD-05), „Dalej” najpierw otwiera okno „Na pewno X g?” z tekstem „To więcej niż 40 g. Sprawdź ilość, zanim wpiszesz PIN.” i przyciskami „Tak, X g” i „Nie”. „Tak” zamyka okno i otwiera podsumowanie dla X g; „Nie” zamyka okno bez podsumowania, tekst pola bez zmian. Dla 1–40 g podsumowanie otwiera się od razu. Okno pokazuje ilość `CARBS`, więc przez cały czas otwarcia okno `Activity` ma `FLAG_SECURE` (CMDUI-23; decyzja użytkownika, P11).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** tekst pola `"41"`, **gdy** wywołano „Dalej”, **wtedy** okno „Na pewno” jest otwarte dla 41 g, a podsumowanie zamknięte; **gdy** wywołano „Tak”, **wtedy** okno zamknięte, podsumowanie otwarte dla 41 g.
 - **Zakładając** okno „Na pewno” dla 50 g, **gdy** wywołano „Nie”, **wtedy** okno i podsumowanie są zamknięte, tekst pola = `"50"`, `FakeSmsSender` nie dostał SMS-a.
 - **Zakładając** tekst pola `"40"`, **gdy** wywołano „Dalej”, **wtedy** okno „Na pewno” nie jest otwierane, a podsumowanie jest otwarte dla 40 g.
+- **Zakładając** tekst pola `"45"`, **gdy** wywołano „Dalej”, **wtedy** znacznik „ekran chroniony” `CommandsViewModel` = `true` (okno otwarte, podsumowanie zamknięte); **gdy** wywołano „Nie”, **wtedy** = `false`; **gdy** ponownie wywołano „Dalej” i „Tak”, **wtedy** = `true` w każdej emisji `uiState` (Turbine) od otwarcia okna do otwarcia podsumowania.
+- **Zakładając** otwarte okno „Na pewno” dla 45 g, **gdy** wywołano `onStop()`, **wtedy** okno zamknięte, a znacznik „ekran chroniony” = `false`.
 
 ### CMDUI-10: Podsumowanie z PIN-em
 
@@ -307,6 +309,16 @@ Przebieg pokazuje listę kroków zależną od polecenia; każdy krok ma status: 
 
 Liczby minut pochodzą z domyślnych `SessionTimeouts` (`reply`, `confirmation`). Tabela faz jest wspólna dla wszystkich poleceń. Gdy krok bieżący z tabeli wykracza poza listę kroków polecenia (dla `BG`/`PUMP`: fazy `PREPARING_CODE`, `SENDING_CODE`, `AWAITING_CONFIRMATION`) albo faza to `FINISHED`, wszystkie kroki są oczekujące. Faza nietypowa dla polecenia, ale z krokiem bieżącym w zakresie jego listy (np. `AWAITING_CODE_REQUEST` dla `BG`, `AWAITING_REPLY` dla `CARBS`), daje krok bieżący z tabeli (krok 2). Takie fazy nie występują w działaniu; przebieg w `FINISHED` jest zastąpiony wynikiem.
 
+**Status dla czytnika ekranu** (decyzja użytkownika, P12): status kroku nie jest przekazywany wyłącznie ikoną ani kolorem. Każdy krok jest dla usług dostępności (TalkBack) jednym elementem, który czyta nazwę kroku i opis stanu (`stateDescription`) według tabeli; ikony kroków nie mają własnego opisu (`contentDescription = null`), żeby status nie był czytany dwa razy.
+
+| Status kroku | Opis stanu (`stateDescription`) |
+| --- | --- |
+| wykonany | „wykonany” |
+| bieżący | „w toku” |
+| oczekujący | „oczekuje” |
+
+Krok nie ma statusu „błąd”: błąd, brak odpowiedzi i anulowanie pokazuje wynik (CMDUI-19), który zastępuje przebieg.
+
 **Kryteria akceptacji:**
 
 - **Zakładając** `CARBS` i każdą z faz `NOT_STARTED` … `AWAITING_CONFIRMATION`, **gdy** wyliczono kroki, **wtedy** jest 5 kroków, a statusy odpowiadają tabeli (np. dla `SENDING_CODE`: wykonany, wykonany, wykonany, bieżący, oczekujący).
@@ -314,6 +326,9 @@ Liczby minut pochodzą z domyślnych `SessionTimeouts` (`reply`, `confirmation`)
 - **Zakładając** `BG` w fazie `AWAITING_CONFIRMATION` (osobno `PREPARING_CODE`), **gdy** wyliczono kroki, **wtedy** oba są oczekujące.
 - **Zakładając** `BG` w fazie `AWAITING_CODE_REQUEST` i (osobno) `CARBS` w fazie `AWAITING_REPLY`, **gdy** wyliczono kroki, **wtedy** krok 2 jest bieżący: odpowiednio (wykonany, bieżący) i (wykonany, bieżący, oczekujący, oczekujący, oczekujący).
 - **Zakładając** domyślne `SessionTimeouts`, **gdy** odczytano argumenty minut kroków, **wtedy** to 3 i 6.
+- **Zakładając** każdy status kroku (wykonany, bieżący, oczekujący), **gdy** test JVM odwzorował go na zasób opisu stanu, **wtedy** każdy identyfikator jest niezerowy, trzy identyfikatory są różne, a `strings.xml` zawiera dla nich teksty „wykonany”, „w toku”, „oczekuje”.
+- **Zakładając** źródło `ui/commands/RunScreen.kt`, **gdy** test JVM je przeczytał, **wtedy** zawiera przypisanie `stateDescription` i odwołanie do funkcji odwzorowania statusu kroku na zasób.
+- **Zakładając** telefon z włączonym TalkBack (W13), **gdy** w trakcie `CARBS 1` w fazie czekania na prośbę o kod przesunięto fokus po krokach, **wtedy** TalkBack czyta kolejno: krok 1 z „wykonany”, krok 2 z „w toku”, kroki 3–5 z „oczekuje”, a każdy status jest czytany raz.
 
 ### CMDUI-18: Anulowanie
 
@@ -408,14 +423,19 @@ Gdy polecenie jest w toku (`activeSession.value != null`), okno `Activity` ma w�
 - **Zakładając** `CommandRunViewModel` bez uruchomienia, **gdy** uruchomiono `BG` przez launcher (`activeSession`: `null` → sesja `BG`), a potem przyszedł `bg.txt` (`activeSession` → `null`), **wtedy** znacznik „ekran włączony” (z `activeSession`) ma kolejno wartości `false`, `true`, `false`, a po zakończeniu stan = wynik (z `CurrentRun`).
 - **Zakładając** telefon z czasem wygaszania ekranu 15 s (W9), **gdy** uruchomiono `CARBS 1` i czekano na prośbę o kod dłużej niż 15 s, **wtedy** ekran się nie wygasza, także po przełączeniu na zakładkę Ustawienia; po wyniku ekran wygasa po 15 s.
 
-### CMDUI-23: Ochrona ekranu (podsumowanie, przebieg, wynik)
+### CMDUI-23: Ochrona ekranu (okno „Na pewno”, podsumowanie, przebieg, wynik)
 
-Gdy na zakładce Polecenia otwarte jest podsumowanie z polem PIN-u albo ekran przebiegu lub wyniku polecenia, okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach), zgodnie z planem („FLAG_SECURE na ekranach z danymi”). Po zamknięciu podsumowania albo wyniku (panel Polecenia) flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania). Panel Polecenia bez podsumowania i bez przebiegu nie ma `FLAG_SECURE` (decyzja użytkownika, P3, zmieniona po recenzji).
+Okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach), zgodnie z planem („FLAG_SECURE na ekranach z danymi”), gdy:
 
-Okno ma flagę, gdy znacznik „ekran chroniony” jest włączony w `CommandsViewModel` albo w `CommandRunViewModel`:
+- na zakładce Polecenia otwarte jest okno „Na pewno X g?” (CMDUI-09; decyzja użytkownika, P11) albo podsumowanie z polem PIN-u, lub
+- istnieje przebieg albo niezamknięty wynik polecenia – od `LaunchResult.Started` do zamknięcia wyniku (CMDUI-21) – **niezależnie od wybranej zakładki** (Polecenia, Ustawienia, Historia; decyzja użytkownika, P11). Ochrona wynika ze stanu uruchomienia (`CurrentRun` w `CommandRunViewModel` i `runHandoff` w `CommandsViewModel`, oba w zakresie `Activity`), a nie z tego, że ekran zakładki Polecenia jest w kompozycji.
+
+Po zamknięciu okna „Na pewno” („Nie”), podsumowania albo wyniku flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania; HISTUI-13 – zakładka Historia). Flaga jest zdejmowana dopiero, gdy żaden ekran ani przebieg jej nie wymaga (licznik żądań). Panel Polecenia bez okna „Na pewno”, bez podsumowania i bez przebiegu albo wyniku nie ma `FLAG_SECURE` (decyzja użytkownika, P3, zmieniona po recenzji). Skutek: w trakcie polecenia także zakładka Ustawienia nie pozwala na zrzut ekranu.
+
+Okno ma flagę, gdy znacznik „ekran chroniony” jest włączony w `CommandsViewModel` albo w `CommandRunViewModel`, a żądanie ochrony z tych znaczników zgłasza kompozycja wspólna dla wszystkich zakładek (poza zawartością zakładki Polecenia):
 
 - `CommandRunViewModel`: znacznik = przebieg albo wynik jest w stanie ekranu (`view != null`). Ekran przebiegu i wyniku jest pokazywany z tego samego pola, więc nigdy bez flagi.
-- `CommandsViewModel`: znacznik = podsumowanie otwarte albo trwa przekazanie do przebiegu. Po `LaunchResult.Started` ViewModel w jednej zmianie stanu zamyka podsumowanie i włącza znacznik przekazania (`runHandoff`) – dla każdego polecenia. Znacznik przekazania wyłącza dopiero kolektor `CurrentRun` w `CommandsViewModel`, gdy zobaczy pusty `CurrentRun` (po zamknięciu wyniku, CMDUI-21). `CurrentRun` jest publikowany przed powrotem z `launch` (CMDUI-16), więc w chwili włączenia znacznika nie jest pusty. Przy `Rejected` znacznik przekazania nie jest włączany.
+- `CommandsViewModel`: znacznik = okno „Na pewno” otwarte, podsumowanie otwarte albo trwa przekazanie do przebiegu. Po `LaunchResult.Started` ViewModel w jednej zmianie stanu zamyka podsumowanie i włącza znacznik przekazania (`runHandoff`) – dla każdego polecenia. Znacznik przekazania wyłącza dopiero kolektor `CurrentRun` w `CommandsViewModel`, gdy zobaczy pusty `CurrentRun` (po zamknięciu wyniku, CMDUI-21). `CurrentRun` jest publikowany przed powrotem z `launch` (CMDUI-16), więc w chwili włączenia znacznika nie jest pusty. Przy `Rejected` znacznik przekazania nie jest włączany.
 
 Dzięki temu flaga nie spada między zamknięciem podsumowania a pokazaniem przebiegu, niezależnie od kolejności wykonania kolektorów obu ViewModeli; po zamknięciu wyniku może zostać chwilę dłużej (opóźnienie działa w bezpieczną stronę). Po ponownym otwarciu `Activity` z niezamkniętym wynikiem (P7) flaga włącza się razem z pokazaniem wyniku; wcześniej widoczny jest tylko panel, który nie wymaga ochrony (P3).
 
@@ -427,7 +447,11 @@ Dzięki temu flaga nie spada między zamknięciem podsumowania a pokazaniem prze
 - **Zakładając** `CommandsViewModel` i `CommandRunViewModel` ze wspólnym `CurrentRun` i podsumowanie dla 1 g z PIN-em `4321`, **gdy** wywołano „Wyślij” (start udany), w chwili 60 000 przyszedł `carbs-prosba-o-kod.txt`, w chwili 120 000 `carbs-sukces.txt`, a potem wywołano `onResultDismissed()`, i od „Wyślij” do `onResultDismissed()` po każdym kroku dyspozytora (`runCurrent()`, `advanceTimeBy`, także przed pierwszym wykonaniem kolektora `CommandRunViewModel`) odczytano `commands.uiState.value.secureWindow || run.uiState.value.secureWindow`, **wtedy** każda odczytana wartość = `true`; po `onResultDismissed()` i wykonaniu zadań = `false`.
 - **Zakładając** `CommandsViewModel` ze wspólnym `CurrentRun` bez żadnego `CommandRunViewModel` (żaden kolektor nie ustawia `view`), **gdy** wywołano „Wyślij” (start udany) i wykonano wszystkie zadania dyspozytora, **wtedy** znacznik „ekran chroniony” `CommandsViewModel` = `true`, dopóki `CurrentRun` nie jest pusty.
 - **Zakładając** licznik ochrony okna, **gdy** ochronę włączyły dwa źródła, a wyłączyło jedno, **wtedy** flaga jest nadal włączona; po wyłączeniu przez drugie – wyłączona.
+- **Zakładając** `CommandsViewModel` i `CommandRunViewModel` ze wspólnym `CurrentRun` i przebieg `BG` uruchomiony przez launcher, **gdy** wywołano `onStop()` w `CommandsViewModel` (zmiana zakładki) i wykonano zadania dyspozytora, a potem przyszedł `bg.txt`, **wtedy** `commands.uiState.value.secureWindow || run.uiState.value.secureWindow` = `true` po każdym kroku aż do `onResultDismissed()`, a po nim i wykonaniu zadań = `false`.
+- **Zakładając** źródła `ui/navigation/AppScaffold.kt` i `ui/commands/CommandsScreen.kt`, **gdy** test JVM je przeczytał, **wtedy** `AppScaffold.kt` zawiera dokładnie jedno wywołanie `SecureWindowEffect(` (z obu znaczników), a `CommandsScreen.kt` nie zawiera wywołania `SecureWindowEffect(`.
 - **Zakładając** otwarte podsumowanie na telefonie (W10), **gdy** wykonano zrzut ekranu i otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd jest pusty; po zamknięciu podsumowania zrzut działa.
+- **Zakładając** przebieg `CARBS 1` na telefonie (W10), **gdy** przełączono na zakładkę Ustawienia, potem Historia, potem znów Ustawienia i za każdym razem wykonano zrzut ekranu, **wtedy** żaden zrzut się nie wykonuje; po wyniku i jego zamknięciu zrzut na zakładce Ustawienia (bez skanera) działa.
+- **Zakładając** okno „Na pewno 45 g?” na telefonie (W10), **gdy** wykonano zrzut ekranu, **wtedy** zrzut się nie wykonuje; po „Nie” zrzut panelu działa.
 
 ### CMDUI-24: Przycisk Wstecz na zakładce Polecenia
 
@@ -509,7 +533,7 @@ Moduł Hilt `ui.platform.CommandsModule` (`SingletonComponent`) dostarcza dokła
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo) i sposób ich spełnienia:
 
 - **Nigdy nie logujemy sekretu, kodów ani PIN-u.** `ui` nie wywołuje API logowania; `toString()` stanów nie zawiera PIN-u, ilości ani treści SMS (CMDUI-26). Komunikaty są stałymi wartościami wyliczeniowymi (CMDUI-12, CMDUI-25).
-- **PIN AAPS nigdy nie jest zapisywany.** Tekst PIN-u jest tylko w stanie ViewModelu w pamięci, bez `SavedStateHandle` i `rememberSaveable`, więc nie trafia do stanu instancji zapisywanego przez system; jest czyszczony przy „Wyślij” (przed odczytem sekretu), „Anuluj”, Wstecz i `ON_STOP` (CMDUI-11). `AapsPin` powstaje z tablicy, którą `fromChars` zeruje; na każdej ścieżce bez startu czyści go `CommandLauncher` albo koordynator, po starcie – sesja (CMDUI-12, CMDUI-13, SESSION-19). Pole jest maskowane, z klawiaturą typu hasło (CMDUI-10), a podsumowanie, przebieg i wynik mają `FLAG_SECURE` (CMDUI-23). Ograniczenie: `String` tekstu pola nie da się wyzerować w JVM. Wyjątek poza kontrolą aplikacji: system zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (Spec 005, W7 ze Spec 005 w W5 tej spec).
+- **PIN AAPS nigdy nie jest zapisywany.** Tekst PIN-u jest tylko w stanie ViewModelu w pamięci, bez `SavedStateHandle` i `rememberSaveable`, więc nie trafia do stanu instancji zapisywanego przez system; jest czyszczony przy „Wyślij” (przed odczytem sekretu), „Anuluj”, Wstecz i `ON_STOP` (CMDUI-11). `AapsPin` powstaje z tablicy, którą `fromChars` zeruje; na każdej ścieżce bez startu czyści go `CommandLauncher` albo koordynator, po starcie – sesja (CMDUI-12, CMDUI-13, SESSION-19). Pole jest maskowane, z klawiaturą typu hasło (CMDUI-10), a okno „Na pewno X g?”, podsumowanie oraz przebieg i wynik (na każdej zakładce, od startu do zamknięcia wyniku) mają `FLAG_SECURE` (CMDUI-23). Ograniczenie: `String` tekstu pola nie da się wyzerować w JVM. Wyjątek poza kontrolą aplikacji: system zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (Spec 005, W7 ze Spec 005 w W5 tej spec).
 - **Sekret tylko do zbudowania `CodeCredentials`.** Odczyt tuż przed startem polecenia z kodem, po wszystkich innych sprawdzeniach; sekret jest zmienną lokalną `launch`, `CommandLauncher` i ViewModele nie mają pól z sekretem (CMDUI-12, CMDUI-15, SECRET-14). `CommandRunViewModel` i jego stan nie trzymają referencji do sesji, która przechowuje `CodeCredentials`; `CurrentRun` trzyma do zamknięcia wyniku tylko polecenie i `StateFlow` stanu sesji, który nie wskazuje na sesję ani na `CodeCredentials` (CMDUI-21). Ograniczenie: `TotpSecret` nie ma czyszczenia („Przyszłe zmiany” w Spec 006).
 - **Kod tylko po zgodnej odpowiedzi AAPS** – decyduje `session` (Spec 004); `ui` nie ma ścieżki wysłania kodu. Ilość jest zatwierdzana przez użytkownika dwa razy dla > 40 g (CMDUI-09) i widoczna w podsumowaniu (CMDUI-10).
 - **Bez automatycznego ponawiania.** `ui` nie ponawia startu ani polecenia po żadnym wyniku (CMDUI-13); wynik „nieznany” ma ostrzeżenie przed ponowieniem bez sprawdzenia AAPS (CMDUI-19), bo powtórzone `CARBS` mogłoby wprowadzić węglowodany dwa razy.
@@ -542,9 +566,10 @@ Kompozycje, okna, `FLAG_SECURE`, utrzymanie ekranu, nawigacja i Hilt nie mają t
 | W7 | Sekret przy starcie `CARBS`: zmiana blokady ekranu i `CARBS` działa (W3 ze Spec 006); wyłączenie blokady ekranu → zanotować wynik (`Loaded` albo komunikat „zeskanuj ponownie”, W4 ze Spec 006); zabicie procesu zaraz po zamianie sekretu (kroki: zamienić sekret w Ustawieniach i od razu zabić proces – `adb shell am kill` albo wymuszone zatrzymanie; uruchomić aplikację ponownie i wykonać `CARBS 1` z poprawnym PIN-em) → polecenie startuje, a kod zgadza się ze starym albo nowym sekretem (W9 ze Spec 006); błąd (niezaliczone): komunikat „zeskanuj ponownie” (`Invalidated`) albo awaria aplikacji; Smart Lock → nigdy „zeskanuj ponownie” (W10 ze Spec 006); W2 ze Spec 006 nie jest sprawdzane w 009 (P4) | CMDUI-12 |
 | W8 | W trakcie `CARBS`: przełączenie zakładek i obrót → ten sam przebieg; w Ustawieniach baner „Trwa polecenie” i nieaktywne „Zmień”/„Usuń”/„Skanuj QR”/„Wklej URI” (ręczne sprawdzenie UI-15 ze Spec 008); „Anuluj polecenie” przed prośbą o kod → „Anulowano”, późniejsza prośba AAPS bez kodu; „Przestań czekać” po kodzie → okno, potwierdzenie → „Nieznany – sprawdź w AAPS” | CMDUI-16, CMDUI-18, CMDUI-21 |
 | W9 | Ekran włączony: czas wygaszania 15 s, `CARBS` czeka > 15 s → ekran nie gaśnie (także na zakładce Ustawienia); po wyniku gaśnie | CMDUI-22 |
-| W10 | `FLAG_SECURE`: zrzut ekranu zablokowany na podsumowaniu, na przebiegu i na wyniku (także zrzut wykonany zaraz po „Wyślij”), podgląd w ostatnich aplikacjach pusty; po zamknięciu wyniku na panelu Polecenia zrzut znów działa; skaner QR w Ustawieniach nadal chroniony (UI-23) | CMDUI-23 |
+| W10 | `FLAG_SECURE`: zrzut ekranu zablokowany w oknie „Na pewno 45 g?”, na podsumowaniu, na przebiegu i na wyniku (także zrzut wykonany zaraz po „Wyślij”), podgląd w ostatnich aplikacjach pusty; w trakcie `CARBS 1` po przejściu na Ustawienia i na Historię, a potem z Historii na Ustawienia – zrzut nadal zablokowany; po zamknięciu wyniku na panelu Polecenia i na Ustawieniach (bez skanera) zrzut znów działa; po „Nie” w oknie „Na pewno” zrzut panelu działa; skaner QR w Ustawieniach nadal chroniony (UI-23) | CMDUI-09, CMDUI-23 |
 | W11 | Wstecz: w podsumowaniu zamyka je; na wyniku zamyka wynik; w trakcie `BG` okno „Trwa polecenie”, „Wyjdź” → aplikacja zamknięta, po odpowiedzi AAPS i ponownym otwarciu (bez zabijania procesu) wynik `BG`, po „Zamknij” panel, w Historii wpis; brak polecenia → Wstecz zamyka aplikację | CMDUI-21, CMDUI-24 |
 | W12 | Brak zasięgu (tryb samolotowy) przy `BG` → „Nie udało się wysłać SMS…”; AAPS wyłączony / numer spoza listy AAPS → po 3 min „AAPS nie odpowiada” | CMDUI-19 |
+| W13 | TalkBack w trakcie `CARBS 1` (czekanie na prośbę o kod) i `BG` (czekanie na odpowiedź): każdy krok czytany jako jeden element – nazwa i „wykonany” / „w toku” / „oczekuje”; status czytany raz; ikona nie ma osobnego fokusu | CMDUI-17 |
 
 **Punkty weryfikacji z wcześniejszych specyfikacji** (podział P3 ze Spec 008):
 
@@ -567,6 +592,8 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 - [x] **P8. Wstecz w trakcie polecenia.** Rozstrzygnięte: okno „Trwa polecenie” z „Zostań”/„Wyjdź”; rozszerza UI-02 ze Spec 008 tylko na czas polecenia (CMDUI-24).
 - [x] **P9. Wiadomości nieoczekiwane.** Rozstrzygnięte: pokazywana tylko liczba, bez treści (CMDUI-20), spójnie z historią (DATA-08).
 - [x] **P10. Błąd wysyłania bez przyczyny.** Rozstrzygnięte: ogólny komunikat „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” (CMDUI-19); przyczyna – osobna zmiana Spec 004/005 („Przyszłe zmiany”).
+- [x] **P11. `FLAG_SECURE` przy zmianie zakładki i w oknie „Na pewno”** (2026-10-28, po przeglądzie jakości UI). Rozstrzygnięte: ochrona trwa od startu polecenia do zamknięcia wyniku także po przejściu na inną zakładkę (wcześniej chroniona była tylko zakładka Polecenia); okno „Na pewno X g?” pokazuje ilość `CARBS`, więc też ma `FLAG_SECURE` na czas otwarcia (CMDUI-09, CMDUI-23).
+- [x] **P12. Status kroków dla czytnika ekranu** (2026-10-28, po przeglądzie jakości UI). Rozstrzygnięte: każdy krok ma `stateDescription` „wykonany” / „w toku” / „oczekuje”, żeby status nie był przekazywany samą ikoną (CMDUI-17).
 
 ## Przyszłe zmiany (nie blokują)
 
@@ -578,6 +605,11 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
+- **2026-10-28 – dostępność i `FLAG_SECURE` po przeglądzie jakości UI (decyzje użytkownika P11, P12).**
+  - CMDUI-17: `stateDescription` kroków („wykonany”, „w toku”, „oczekuje”), ikony bez opisu; kryteria JVM (zasoby, źródło `RunScreen.kt`) i W13 (TalkBack).
+  - CMDUI-23: ochrona od `Started` do zamknięcia wyniku na każdej zakładce – żądanie `SecureWindowEffect` przeniesione z `CommandsScreen` do `AppScaffold` (poza `NavHost`), ten sam licznik; znacznik `CommandsViewModel` obejmuje okno „Na pewno”. Nowe kryteria (zmiana zakładki w trakcie, położenie wywołania), rozszerzony W10.
+  - CMDUI-09: okno „Na pewno X g?” z `FLAG_SECURE` (kryteria znacznika, `onStop`).
+  - Design: `CommandsUiState.secureWindow`, „Ekrany”, „Decyzje”, mapowanie testów, zadania 9 i 10. Konsekwencje dla Spec 010: HISTUI-13 (zakładka Historia nadal chroniona; zejście z Historii w trakcie polecenia nie zdejmuje flagi).
 - **2026-10-21 – korekta spójności po przeglądzie (bez zmian decyzji P1–P10).** Po wprowadzeniu `CurrentRun` ujednolicono spec i design:
   - CMDUI-24, W11 i „Przypadki błędów”: po „Wyjdź” i ponownym otwarciu przy żyjącym procesie widać przebieg albo wynik, a panel dopiero po „Zamknij” (zgodnie z P7 i CMDUI-21).
   - `CurrentRun` w CMDUI-15 i CMDUI-27 (z kryterium refleksji), w konstruktorach `CommandRunViewModel` i `CommandsViewModel`, w układzie plików i „Decyzjach” design.

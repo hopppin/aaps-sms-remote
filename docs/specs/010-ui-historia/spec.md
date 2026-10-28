@@ -177,10 +177,13 @@ Gdy strumień daje `Unavailable`, ekran pokazuje tekst „Nie udało się wczyta
 
 Przycisk „Wyczyść historię” jest aktywny tylko w stanie listy i gdy nie trwa czyszczenie. Dotknięcie otwiera okno „Wyczyścić historię?” z tekstem „Wszystkie wpisy (N) zostaną usunięte. Tej operacji nie można cofnąć.” (N = liczba wierszy w chwili otwarcia) i przyciskami „Wyczyść” i „Anuluj” (klucz `action_cancel` ze Spec 008). „Anuluj” i Wstecz zamykają okno bez wywołania `clearAll()`. „Wyczyść” zamyka okno i wywołuje `CommandHistory.clearAll()` dokładnie raz. W trakcie czyszczenia przycisk jest nieaktywny, a kolejne wywołania są ignorowane. Polecenie w toku nie blokuje czyszczenia (P2).
 
+**Przypadek brzegowy – wpis zapisany przy otwartym oknie (świadomie przyjęty, P6):** liczba N w oknie nie jest aktualizowana, gdy przy otwartym oknie strumień przyniesie nowy wpis (np. polecenie zakończone w tle zapisze wynik, DATA-13). „Wyczyść” wywołuje `clearAll()`, które usuwa wszystkie wpisy w bazie, także ten nowy – więc usuniętych może być więcej niż N. Powód: najprostsze rozwiązanie; `clearAll()` nie przyjmuje listy wpisów (Spec 007), okno ostrzega o usunięciu wszystkich wpisów i o nieodwracalności, a wynik polecenia był widoczny na zakładce Polecenia (CMDUI-19).
+
 **Kryteria akceptacji:**
 
 - **Zakładając** listę z 3 wpisami, **gdy** wywołano `onClearClicked()`, **wtedy** okno jest otwarte z liczbą 3, a `clearAll()` nie był wywołany; **gdy** wywołano `onClearDismissed()`, **wtedy** okno zamknięte, `clearAll()` nie był wywołany.
 - **Zakładając** otwarte okno i `clearAll()` wstrzymany bramką, **gdy** wywołano `onClearConfirmed()` dwa razy oraz `onClearClicked()`, **wtedy** `clearAll()` wywołano 1 raz, okno zamknięte, czyszczenie trwa, czyszczenie niedostępne.
+- **Zakładając** listę z 3 wpisami i otwarte okno z liczbą 3, **gdy** strumień wyemitował `Entries` z 4 wpisami (nowy na początku), **wtedy** okno jest nadal otwarte z liczbą 3, a lista ma 4 wiersze; **gdy** wywołano `onClearConfirmed()`, **wtedy** `clearAll()` wywołano dokładnie 1 raz (bez argumentów – usuwa wszystkie wpisy, także czwarty).
 - **Zakładając** ViewModel historii, **gdy** sprawdzono parametry jego konstruktora refleksją, **wtedy** nie ma wśród nich `SessionCoordinator` (czyszczenie nie zależy od polecenia w toku – P2).
 
 ### HISTUI-11: Wynik czyszczenia
@@ -208,12 +211,13 @@ Po `Cleared` ekran pokazuje komunikat „Historia wyczyszczona.”, a stan treś
 
 ### HISTUI-13: Ochrona ekranu
 
-Gdy zakładka Historia jest w kompozycji (każdy stan treści, lista i szczegóły), okno `Activity` ma `FLAG_SECURE` przez `SecureWindowEffect` z licznikiem ze Spec 009 (P3: historia zawiera te same dane co chroniony wynik – CMDUI-23). Po przejściu na inną zakładkę flaga jest zdejmowana, chyba że chroni ją inny ekran.
+Gdy zakładka Historia jest w kompozycji (każdy stan treści, lista i szczegóły), okno `Activity` ma `FLAG_SECURE` przez `SecureWindowEffect` z licznikiem ze Spec 009 (P3: historia zawiera te same dane co chroniony wynik – CMDUI-23). Po przejściu na inną zakładkę żądanie Historii jest wycofywane, a flaga jest zdejmowana dopiero, gdy żaden ekran ani przebieg jej nie wymaga (licznik żądań): w szczególności w trakcie polecenia i do zamknięcia jego wyniku flagę utrzymuje CMDUI-23 (Spec 009, zmiana P11) na każdej zakładce, także po zejściu z Historii.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** źródło `ui/history/HistoryScreen.kt`, **gdy** test JVM je przeczytał, **wtedy** zawiera wywołanie `SecureWindowEffect(true)`.
-- **Zakładając** telefon (W6), **gdy** otwarto Historię (lista, potem szczegóły) i wykonano zrzut ekranu oraz otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd jest pusty; po przejściu na panel Polecenia zrzut działa.
+- **Zakładając** telefon (W6), **gdy** otwarto Historię (lista, potem szczegóły) i wykonano zrzut ekranu oraz otwarto listę ostatnich aplikacji, **wtedy** zrzut się nie wykonuje, a podgląd jest pusty; po przejściu na panel Polecenia (bez przebiegu i wyniku) zrzut działa.
+- **Zakładając** telefon w trakcie `BG` (W6), **gdy** z zakładki Historia przełączono na Ustawienia i wykonano zrzut ekranu, **wtedy** zrzut się nie wykonuje; po zamknięciu wyniku `BG` zrzut na Ustawieniach (bez skanera) działa.
 
 ### HISTUI-14: Teksty po polsku w zasobach
 
@@ -247,6 +251,7 @@ Wszystkie teksty z tej specyfikacji są w `app/src/main/res/values/strings.xml`,
 | Podwójne potwierdzenie czyszczenia | jedno `clearAll()` | HISTUI-10 |
 | `clearAll()` = `Failed` | komunikat, lista bez zmian, brak ponawiania | HISTUI-11 |
 | Czyszczenie w trakcie polecenia | dozwolone; wpis bieżącego polecenia powstanie po jego zakończeniu (DATA-13) | HISTUI-10 (P2) |
+| Nowy wpis zapisany przy otwartym oknie czyszczenia | N w oknie bez zmian; „Wyczyść” usuwa wszystkie wpisy, także nowy (świadomie przyjęte) | HISTUI-10 (P6) |
 | Zmiana strefy czasowej telefonu | czasy pokazywane w strefie z chwili wyświetlenia | HISTUI-05 |
 
 ## Bezpieczeństwo
@@ -278,7 +283,7 @@ Kompozycje, okno, `FLAG_SECURE` i nawigacja nie mają testów automatycznych (de
 | W3 | Retencja wg W4 ze Spec 007 (205 wierszy wstawionych narzędziem `sqlite3`); po `BG` zakładka Historia pokazuje 200 wierszy, a ostatni wiersz to najstarszy zachowany wpis | HISTUI-02 |
 | W4 | „Wyczyść historię” → okno z liczbą wpisów; „Anuluj” i Wstecz nic nie usuwają; „Wyczyść” → komunikat i stan pusty; po ponownym starcie historia pusta, a nowy wpis ma w bazie (`sqlite3` na kopii) identyfikator większy od wcześniejszych (W5 ze Spec 007) | HISTUI-08, HISTUI-10, HISTUI-11, HISTUI-12 |
 | W5 | `adb shell bmgr backupnow pl.twojanazwa.aapsremote` przy niepustej historii: kopia nie jest wykonywana (W6 ze Spec 007, część historii) | – (DATA-16) |
-| W6 | `FLAG_SECURE`: zrzut zablokowany na liście i szczegółach, podgląd w ostatnich aplikacjach pusty; po przejściu na panel Polecenia zrzut działa | HISTUI-13 |
+| W6 | `FLAG_SECURE`: zrzut zablokowany na liście i szczegółach, podgląd w ostatnich aplikacjach pusty; po przejściu na panel Polecenia (bez przebiegu i wyniku) zrzut działa; w trakcie `BG` przejście z Historii na Ustawienia → zrzut nadal zablokowany, po zamknięciu wyniku działa (sprawdzane w PR zadania 9 Spec 009) | HISTUI-13 |
 | W7 | Wpis nierozpoznany: w kopii bazy zmienić w jednym wierszu `command` na `TBR`, w drugim `outcome` na `PARTIAL`, w trzecim `reason` na `NO_SIGNAL` (rodzaj `FAILED`), zapisać bazę jak w W4 ze Spec 007; aplikacja pokazuje „Nieznane polecenie”, „Nierozpoznany wynik”, „Brak szczegółów wyniku …”, bez awarii | HISTUI-03, HISTUI-04 |
 | W8 | Wynik po zamknięciu aplikacji (P7 w Spec 009): w trakcie `BG` Wstecz → „Wyjdź”, po odpowiedzi AAPS zabić proces, uruchomić aplikację – wynik tylko w Historii; zmiana strefy czasowej telefonu → po ponownym wejściu na zakładkę czasy w nowej strefie | HISTUI-02, HISTUI-05 |
 
@@ -295,3 +300,11 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 - [x] **P3. `FLAG_SECURE` na zakładce Historia.** Rozstrzygnięte: tak, na całej zakładce (lista i szczegóły), bo historia zawiera te same dane co chroniony ekran wyniku (CMDUI-23) i plan mówi „FLAG_SECURE na ekranach z danymi” – HISTUI-13 [przyjęta propozycja, 2026-10-21].
 - [x] **P4. Format czasu.** Rozstrzygnięte: strefa telefonu, stały wzorzec polski `dd.MM.yyyy HH:mm:ss` w szczegółach i `dd.MM.yyyy HH:mm` w wierszu; w wierszu czas rozpoczęcia, a gdy go brak – zakończenia (HISTUI-05) [przyjęta propozycja, 2026-10-21].
 - [x] **P5. Dodatki w historii.** Rozstrzygnięte: szczegóły pokazują „Kod nie został wysłany.” i ostrzeżenie przed ponowieniem dla wyniku „nieznany” na tych samych zasadach co Spec 009, przy czym „Kod nie został wysłany” tylko przy znanym powodzie (HISTUI-04) [przyjęta propozycja, 2026-10-21].
+- [x] **P6. Wpis zapisany przy otwartym oknie czyszczenia** (2026-10-28, po przeglądzie jakości UI). Rozstrzygnięte: bez zmian zachowania – okno pokazuje N z chwili otwarcia, a `clearAll()` usuwa także wpis zapisany przy otwartym oknie; zapisane jawnie jako przypadek brzegowy HISTUI-10 (najprostsze rozwiązanie).
+
+## Historia zmian
+
+- **2026-10-28 – doprecyzowanie po przeglądzie jakości UI (razem ze zmianą Spec 009, P11, P12).**
+  - HISTUI-10: jawny przypadek brzegowy (wpis zapisany przy otwartym oknie) z kryterium JVM i wierszem w „Przypadkach błędów”; zachowanie bez zmian (P6).
+  - HISTUI-13: flaga po zejściu z Historii w trakcie polecenia zostaje (CMDUI-23 na każdej zakładce); nowe kryterium i rozszerzony W6. `HistoryScreen` nadal zgłasza `SecureWindowEffect(true)`.
+  - Design: decyzja o przypadku brzegowym, mapowanie testów, zadanie 5.
