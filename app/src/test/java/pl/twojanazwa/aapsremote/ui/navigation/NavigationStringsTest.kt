@@ -17,9 +17,8 @@ class NavigationStringsTest {
     }
 
     @Test
-    fun `UI-03 zaslepki Polecenia i Historia maja niepuste teksty`() {
+    fun `UI-03 zaslepka Polecenia ma niepusty tekst`() {
         assertNotBlank("placeholder_commands_text")
-        assertNotBlank("placeholder_history_text")
     }
 
     @Test
