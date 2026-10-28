@@ -84,6 +84,7 @@ class CommandsViewModelPinRetentionTest {
     fun `CMDUI-11 anulowanie viewModelScope po Wyslij czysci PIN i nie startuje sesji`() = runTest(main.dispatcher) {
         val env = env()
         env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+        env.secrets.loadGate = CompletableDeferred()
         val real = env.launcher()
         val pins = mutableListOf<AapsPin?>()
         val launcher = mockk<CommandLauncher>()
@@ -94,8 +95,13 @@ class CommandsViewModelPinRetentionTest {
         val vm = env.viewModel(launcher)
         vm.openSummary()
         vm.onPinChanged("4321")
+        assertEquals("4321", vm.state().pinText)
         vm.onSendClicked()
+        settle()
+        assertEquals("", vm.state().pinText)
+        assertEquals(1, env.secrets.loadCount)
         vm.viewModelScope.cancel() // jak ViewModelStore.clear(), zanim ruszy dyspozytor
+        env.secrets.loadGate!!.complete(Unit)
         settle()
         assertEquals(1, pins.size)
         assertTrue(pins.single()!!.isCleared)
