@@ -58,6 +58,9 @@ class HistoryViewModelClearTest {
         idle()
         assertEquals(3, vm.uiState.value.confirmingClearCount)
         assertEquals(4, (vm.uiState.value.content as HistoryContent.Entries).items.size)
+        vm.onClearConfirmed()
+        idle()
+        assertEquals(1, history.clearCount)
     }
 
     @Test
