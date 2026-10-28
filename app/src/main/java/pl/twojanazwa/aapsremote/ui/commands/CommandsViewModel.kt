@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
@@ -63,6 +64,50 @@ class CommandsViewModel @Inject constructor(
     fun onBgClicked() = startCommand(Command.Bg)
 
     fun onPumpClicked() = startCommand(Command.Pump)
+
+    fun onCarbsInputChanged(text: String) {
+        local.update { it.copy(carbsInput = text, carbsError = null) }
+    }
+
+    fun onCarbsNextClicked() {
+        if (!compose().canStartCarbs) return
+        when (val result = Command.Carbs.parse(local.value.carbsInput)) {
+            is CarbsValidation.Invalid ->
+                local.update { it.copy(carbsError = result.error) }
+            is CarbsValidation.Valid -> {
+                val carbs = result.command
+                if (carbs.requiresExtraConfirmation) {
+                    local.update { it.copy(confirmingLargeGrams = carbs.grams) }
+                } else {
+                    local.update { it.copy(summaryGrams = carbs.grams, pinText = "") }
+                }
+            }
+        }
+    }
+
+    fun onQuickValueClicked(grams: Int) {
+        if (!compose().canStartCarbs) return
+        local.update {
+            it.copy(
+                carbsInput = grams.toString(),
+                carbsError = null,
+                summaryGrams = grams,
+                confirmingLargeGrams = null,
+                pinText = "",
+            )
+        }
+    }
+
+    fun onLargeAmountConfirmed() {
+        val grams = local.value.confirmingLargeGrams ?: return
+        local.update {
+            it.copy(confirmingLargeGrams = null, summaryGrams = grams, pinText = "")
+        }
+    }
+
+    fun onLargeAmountDismissed() {
+        local.update { it.copy(confirmingLargeGrams = null) }
+    }
 
     /**
      * Procedura wspólna (design 009): `launching` i `activeSession` sprawdzane synchronicznie na głównym wątku,
