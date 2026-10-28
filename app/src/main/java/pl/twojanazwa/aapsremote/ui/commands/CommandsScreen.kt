@@ -32,7 +32,6 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
-import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 
 /** Panel Polecenia i odświeżanie uprawnień przy powrocie z ustawień systemu. */
 @Composable
@@ -99,8 +98,6 @@ fun CommandsScreen(
         }
     }
 
-    // CMDUI-23: jedno żądanie dla podsumowania, przekazania (runHandoff), przebiegu i wyniku.
-    SecureWindowEffect(commands.secureWindow || run.secureWindow)
     BackHandler(enabled = run.interceptsBack) { runViewModel.onBack() }
     BackHandler(enabled = !run.interceptsBack && commands.interceptsBack) { commandsViewModel.onBack() }
     if (run.confirmingStopWaiting) {

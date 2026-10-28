@@ -5,6 +5,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.SecureFlagPolicy
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CarbsLimits
 
@@ -13,6 +15,8 @@ import pl.twojanazwa.aapsremote.commands.CarbsLimits
 fun LargeAmountDialog(grams: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        // CMDUI-09: osobne okno systemowe nie dziedziczy FLAG_SECURE z Activity.
+        properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.commands_large_title, grams)) },
         text = { Text(stringResource(R.string.commands_large_text, CarbsLimits.EXTRA_CONFIRMATION_ABOVE_GRAMS)) },
         confirmButton = {

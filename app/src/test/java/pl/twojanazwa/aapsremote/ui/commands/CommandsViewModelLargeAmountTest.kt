@@ -6,6 +6,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.launch
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.sms.FakeSmsPermissions
@@ -68,4 +72,45 @@ class CommandsViewModelLargeAmountTest {
             assertNull(vm.uiState.value.confirmingLargeGrams)
             assertEquals(40, vm.uiState.value.summaryGrams)
         }
+
+    @Test
+    fun `CMDUI-09 znacznik ekran chroniony obejmuje okno Na pewno od otwarcia do podsumowania`() =
+        runTest(main.dispatcher) {
+            val vm = viewModel()
+            settle()
+            vm.onCarbsInputChanged("45")
+            settle()
+            val flags = mutableListOf<Boolean>()
+            val job = launch(UnconfinedTestDispatcher(main.dispatcher.scheduler)) {
+                vm.uiState.collect { flags.add(it.secureWindow) }
+            }
+            vm.onCarbsNextClicked()
+            settle()
+            assertEquals(45, vm.uiState.value.confirmingLargeGrams)
+            assertTrue(vm.uiState.value.secureWindow)
+            vm.onLargeAmountDismissed()
+            settle()
+            assertFalse(vm.uiState.value.secureWindow)
+            val beforeSecond = flags.size
+            vm.onCarbsNextClicked()
+            vm.onLargeAmountConfirmed()
+            settle()
+            assertEquals(45, vm.uiState.value.summaryGrams)
+            assertTrue(flags.drop(beforeSecond).all { it })
+            job.cancel()
+        }
+
+    @Test
+    fun `CMDUI-09 onStop zamyka okno Na pewno i gasi znacznik ekran chroniony`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        settle()
+        vm.onCarbsInputChanged("45")
+        vm.onCarbsNextClicked()
+        settle()
+        assertTrue(vm.uiState.value.secureWindow)
+        vm.onStop()
+        settle()
+        assertNull(vm.uiState.value.confirmingLargeGrams)
+        assertFalse(vm.uiState.value.secureWindow)
+    }
 }

@@ -35,8 +35,8 @@ data class CommandsUiState(
 
     val canSubmitPin: Boolean get() = summaryGrams != null && pinText.isNotEmpty() && !launching
 
-    /** CMDUI-23: podsumowanie albo przekazanie do przebiegu. */
-    val secureWindow: Boolean get() = summaryGrams != null || runHandoff
+    /** CMDUI-09, CMDUI-23: okno „Na pewno”, podsumowanie, uruchamianie albo przekazanie do przebiegu. */
+    val secureWindow: Boolean get() = confirmingLargeGrams != null || summaryGrams != null || launching || runHandoff
 
     /** CMDUI-24: Wstecz obsługuje ten ViewModel. */
     val interceptsBack: Boolean get() = confirmingLargeGrams != null || summaryGrams != null
