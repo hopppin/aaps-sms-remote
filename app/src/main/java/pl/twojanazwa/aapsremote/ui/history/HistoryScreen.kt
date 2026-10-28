@@ -1,6 +1,5 @@
 package pl.twojanazwa.aapsremote.ui.history
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,8 +24,8 @@ import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 @Composable
 fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
     SecureWindowEffect(true)
+    // Szczegółów jeszcze nie wyświetlamy (4b), więc ani kliknięcie wiersza, ani przechwytywanie Wstecz.
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    BackHandler(enabled = state.interceptsBack) { viewModel.onBack() }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -52,7 +51,7 @@ fun HistoryScreen(viewModel: HistoryViewModel = hiltViewModel()) {
                 Text(stringResource(R.string.history_unavailable), style = MaterialTheme.typography.bodyLarge)
                 Button(onClick = viewModel::onRetry) { Text(stringResource(R.string.history_retry)) }
             }
-            is HistoryContent.Entries -> HistoryList(content.items, viewModel::onEntryClicked)
+            is HistoryContent.Entries -> HistoryList(content.items) { } // 4b: onEntryClicked + BackHandler razem ze szczegółami
         }
     }
 }
