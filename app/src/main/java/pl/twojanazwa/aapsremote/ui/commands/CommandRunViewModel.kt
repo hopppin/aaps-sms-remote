@@ -32,7 +32,9 @@ class CommandRunViewModel @Inject constructor(
         viewModelScope.launch {
             currentRun.state.collectLatest { run ->
                 if (run == null) {
-                    mutableState.update { it.copy(view = null) }
+                    mutableState.update {
+                        it.copy(view = null, confirmingStopWaiting = false, confirmingExit = false)
+                    }
                 } else {
                     observe(run)
                 }
@@ -79,5 +81,57 @@ class CommandRunViewModel @Inject constructor(
             currentRun.clear()
             mutableState.update { it.copy(view = null) }
         }
+    }
+
+    /** Przebieg, dla którego otwarto okno „Przestać czekać?”; potwierdzenie anuluje tylko jego sesję. */
+    private var stopWaitingRun: CurrentRunData? = null
+
+    /** CMDUI-18: tryb z bieżącej fazy `activeSession` (widok może się spóźniać); przed kodem `cancel()`, po kodzie okno. */
+    fun onCancelClicked() {
+        val session = coordinator.activeSession.value ?: return
+        when (session.state.value.phase.cancelMode()) {
+            CancelMode.CANCEL -> session.cancel()
+            CancelMode.STOP_WAITING -> {
+                stopWaitingRun = currentRun.state.value
+                mutableState.update { it.copy(confirmingStopWaiting = true) }
+            }
+            CancelMode.NONE -> Unit
+        }
+    }
+
+    fun onStopWaitingConfirmed() {
+        mutableState.update { it.copy(confirmingStopWaiting = false) }
+        val opened = stopWaitingRun
+        stopWaitingRun = null
+        val session = coordinator.activeSession.value ?: return
+        // Inna sesja niż ta, dla której otwarto okno, nie jest anulowana.
+        if (opened != null && opened.state === session.state) session.cancel()
+    }
+
+    fun onStopWaitingDismissed() {
+        stopWaitingRun = null
+        mutableState.update { it.copy(confirmingStopWaiting = false) }
+    }
+
+    /** CMDUI-24: wynik -> zamknięcie; przebieg -> okno „Trwa polecenie”; inaczej nic. */
+    fun onBack() {
+        when (mutableState.value.view) {
+            is RunView.Finished -> onResultDismissed()
+            is RunView.Active -> mutableState.update { it.copy(confirmingExit = true) }
+            null -> Unit
+        }
+    }
+
+    /** „Wyjdź” nie anuluje sesji i nie czyści `CurrentRun`. */
+    fun onExitConfirmed() {
+        mutableState.update { it.copy(confirmingExit = false, exitRequested = true) }
+    }
+
+    fun onExitDismissed() {
+        mutableState.update { it.copy(confirmingExit = false) }
+    }
+
+    fun onExitHandled() {
+        mutableState.update { it.copy(exitRequested = false) }
     }
 }
