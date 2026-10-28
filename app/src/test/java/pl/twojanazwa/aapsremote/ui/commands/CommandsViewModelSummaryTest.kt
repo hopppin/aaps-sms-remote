@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.session.deliverAt
@@ -265,4 +266,31 @@ class CommandsViewModelSummaryTest {
             settle()
             assertFalse(secure())
         }
+
+    @Test
+    fun `CMDUI-11 onStop w trakcie CARBS 1 nie rusza przebiegu sesji ani ochrony`() = runTest(main.dispatcher) {
+        val env = env()
+        env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+        val vm = env.viewModel()
+        val run = CommandRunViewModel(env.currentRun, env.coordinator)
+        fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
+        vm.openSummary("1")
+        vm.onPinChanged("4321")
+        vm.onSendClicked()
+        settle()
+        val published = env.currentRun.state.value
+        val session = env.coordinator.activeSession.value
+        val before = run.uiState.value.view as RunView.Active
+        assertTrue(published != null && session != null)
+        vm.onStop()
+        settle()
+        assertSame(published, env.currentRun.state.value)
+        assertSame(session, env.coordinator.activeSession.value)
+        val after = run.uiState.value.view as RunView.Active
+        assertEquals(1, after.commandGrams)
+        assertEquals(before.commandId, after.commandId)
+        assertTrue(secure())
+        env.coordinator.activeSession.value?.cancel()
+        settle()
+    }
 }

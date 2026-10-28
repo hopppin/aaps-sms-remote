@@ -56,6 +56,15 @@ class CommandsSourcesTest {
         assertTrue("stringResource(step.status.descriptionRes())" in run)
     }
 
+    @Test
+    fun `CMDUI-11 CommandsScreen woła onStop przy ON_STOP i przy opuszczeniu kompozycji bez runViewModel`() {
+        val screen = withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText())
+        assertTrue("LifecycleEventEffect(Lifecycle.Event.ON_STOP) { commandsViewModel.onStop() }" in screen)
+        assertTrue("DisposableEffect(Unit) { onDispose { commandsViewModel.onStop() } }" in screen)
+        val onDispose = screen.substringAfter("onDispose {").substringBefore("}")
+        assertFalse("runViewModel" in onDispose)
+    }
+
     private fun withoutComments(source: String) =
         source.replace(Regex("""/\*[\s\S]*?\*/"""), "").replace(Regex("//.*"), "")
 }
