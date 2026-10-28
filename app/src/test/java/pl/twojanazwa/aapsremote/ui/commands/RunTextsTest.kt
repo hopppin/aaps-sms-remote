@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CommandId
 
 class RunTextsTest {
@@ -120,6 +121,13 @@ class RunTextsTest {
     @Test
     fun `CMDUI-17 kazdy StepStatus ma niezerowy i rozny opis stanu`() {
         assertDistinctNonZero(StepStatus.entries.map { it.descriptionRes() })
+    }
+
+    @Test
+    fun `CMDUI-17 kazdy StepStatus wskazuje wlasciwy zasob opisu stanu`() {
+        assertEquals(R.string.run_step_status_done, StepStatus.DONE.descriptionRes())
+        assertEquals(R.string.run_step_status_current, StepStatus.CURRENT.descriptionRes())
+        assertEquals(R.string.run_step_status_pending, StepStatus.PENDING.descriptionRes())
     }
 
     @Test
