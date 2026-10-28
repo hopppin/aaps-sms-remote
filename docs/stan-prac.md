@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-10-28 (po #215)_
+_Ostatnia aktualizacja: 2026-10-28 (po #219)_
 
 ## Zrobione
 
@@ -31,6 +31,7 @@ _Ostatnia aktualizacja: 2026-10-28 (po #215)_
 | Proces | tańsze modele, agenci ogólni, Hermes z Codexem (`codex-latwe.sh`) dla łatwych issues bez `bezpieczenstwo` | PR #190, #192 |
 | Poprawki UI 009/010 | spec: czytnik ekranu (`stateDescription` kroków, CMDUI-17), `FLAG_SECURE` od startu polecenia do zamknięcia wyniku na każdej zakładce i w oknie „Na pewno” (CMDUI-09, CMDUI-23), przypadek brzegowy czyszczenia historii zapisany jako przyjęty (HISTUI-10); kod i testy | PR #207 (spec), #214, #215, #212 (issues #209–#211) |
 | Ikona aplikacji | adaptacyjna ikona wektorowa (dymek SMS z kroplą, warstwa monochrome), bez osobnej spec (same zasoby) | PR #213 (issue #208) |
+| CMDUI-11 | czyszczenie PIN-u i podsumowania przy zmianie zakładki (`DisposableEffect` w `CommandsScreen`), PIN nie przeżywa zmiany zakładki; przebieg i `FLAG_SECURE` bez zmian | PR #217 (spec), #219 (issue #218) |
 | Test na telefonie | pierwsza instalacja APK (debug) na telefonie z AAPS: Historia, `BG`, `CARBS 1` z kodem działają; `PUMP` bez pompy przy telefonie nie dostaje stanu pompy (AAPS odpowiada spóźnionym „Odczyt statusu nie powiodl sie”, aplikacja traktuje to jako wiadomość nieoczekiwaną) | zamknięte issue #205 |
 
 ## W toku
@@ -41,9 +42,8 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Dokończyć ręczną weryfikację na telefonie (nowy APK): ikona aplikacji (#213), W13 i W10 ze spec 009 (TalkBack na krokach; `FLAG_SECURE` także po zmianie zakładki w trakcie polecenia i w oknie „Na pewno”), W6 ze spec 010, W4–W12 ze [spec 009](specs/009-ui-polecenia/spec.md) (m.in. zrzut ekranu zablokowany na podsumowaniu, przebiegu i wyniku, Wstecz i „Wyjdź”, tryb samolotowy, AAPS wyłączony), W1–W8 ze [spec 010](specs/010-ui-historia/spec.md) (szczegóły, czyszczenie, `FLAG_SECURE` na Historii, kopia zapasowa, zmiana strefy czasowej), W7 ze spec 008 (aparat zajęty przez inną aplikację), punkty ze spec 005, 006 i 007. Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo.
-2. Decyzja do podjęcia (zmiana spec, potem kod): CMDUI-11 zakłada, że zmiana zakładki czyści PIN i zamyka podsumowanie przez `ON_STOP`, a przy zmianie zakładki to zdarzenie może nie nadejść. Możliwe rozwiązanie (do ustalenia): analogiczny `DisposableEffect(Unit) { onDispose { … } }` jak dla pola URI TOTP w spec 008, ale dla PIN-u przechowywanego w `CommandsViewModel`.
-3. Ewentualnie później: przyczyna w `SendResult.Failed` (zmiana spec 004), usługa pierwszoplanowa na czas polecenia (osobna spec), `TotpSecret.clear()` po zakończeniu polecenia (zmiana spec 001 i 004, „Przyszłe zmiany” w spec 006), doprecyzowanie w design 006: `encrypt` przy pustym tekście jawnym → `UNAVAILABLE`, `CancellationException` w szkicach `KeyGenerationPolicy`/klasyfikatora; numer AAPS ustalany raz na polecenie (zmiana spec 004/005, „Przyszłe zmiany” w spec 007); jawne rozpoznanie „Odczyt statusu nie powiodl sie” jako niepowodzenia `PUMP` (odrzucone na razie – limit 3 min zostaje).
+1. Dokończyć ręczną weryfikację na telefonie (nowy APK): ikona aplikacji (#213), W13 ze specyfikacji 009 (TalkBack na krokach), W4–W12 ze [specyfikacji 009](specs/009-ui-polecenia/spec.md) (m.in. W6: zmiana zakładki z otwartym podsumowaniem i PIN-em czyści PIN, a przebieg trwa; W10: `FLAG_SECURE` także po zmianie zakładki w trakcie polecenia i w oknie „Na pewno”; zrzut ekranu zablokowany na podsumowaniu, przebiegu i wyniku, Wstecz i „Wyjdź”, tryb samolotowy, AAPS wyłączony), W1–W8 ze [spec 010](specs/010-ui-historia/spec.md) (szczegóły, czyszczenie, `FLAG_SECURE` na Historii, kopia zapasowa, zmiana strefy czasowej), W7 ze spec 008 (aparat zajęty przez inną aplikację), punkty ze spec 005, 006 i 007. Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo.
+2. Ewentualnie później: przyczyna w `SendResult.Failed` (zmiana spec 004), usługa pierwszoplanowa na czas polecenia (osobna spec), `TotpSecret.clear()` po zakończeniu polecenia (zmiana spec 001 i 004, „Przyszłe zmiany” w spec 006), doprecyzowanie w design 006: `encrypt` przy pustym tekście jawnym → `UNAVAILABLE`, `CancellationException` w szkicach `KeyGenerationPolicy`/klasyfikatora; numer AAPS ustalany raz na polecenie (zmiana spec 004/005, „Przyszłe zmiany” w spec 007); jawne rozpoznanie „Odczyt statusu nie powiodl sie” jako niepowodzenia `PUMP` (odrzucone na razie – limit 3 min zostaje).
 
 ## Ustalenia z użytkownikiem (decyzje)
 
@@ -63,5 +63,4 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 ## Otwarte (do ustalenia)
 
 - Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo – częściowo (kod w `CARBS 1` przyjęty przez AAPS), pełne porównanie jeszcze niezrobione.
-- CMDUI-11: czyszczenie PIN-u przy zmianie zakładki (Następne kroki, punkt 2).
 - Rozstrzygnięte 2026-10-28: kroki przebiegu mają trzy statusy dla czytnika ekranu (wykonany, w toku, oczekuje); HISTUI-10 bez zmiany zachowania (okno pokazuje liczbę z chwili otwarcia); `FLAG_SECURE` trwa do końca polecenia na każdej zakładce (skutek: w trakcie polecenia zrzuty blokuje także zakładka Ustawienia); okno „Na pewno” chronione.
