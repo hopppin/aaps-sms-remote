@@ -57,3 +57,11 @@ fun ProgressStepId.textRes(): Int = when (this) {
     ProgressStepId.SEND_CODE -> R.string.run_step_send_code
     ProgressStepId.AWAIT_CONFIRMATION -> R.string.run_step_await_confirmation
 }
+
+/** CMDUI-17: opis stanu kroku dla czytnika ekranu (stateDescription). */
+@StringRes
+fun StepStatus.descriptionRes(): Int = when (this) {
+    StepStatus.DONE -> R.string.run_step_status_done
+    StepStatus.CURRENT -> R.string.run_step_status_current
+    StepStatus.PENDING -> R.string.run_step_status_pending
+}
