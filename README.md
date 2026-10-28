@@ -1,6 +1,6 @@
 # aaps-sms-remote
 
-Aplikacja na Androida do wysyłania poleceń SMS do telefonu z AndroidAPS. Po zatwierdzeniu polecenia przez użytkownika aplikacja odpowiada kodem potwierdzającym, łączącym kod TOTP z PIN-em AAPS wpisywanym przy każdym poleceniu. Wersja MVP obsługuje polecenia `BG`, `PUMP` i `CARBS <g>`.
+Aplikacja na Androida do wysyłania poleceń SMS do telefonu z AndroidAPS. Dla polecenia `CARBS <g>` po otrzymaniu prośby AAPS aplikacja odsyła kod potwierdzający, łączący kod TOTP z PIN-em AAPS wpisanym przy tym poleceniu. Polecenia `BG` i `PUMP` są wysyłane jednym dotknięciem, bez kodu potwierdzającego. Wersja MVP obsługuje polecenia `BG`, `PUMP` i `CARBS <g>`.
 
 ## Wymagania
 
