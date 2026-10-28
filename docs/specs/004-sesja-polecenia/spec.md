@@ -485,3 +485,9 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji:
 - [x] Anulowanie: przed kodem w każdej chwili; po kodzie tylko kończy czekanie z wynikiem „nieznany” (SESSION-17).
 - [x] CARBS ponad limit AAPS: AAPS obcina ilość → niezgodna ilość → stop (A3, SESSION-11).
 - [x] Czas na kod w AAPS: 5 min (A1, SESSION-10).
+
+## Historia zmian
+
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+  - SESSION-06: `AWAITING_REPLY` przyjmuje też odpowiedź na `PROFILE STATUS` i `PROFILE LIST` (PROF-11).
+  - SESSION-08, SESSION-11 – SESSION-13: reguły dla `CARBS` obejmują każde polecenie z kodem – prośba o kod i niezgodność rozpoznawane po wspólnych typach parsera; tabele dla `BOLUS` (BOL-10, BOL-11) i zmiany profilu (PROF-12). Nowy wynik `BolusConfirmed` (jak `CarbsConfirmed`). Fazy, limity czasu i A1 – A7 bez zmian.

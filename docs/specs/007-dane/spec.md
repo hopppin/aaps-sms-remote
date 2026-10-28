@@ -353,3 +353,10 @@ Brak. Decyzje przyjęte przy tej specyfikacji:
 
 - **Numer ustalany raz na polecenie.** Sesja (albo `sms`) mogłaby pobrać numer raz przy starcie polecenia i używać go także do wysłania odpowiedzi z kodem, zamiast czytać go przy każdym wysłaniu. Usuwa to zależność od blokady w `ui` (sekcja Bezpieczeństwo); wymaga zmiany Spec 004 albo Spec 005.
 - **Testy automatyczne DAO** (Robolectric albo `androidTest` z bazą w pamięci), jeśli zapytania Room się rozrosną; dziś retencję i kolejność sprawdzają testy logiki z atrapą, test wyeksportowanego schematu i W3–W5.
+
+## Historia zmian
+
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+  - Nowy plik ustawień `command_limits` (LIM-04); DATA-01 i plik `settings` bez zmian.
+  - DATA-07, DATA-09: nowe polecenia i rodzaj wyniku `BOLUS_CONFIRMED`, pola ilości bolusa, numeru i procentu profilu (BOL-17, PROF-17).
+  - DATA-14: baza w wersji 2 (migracja 1 → 2, kolumna `bolus_centi_units`) i 3 (migracja 2 → 3, `profile_number`, `profile_percent`), bez migracji destrukcyjnych.

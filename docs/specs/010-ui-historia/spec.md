@@ -304,6 +304,9 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 
 ## Historia zmian
 
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+  - HISTUI-03: etykiety „BOLUS X j.”, „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%” (BOL-17, PROF-17).
+  - HISTUI-04: wynik `BolusConfirmed` → „AAPS potwierdził podanie X j.” (BOL-17); komunikaty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16.
 - **2026-10-28 – doprecyzowanie po przeglądzie jakości UI (razem ze zmianą Spec 009, P11, P12).**
   - HISTUI-10: jawny przypadek brzegowy (wpis zapisany przy otwartym oknie) z kryterium JVM i wierszem w „Przypadkach błędów”; zachowanie bez zmian (P6).
   - HISTUI-13: flaga po zejściu z Historii w trakcie polecenia zostaje (CMDUI-23 na każdej zakładce); nowe kryterium i rozszerzony W6. `HistoryScreen` nadal zgłasza `SecureWindowEffect(true)`.

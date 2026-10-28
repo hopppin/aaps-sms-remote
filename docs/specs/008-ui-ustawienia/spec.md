@@ -452,6 +452,8 @@ Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekra
 
 ## Historia zmian
 
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+  - Ekran Ustawienia dostaje sekcję „Limity poleceń” pod sekcjami numeru, sekretu i uprawnień (LIM-10); blokada w trakcie polecenia i jedna operacja naraz jak UI-15 i UI-16 (LIM-11). Wymagania UI-01 – UI-24 bez zmian.
 - **2026-10-21 – doprecyzowania po implementacji (bez zmian wymagań).** Design uzupełniony o zachowanie, które realizuje kod zadań 1–10 i poprawek z przeglądu:
   - Tabele przejść `AapsNumberViewModel`: warunek `onEditClicked` liczony ze źródeł w chwili akcji (`!busy`, brak polecenia, stan ≠ `Loading`); `onInputChanged` i `onEditCancelled` ignorowane przy `busy`.
   - Tabele przejść `TotpSecretViewModel`: `onCameraPermissionResult` otwiera skaner tylko przy `canScan` i nie wymaga oczekującej prośby; `onReplaceConfirmed` przy `!canPaste`/`!canScan` tylko zamyka okno; `onPasteSubmitted` celowo bez `canSubmitPaste` (wyścig → `COMMAND_ACTIVE`); `onCameraFailed`/`onScannerClosed` ignorowane poza skanerem.

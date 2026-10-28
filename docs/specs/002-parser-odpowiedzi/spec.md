@@ -255,3 +255,9 @@ Warianty oznaczone w kryteriach jako „syntetyczne” to modyfikacje tych wiado
 - [x] **2. CARBS powyżej limitu AAPS.** Rozstrzygnięte bez znajomości treści (użytkownik nie może tego sprawdzić): oba możliwe warianty kończą się bezpiecznie – prośba o kod z obciętą ilością daje „niezgodna ilość” (PARSER-06), osobny komunikat odmowy daje „nierozpoznana” (PARSER-09); w obu przypadkach kod nie jest odsyłany, a użytkownik widzi treść SMS. Osobny wynik „odrzucono przez limit” poza MVP; do dodania, gdy poznamy treść.
 - [x] **3. Czas na odesłanie kodu.** Nie dotyczy parsera. W SMS Communicator nie ma takiego ustawienia (wg użytkownika); wartość trzeba ustalić w spec `session` (np. z dokumentacji lub kodu AAPS).
 - [x] **4. Powiadomienie o poleceniu z innego numeru.** Rozstrzygnięte: po `CARBS` z innego numeru treść jest identyczna z własnym potwierdzeniem. Skutki i wymóg dla `session` – sekcja Bezpieczeństwo. Treści powiadomień o innych poleceniach (np. bolus) nie znamy; dają „nierozpoznana”.
+
+## Historia zmian
+
+- **2026-10-28 – Planowane zmiany (Spec 011 – 013, status `szkic`; obowiązują dopiero po ich zatwierdzeniu).**
+  - PARSER-01: nowe konteksty – `BOLUS` ([Spec 012](../012-bolus/spec.md), BOL-06 – BOL-09) oraz stan profilu, lista profili i zmiana profilu ([Spec 013](../013-profil/spec.md), PROF-05 – PROF-10) – z nowymi rodzajami wyników opisanymi tam. Wyniki dla `BG`, `PUMP` i `CARBS` bez zmian.
+  - Design: wspólne interfejsy znacznikowe `AapsReply` (prośba o kod zgodna z poleceniem, niezgodność, potwierdzenie) – [design 012](../012-bolus/design.md#interfejsy); istniejące typy dostają nadtyp, bez zmiany pól i `toString()`.

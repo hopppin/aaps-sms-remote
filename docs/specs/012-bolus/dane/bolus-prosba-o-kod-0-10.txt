@@ -1,0 +1,1 @@
+Aby dostarczyc bolus 0,10U wprowadz kod z aplikacji Authenticator dla: Jan, z doklejonym PIN-em
