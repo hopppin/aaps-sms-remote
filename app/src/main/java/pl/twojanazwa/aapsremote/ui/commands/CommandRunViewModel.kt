@@ -32,7 +32,9 @@ class CommandRunViewModel @Inject constructor(
         viewModelScope.launch {
             currentRun.state.collectLatest { run ->
                 if (run == null) {
-                    mutableState.update { it.copy(view = null) }
+                    mutableState.update {
+                        it.copy(view = null, confirmingStopWaiting = false, confirmingExit = false)
+                    }
                 } else {
                     observe(run)
                 }
@@ -79,5 +81,45 @@ class CommandRunViewModel @Inject constructor(
             currentRun.clear()
             mutableState.update { it.copy(view = null) }
         }
+    }
+
+    /** CMDUI-18: przed kodem od razu `cancel()`, po kodzie najpierw okno; sesja z `activeSession` w chwili akcji. */
+    fun onCancelClicked() {
+        when ((mutableState.value.view as? RunView.Active)?.cancelMode) {
+            CancelMode.CANCEL -> coordinator.activeSession.value?.cancel()
+            CancelMode.STOP_WAITING -> mutableState.update { it.copy(confirmingStopWaiting = true) }
+            CancelMode.NONE, null -> Unit
+        }
+    }
+
+    fun onStopWaitingConfirmed() {
+        mutableState.update { it.copy(confirmingStopWaiting = false) }
+        coordinator.activeSession.value?.cancel()
+    }
+
+    fun onStopWaitingDismissed() {
+        mutableState.update { it.copy(confirmingStopWaiting = false) }
+    }
+
+    /** CMDUI-24: wynik -> zamknięcie; przebieg -> okno „Trwa polecenie”; inaczej nic. */
+    fun onBack() {
+        when (mutableState.value.view) {
+            is RunView.Finished -> onResultDismissed()
+            is RunView.Active -> mutableState.update { it.copy(confirmingExit = true) }
+            null -> Unit
+        }
+    }
+
+    /** „Wyjdź” nie anuluje sesji i nie czyści `CurrentRun`. */
+    fun onExitConfirmed() {
+        mutableState.update { it.copy(confirmingExit = false, exitRequested = true) }
+    }
+
+    fun onExitDismissed() {
+        mutableState.update { it.copy(confirmingExit = false) }
+    }
+
+    fun onExitHandled() {
+        mutableState.update { it.copy(exitRequested = false) }
     }
 }
