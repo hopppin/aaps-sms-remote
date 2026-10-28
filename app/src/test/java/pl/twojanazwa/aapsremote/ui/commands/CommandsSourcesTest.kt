@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CommandsSourcesTest {
@@ -23,4 +24,16 @@ class CommandsSourcesTest {
         assertFalse("rememberSaveable" in sources)
         assertFalse("SavedStateHandle" in sources)
     }
+
+    @Test
+    fun `CMDUI-10 CMDUI-23 podsumowanie maskuje PIN, a ekran chroni okno znacznikiem secureWindow`() {
+        val summary = withoutComments(File(commandsDirectory, "CarbsSummary.kt").readText())
+        assertTrue("PasswordVisualTransformation()" in summary)
+        assertTrue("KeyboardType.NumberPassword" in summary)
+        assertTrue("autoCorrectEnabled = false" in summary)
+        assertTrue("SecureWindowEffect(commands.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
+    }
+
+    private fun withoutComments(source: String) =
+        source.replace(Regex("""/\*[\s\S]*?\*/"""), "").replace(Regex("//.*"), "")
 }

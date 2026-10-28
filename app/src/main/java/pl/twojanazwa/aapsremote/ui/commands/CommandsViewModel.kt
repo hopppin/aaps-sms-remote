@@ -141,12 +141,15 @@ class CommandsViewModel @Inject constructor(
         startCommand(carbs, pin)
     }
 
+    /** W trakcie uruchamiania „Anuluj” i Wstecz nie ukrywają podsumowania (CMDUI-10, CMDUI-11). */
     fun onSummaryDismissed() {
+        if (local.value.launching) return
         local.update { it.copy(summaryGrams = null, pinText = "") }
     }
 
     /** Okno „Na pewno” -> zamknij; podsumowanie -> jak „Anuluj” (CMDUI-24). */
     fun onBack() {
+        if (local.value.launching) return
         if (local.value.confirmingLargeGrams != null) onLargeAmountDismissed() else onSummaryDismissed()
     }
 

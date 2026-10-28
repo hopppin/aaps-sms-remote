@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
 import pl.twojanazwa.aapsremote.ui.settings.permissions.SmsPermissionsSection
+import pl.twojanazwa.aapsremote.ui.settings.secret.SecureWindowEffect
 
 /** Panel Polecenia i odświeżanie uprawnień przy powrocie z ustawień systemu. */
 @Composable
@@ -84,27 +86,51 @@ fun CommandsScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        CommandsPanel(
-            state = commands,
-            onBgClicked = commandsViewModel::onBgClicked,
-            onPumpClicked = commandsViewModel::onPumpClicked,
-            onCarbsInputChanged = commandsViewModel::onCarbsInputChanged,
-            onQuickValueClicked = commandsViewModel::onQuickValueClicked,
-            onCarbsNextClicked = commandsViewModel::onCarbsNextClicked,
-            onOpenSettings = onOpenSettings,
-            smsPermissions = {
-                SmsPermissionsSection(
-                    state = permissions,
-                    onRequest = {
-                        val toRequest = smsPermissionsViewModel.permissionsToRequest()
-                        if (toRequest.isNotEmpty()) permissionLauncher.launch(toRequest.toTypedArray())
-                        else smsPermissionsViewModel.onResume()
-                    },
-                    onOpenAppSettings = openAppSettings,
-                )
-            },
+    // CMDUI-23: znacznik obejmuje też przekazanie do przebiegu (runHandoff).
+    SecureWindowEffect(commands.secureWindow)
+    BackHandler(enabled = commands.interceptsBack) { commandsViewModel.onBack() }
+    commands.confirmingLargeGrams?.let { grams ->
+        LargeAmountDialog(
+            grams = grams,
+            onConfirm = commandsViewModel::onLargeAmountConfirmed,
+            onDismiss = commandsViewModel::onLargeAmountDismissed,
         )
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        val summaryGrams = commands.summaryGrams
+        if (summaryGrams != null) {
+            CarbsSummary(
+                grams = summaryGrams,
+                pinText = commands.pinText,
+                canSubmit = commands.canSubmitPin,
+                launching = commands.launching,
+                onPinChanged = commandsViewModel::onPinChanged,
+                onSend = commandsViewModel::onSendClicked,
+                onCancel = commandsViewModel::onSummaryDismissed,
+            )
+        } else {
+            CommandsPanel(
+                state = commands,
+                onBgClicked = commandsViewModel::onBgClicked,
+                onPumpClicked = commandsViewModel::onPumpClicked,
+                onCarbsInputChanged = commandsViewModel::onCarbsInputChanged,
+                onQuickValueClicked = commandsViewModel::onQuickValueClicked,
+                onCarbsNextClicked = commandsViewModel::onCarbsNextClicked,
+                onOpenSettings = onOpenSettings,
+                smsPermissions = {
+                    SmsPermissionsSection(
+                        state = permissions,
+                        onRequest = {
+                            val toRequest = smsPermissionsViewModel.permissionsToRequest()
+                            if (toRequest.isNotEmpty()) permissionLauncher.launch(toRequest.toTypedArray())
+                            else smsPermissionsViewModel.onResume()
+                        },
+                        onOpenAppSettings = openAppSettings,
+                    )
+                },
+            )
+        }
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
