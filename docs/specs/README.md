@@ -59,3 +59,6 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 008 | [UI – ustawienia, sekret TOTP i uprawnienia](008-ui-ustawienia/spec.md) | `UI` | zatwierdzona |
 | 009 | [UI – polecenia i przebieg polecenia](009-ui-polecenia/spec.md) | `CMDUI` | zatwierdzona |
 | 010 | [UI – historia poleceń](010-ui-historia/spec.md) | `HISTUI` | zatwierdzona |
+| 011 | [Limity poleceń w ustawieniach](011-limity-polecen/spec.md) | `LIM` | zatwierdzona |
+| 012 | [Polecenie BOLUS](012-bolus/spec.md) | `BOL` | zatwierdzona |
+| 013 | [Profil – stan, lista i zmiana profilu](013-profil/spec.md) | `PROF` | zatwierdzona |
