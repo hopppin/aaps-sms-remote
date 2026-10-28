@@ -11,11 +11,9 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class TotpSecretViewModelStateTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     private fun fixture(initial: SecretState = SecretState.UNKNOWN) = SecretFixture(main.dispatcher, initial)
 

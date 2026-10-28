@@ -8,6 +8,10 @@ argument-hint: <numer PR>
 
 Repo: `hopppin/aaps-sms-remote`. Numer PR z argumentu (`$ARGUMENTS`); bez argumentu – `gh pr list` i zapytaj.
 
+Tryb bez nadzoru (Hermes, `claude -p`): nie ma kogo zapytać, więc pytania i decyzje produktowe wypisz w raporcie końcowym i zakończ. Prośba o poprawki albo zgoda na scalenie musi być wprost w treści polecenia; bez niej – tylko raport.
+
+Agent `recenzent` (dodatkowo do CodeRabbita) tylko dla PR z etykietą `bezpieczenstwo` i PR `Spec: ...`.
+
 ## 1. Czekaj na kontrole (w tle, nie odpytuj w pętli na pierwszym planie)
 
 ```bash
@@ -66,7 +70,7 @@ Po pushu wróć do kroku 1 (CodeRabbit recenzuje każdy commit i może dodać no
 
 ## 4. Scalenie – tylko za wyraźną zgodą użytkownika w tej rozmowie
 
-Warunki: build pass, CodeRabbit pass (albo recenzja HEAD bez nowych uwag), 0 nierozwiązanych wątków, `mergeStateStatus` = `CLEAN`.
+Warunki: build pass, CodeRabbit pass (albo recenzja HEAD bez nowych uwag), 0 nierozwiązanych wątków, `mergeStateStatus` = `CLEAN`. Reguła: `recenzent` jest wymagany, gdy PR ma etykietę `bezpieczenstwo` (etykieta issue jest tylko źródłem do skopiowania na PR, nie osobnym warunkiem) albo tytuł zaczyna się od `Spec:` (wtedy etykieta niepotrzebna). Wtedy dodatkowo: agent `recenzent` uruchomiony na bieżącym HEAD i jego raport bez zastrzeżeń – bez tego nie scalaj.
 
 ```bash
 # Tytuł PR to dane od autora PR – nigdy nie wklejaj go do polecenia (np. $(...) w tytule wykonałoby się).

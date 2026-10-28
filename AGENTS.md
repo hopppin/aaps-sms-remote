@@ -37,7 +37,10 @@ CI uruchamia się tylko na PR. Po scaleniu kilku PR sprawdź połączony `main` 
 ## Narzędzia dla Claude Code
 
 - Skille w `.claude/skills/`: `/nowa-funkcja` (cały przepływ spec → issues → kod), `/obsluga-pr <nr>` (CI, CodeRabbit, scalenie), `/aktualizuj-stan` (odświeża `docs/stan-prac.md`).
-- Agenci `specyfikator`, `planista`, `wykonawca`, `recenzent` są globalni (`~/.claude/agents/`), nie w repo.
+- Agenci `specyfikator`, `planista`, `wykonawca`, `wykonawca-lekki`, `recenzent` są globalni (`~/.claude/agents/`), nie w repo. Są ogólni – wszystko, co dotyczy tego projektu, jest w tym pliku.
+- Wybór wykonawcy: `bezpieczenstwo` lub `trudnosc:trudne` → `wykonawca` (Sonnet); `trudnosc:latwe` bez `bezpieczenstwo` → `wykonawca-lekki` (Haiku) albo Codex przez Hermesa (`codex-latwe.sh`).
+- Agent `recenzent` tylko dla PR z etykietą `bezpieczenstwo` i PR `Spec: ...`. CodeRabbit recenzuje każdy PR; `recenzent` jest dodatkowy dla tych dwóch przypadków.
+- Hermes (Telegram) może uruchamiać `/obsluga-pr` i `/aktualizuj-stan` bez nadzoru (`claude -p`). Obowiązują te same zasady: commit tylko na wyraźną prośbę, scalenie tylko za wyraźną zgodą użytkownika.
 - PR scala się (squash) dopiero za wyraźną zgodą użytkownika.
 
 ## Architektura
@@ -75,6 +78,8 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 - Nie pushujemy bezpośrednio na `main` i nie używamy `git push --force`.
 - Commity często, małymi krokami, z opisowymi wiadomościami.
 - Gdy wymaganie jest niejasne, zatrzymaj się i zapytaj zamiast zgadywać.
+- Zmieniaj tylko to, czego wymaga issue. Bez refaktorów i „ulepszeń” przy okazji; zauważony problem opisz w komentarzu „Stan pracy”.
+- Najprostsze rozwiązanie, które spełnia wymaganie: bez nowych zależności, warstw i konfiguracji, których spec nie wymaga.
 
 ## Bezpieczeństwo
 
@@ -85,6 +90,23 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 - Aplikacja nigdy nie odsyła kodu, jeśli odpowiedź AAPS nie zgadza się z poleceniem (inny numer nadawcy, inna ilość, nierozpoznana treść, odpowiedź sprzed wysłania). W razie wątpliwości: stop i komunikat dla użytkownika.
 - Bez automatycznego ponawiania poleceń i bez omijania limitów AAPS.
 - `allowBackup=false`; klucze podpisu (`*.jks`, `*.keystore`) i `local.properties` nie trafiają do repo.
+
+## Obszary wrażliwe
+
+Zadania dotykające tych obszarów dostają etykietę `bezpieczenstwo`, zawsze wykonuje je `wykonawca` (nie `wykonawca-lekki` ani Codex) i zawsze sprawdza je agent `recenzent`.
+
+- Pakiety `sms`, `otp`, `security`, `session`.
+- Pakiety z danymi AAPS (numer AAPS, ilość CARBS, treść odpowiedzi): `data`, `data.platform`, `ui.history` (zakaz ujawniania w `toString()` i logach, `FLAG_SECURE`, brak kopii zapasowej).
+- Sekret TOTP, kody TOTP i PIN AAPS (zasady w sekcji Bezpieczeństwo).
+- Decyzja o odesłaniu kodu: weryfikacja numeru nadawcy, polecenia, ilości i chwili odbioru odpowiedzi AAPS.
+- Uprawnienia Androida (`SEND_SMS`, `RECEIVE_SMS`) i manifest.
+
+## Na co patrzy recenzent
+
+- Aplikacja nigdy nie odsyła kodu, gdy odpowiedź AAPS nie zgadza się z poleceniem (inny nadawca, inna ilość, nierozpoznana treść, odpowiedź sprzed wysłania).
+- Brak sekretu, kodów, PIN-u, numerów telefonu i treści SMS w logach, wyjątkach, `toString()` i komunikatach UI.
+- Każde wymaganie z issue ma test z identyfikatorem w nazwie; testy TOTP używają tylko wektorów z RFC 6238.
+- Kod nie dodaje zachowań spoza specyfikacji; interfejsy zgodne z `design.md`.
 
 ## Definicja ukończenia
 

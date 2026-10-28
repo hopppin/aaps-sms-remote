@@ -67,6 +67,41 @@
     <string name="secret_msg_delete_failed">Nie udało się usunąć sekretu. Spróbuj ponownie.</string>
     <string name="secret_msg_camera_unavailable">Nie udało się uruchomić aparatu. Możesz wkleić URI z AAPS.</string>
 
+    <!-- 009: panel -->
+    <string name="commands_bg">BG</string>
+    <string name="commands_bg_hint">Glikemia</string>
+    <string name="commands_pump">PUMP</string>
+    <string name="commands_pump_hint">Stan pompy</string>
+    <string name="commands_carbs_title">CARBS – węglowodany</string>
+    <string name="commands_carbs_label">Węglowodany (g)</string>
+    <string name="commands_carbs_quick">%1$d g</string>
+    <string name="commands_carbs_next">Dalej</string>
+    <string name="commands_carbs_error_empty">Podaj ilość węglowodanów (%1$d–%2$d g).</string>
+    <string name="commands_carbs_error_invalid_characters">Podaj liczbę całkowitą – tylko cyfry.</string>
+    <string name="commands_carbs_error_below_min">Najmniejsza ilość to %1$d g.</string>
+    <string name="commands_carbs_error_above_max">Największa ilość to %1$d g.</string>
+    <string name="commands_large_title">Na pewno %1$d g?</string>
+    <string name="commands_large_text">To więcej niż %1$d g. Sprawdź ilość, zanim wpiszesz PIN.</string>
+    <string name="commands_large_confirm">Tak, %1$d g</string>
+    <string name="commands_large_dismiss">Nie</string>
+    <string name="commands_summary_title">Wysłać CARBS %1$d g do AAPS?</string>
+    <string name="commands_summary_text">Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g.</string>
+    <string name="commands_pin_label">PIN AAPS</string>
+    <string name="commands_send">Wyślij</string>
+    <string name="commands_open_settings">Przejdź do Ustawień</string>
+    <string name="commands_banner_number_loading">Wczytywanie ustawień…</string>
+    <string name="commands_banner_number_not_configured">Nie ustawiono numeru AAPS. Bez niego aplikacja nie wyśle poleceń.</string>
+    <string name="commands_banner_number_load_failed">Nie udało się wczytać numeru AAPS. Ustaw go ponownie w Ustawieniach.</string>
+    <string name="commands_banner_secret_absent">CARBS wymaga sekretu TOTP. Zeskanuj kod QR z AAPS w Ustawieniach.</string>
+    <string name="commands_banner_secret_invalidated">Sekret TOTP przestał działać (np. po zmianie blokady ekranu). Zeskanuj ponownie kod QR z AAPS w Ustawieniach.</string>
+    <string name="commands_msg_number_loading">Trwa wczytywanie ustawień. Spróbuj za chwilę.</string>
+    <string name="commands_msg_number_missing">Ustaw numer telefonu AAPS w Ustawieniach.</string>
+    <string name="commands_msg_secret_absent">Brak sekretu TOTP. Zeskanuj kod QR z AAPS w Ustawieniach.</string>
+    <string name="commands_msg_secret_invalidated">Sekret TOTP przestał działać. Zeskanuj ponownie kod QR z AAPS w Ustawieniach.</string>
+    <string name="commands_msg_secret_unavailable">Nie udało się odczytać sekretu TOTP. Spróbuj ponownie.</string>
+    <string name="commands_msg_start_failed">Nie udało się uruchomić polecenia. Spróbuj ponownie.</string>
+    <string name="commands_msg_action_settings">Ustawienia</string>
+
     <!-- 009: przebieg -->
     <string name="run_title_bg">Polecenie BG</string>
     <string name="run_title_pump">Polecenie PUMP</string>

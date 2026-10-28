@@ -37,3 +37,6 @@ Thumbs.db
 
 # Worktree agentów Claude Code
 .claude/worktrees/
+
+# Graphify (graf kodu, generowany lokalnie)
+graphify-out/

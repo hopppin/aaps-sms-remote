@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import pl.twojanazwa.aapsremote.otp.OtpauthError
+import pl.twojanazwa.aapsremote.otp.OtpauthParser
+import pl.twojanazwa.aapsremote.otp.OtpauthResult
 import pl.twojanazwa.aapsremote.otp.TotpGenerator
 import pl.twojanazwa.aapsremote.security.SaveFailure
 import pl.twojanazwa.aapsremote.security.SaveResult
@@ -15,11 +17,11 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class TotpSecretViewModelSaveTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
+    companion object {
         private const val RFC = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
         private const val BASE = "otpauth://totp/AAPS?"
     }
@@ -68,6 +70,7 @@ class TotpSecretViewModelSaveTest {
         expected: SecretMessage,
     ) = runTest(main.dispatcher) {
         val f = fixture()
+        assertEquals(OtpauthResult.Failure(error), OtpauthParser.parse(input))
         assertEquals(expected, submit(f, input))
         assertEquals(0, f.store.saveCount)
     }

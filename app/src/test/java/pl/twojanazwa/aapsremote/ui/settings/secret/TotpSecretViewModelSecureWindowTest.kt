@@ -8,11 +8,9 @@ import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
 
 class TotpSecretViewModelSecureWindowTest {
-    companion object {
-        @JvmField
-        @RegisterExtension
-        val main = MainDispatcherExtension()
-    }
+    @JvmField
+    @RegisterExtension
+    val main = MainDispatcherExtension()
 
     @Test
     fun `UI-23 secureWindow dla skanera i okna wklejania`() = runTest(main.dispatcher) {

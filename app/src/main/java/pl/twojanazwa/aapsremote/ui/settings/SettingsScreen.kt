@@ -1,5 +1,6 @@
 package pl.twojanazwa.aapsremote.ui.settings
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -23,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,6 +35,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.CameraPermission
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
@@ -93,27 +96,34 @@ fun SettingsScreen(
     BackHandler(enabled = secretState.mode == SecretInputMode.SCANNER) { secretViewModel.onScannerClosed() }
 
     val openAppSettings = {
-        context.startActivity(
-            Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", context.packageName, null),
-            ),
-        )
+        try {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.fromParts("package", context.packageName, null),
+                ),
+            )
+        } catch (e: ActivityNotFoundException) {
+            // Okrojony system bez ekranu informacji o aplikacji: bez awarii i bez logowania.
+        }
     }
 
-    val numberMessage =numberState.message?.let { stringResource(it.textRes()) }
+    // Komunikat jest kasowany przed pokazaniem, a pasek pokazuje osobna korutyna: powtórzony identyczny
+    // komunikat pokaże się ponownie, a po zmianie zakładki stary komunikat nie wraca.
+    val snackbarScope = rememberCoroutineScope()
+    val numberMessage = numberState.message?.let { stringResource(it.textRes()) }
     LaunchedEffect(numberMessage) {
         if (numberMessage != null) {
-            snackbarHostState.showSnackbar(numberMessage)
             numberViewModel.onMessageShown()
+            snackbarScope.launch { snackbarHostState.showSnackbar(numberMessage) }
         }
     }
 
     val secretMessage = secretState.message?.let { stringResource(it.textRes()) }
     LaunchedEffect(secretMessage) {
         if (secretMessage != null) {
-            snackbarHostState.showSnackbar(secretMessage)
             secretViewModel.onMessageShown()
+            snackbarScope.launch { snackbarHostState.showSnackbar(secretMessage) }
         }
     }
 
@@ -167,7 +177,12 @@ fun SettingsScreen(
                 state = smsState,
                 onRequest = {
                     val toRequest = smsViewModel.permissionsToRequest()
-                    if (toRequest.isNotEmpty()) smsLauncher.launch(toRequest.toTypedArray())
+                    if (toRequest.isNotEmpty()) {
+                        smsLauncher.launch(toRequest.toTypedArray())
+                    } else {
+                        // Uprawnienia nadano z zewnątrz, a ON_RESUME jeszcze nie przyszło: odśwież stan.
+                        smsViewModel.onResume()
+                    }
                 },
                 onOpenAppSettings = openAppSettings,
             )
