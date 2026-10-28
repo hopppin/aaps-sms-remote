@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-10-21_
+_Ostatnia aktualizacja: 2026-10-28_
 
 ## Zrobione
 
@@ -28,7 +28,7 @@ _Ostatnia aktualizacja: 2026-10-21_
 
 ## W toku
 
-Brak otwartych issues i PR-ów.
+Issue #146: implementacja logiki pola CARBS, szybkich wartości i potwierdzenia ilości > 40 g (CMDUI-07–CMDUI-09); testy i lint przechodzą. PR do utworzenia.
 
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
