@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import pl.twojanazwa.aapsremote.commands.CommandId
 
 class RunTextsTest {
     private val strings: Map<String, String> by lazy {
@@ -113,5 +114,10 @@ class RunTextsTest {
             "Przestano czekać po przekazaniu kodu do wysłania.",
             strings["result_unknown_cancelled_after_code"],
         )
+    }
+
+    @Test
+    fun `CMDUI-16 kazdy CommandId ma niezerowy i rozny naglowek przebiegu i wyniku`() {
+        assertDistinctNonZero(CommandId.entries.map { it.titleRes() })
     }
 }

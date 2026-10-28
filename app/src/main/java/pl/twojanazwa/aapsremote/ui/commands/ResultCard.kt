@@ -27,12 +27,18 @@ fun ResultCard(result: ResultView, onResultDismissed: () -> Unit, modifier: Modi
         ResultKind.CANCELLED -> MaterialTheme.colorScheme.surfaceVariant
     }
     Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (result.commandGrams == null) {
+            Text(stringResource(result.commandId.titleRes()), style = MaterialTheme.typography.headlineSmall)
+        } else {
+            Text(stringResource(result.commandId.titleRes(), result.commandGrams), style = MaterialTheme.typography.headlineSmall)
+        }
         Card(colors = CardDefaults.cardColors(containerColor = container)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(result.kind.titleRes()), style = MaterialTheme.typography.titleLarge)
                 Text(if (result.messageArg == null) stringResource(result.message.textRes()) else stringResource(result.message.textRes(), result.messageArg))
                 if (result.codeNotSent) Text(stringResource(R.string.result_code_not_sent))
                 if (result.unknownWarning) Text(stringResource(R.string.result_unknown_warning))
+                if (result.unexpectedCount > 0) Text(stringResource(R.string.run_unexpected, result.unexpectedCount))
                 if (result.replyText != null) {
                     Text(stringResource(R.string.result_reply_label), style = MaterialTheme.typography.titleSmall)
                     Text(

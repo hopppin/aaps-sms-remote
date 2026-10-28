@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,26 +25,20 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
-import pl.twojanazwa.aapsremote.commands.CommandId
 
 @Composable
 fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val titleRes = when (run.commandId) {
-            CommandId.BG -> R.string.run_title_bg
-            CommandId.PUMP -> R.string.run_title_pump
-            CommandId.CARBS -> R.string.run_title_carbs
-        }
         if (run.commandGrams == null) {
-            Text(stringResource(titleRes), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(run.commandId.titleRes()), style = MaterialTheme.typography.headlineSmall)
         } else {
-            Text(stringResource(titleRes, run.commandGrams), style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(run.commandId.titleRes(), run.commandGrams), style = MaterialTheme.typography.headlineSmall)
         }
-        LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            items(run.steps) { step ->
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            run.steps.forEach { step ->
                 ListItem(
                     headlineContent = {
                         val arg = ProgressSteps.minutesArg(step.id)
