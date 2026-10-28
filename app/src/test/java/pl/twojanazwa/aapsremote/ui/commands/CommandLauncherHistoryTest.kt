@@ -16,6 +16,7 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.data.AapsNumberState
 import pl.twojanazwa.aapsremote.data.SessionHistoryRecorder
 import pl.twojanazwa.aapsremote.parser.AapsSamples
+import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.LoadResult
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
 import pl.twojanazwa.aapsremote.session.SessionOutcome
@@ -47,26 +48,42 @@ class CommandLauncherHistoryTest {
         val recorder = mockk<SessionHistoryRecorder>(relaxed = true)
         val launcher = env.launcher(recorder = recorder)
 
-        // START_FAILED
-        launcher.launch(Command.Bg, CommandTestFixtures.pin())
-        // NUMBER_*
+        val rejections = mutableListOf<LaunchRejection>()
+        suspend fun launchRejected(command: Command, pin: AapsPin?) {
+            val result = launcher.launch(command, pin)
+            rejections += (result as LaunchResult.Rejected).reason
+        }
+
+        launchRejected(Command.Bg, CommandTestFixtures.pin())
         env.setNumber(AapsNumberState.Loading)
-        launcher.launch(Command.Bg, null)
+        launchRejected(Command.Bg, null)
         env.setNumber(AapsNumberState.NotConfigured)
-        launcher.launch(Command.Bg, null)
+        launchRejected(Command.Bg, null)
         env.setNumber(AapsNumberState.LoadFailed)
-        launcher.launch(Command.Bg, null)
-        env.setNumber(AapsNumberState.Loading)
+        launchRejected(Command.Bg, null)
         env.numbers.setConfigured("+447700900123")
-        // SMS_PERMISSIONS_MISSING
         env.permissions.receive = false
-        launcher.launch(Command.Bg, null)
+        launchRejected(Command.Bg, null)
         env.permissions.receive = true
-        // SECRET_*
         env.secrets.loadResults.addAll(
             listOf(LoadResult.Absent, LoadResult.Invalidated, LoadResult.Locked, LoadResult.Unavailable),
         )
-        repeat(4) { launcher.launch(CommandTestFixtures.carbs(20), CommandTestFixtures.pin()) }
+        repeat(4) { launchRejected(CommandTestFixtures.carbs(20), CommandTestFixtures.pin()) }
+
+        assertEquals(
+            listOf(
+                LaunchRejection.START_FAILED,
+                LaunchRejection.NUMBER_LOADING,
+                LaunchRejection.NUMBER_MISSING,
+                LaunchRejection.NUMBER_MISSING,
+                LaunchRejection.SMS_PERMISSIONS_MISSING,
+                LaunchRejection.SECRET_ABSENT,
+                LaunchRejection.SECRET_INVALIDATED,
+                LaunchRejection.SECRET_LOCKED,
+                LaunchRejection.SECRET_UNAVAILABLE,
+            ),
+            rejections,
+        )
 
         verify(exactly = 0) { recorder.track(any()) }
     }

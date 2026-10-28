@@ -2,8 +2,8 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
@@ -53,8 +53,10 @@ class CommandTestEnv(testScope: TestScope) {
     val history = FakeCommandHistory()
     val currentRun = CurrentRun()
 
-    /** Zakres sesji i zapisu historii; czas wirtualny testu. */
-    val appScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScope.testScheduler))
+    /** Zakres sesji i zapisu historii; czas wirtualny testu, dziecko `backgroundScope` (anulowane po teście). */
+    val appScope = CoroutineScope(
+        testScope.backgroundScope.coroutineContext + SupervisorJob(testScope.backgroundScope.coroutineContext[Job]),
+    )
     val recorder = SessionHistoryRecorder(history, appScope)
 
     fun launcher(

@@ -89,12 +89,16 @@ class CommandsViewModelReadinessTest {
     @Test
     fun `CMDUI-03 brak uprawnienia odbioru blokuje przyciski a po zmianie i odswiezeniu BG jest dostepne`() =
         runTest(main.dispatcher) {
-            permissions.send = true
+            permissions.send = false
             permissions.receive = false
             val vm = viewModel()
             settle()
             assertFalse(vm.uiState.value.smsGranted)
             assertFalse(vm.uiState.value.canSendNoCode)
+            permissions.send = true
+            vm.refreshPermissions()
+            settle()
+            assertFalse(vm.uiState.value.smsGranted)
             permissions.receive = true
             vm.refreshPermissions()
             settle()
@@ -103,7 +107,7 @@ class CommandsViewModelReadinessTest {
         }
 
     @Test
-    fun `CMDUI-03 odczyt uprawnien po utworzeniu i dwoch odswiezeniach daje po trzy wywolania`() =
+    fun `CMDUI-03 odczyt uprawnien po utworzeniu i dwoch odswiezeniach daje po trzy wywolania takze gdy pierwszy odczyt jest false`() =
         runTest(main.dispatcher) {
             val counting = CountingPermissions()
             val vm = CommandsViewModel(mockk(relaxed = true), session.coordinator, CurrentRun(), numbers, secrets, counting)
@@ -186,7 +190,7 @@ class CommandsViewModelReadinessTest {
 
         override fun canSend(): Boolean {
             sendCalls++
-            return true
+            return false
         }
 
         override fun canReceive(): Boolean {

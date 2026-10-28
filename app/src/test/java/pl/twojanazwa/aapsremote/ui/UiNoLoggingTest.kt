@@ -45,7 +45,7 @@ class UiNoLoggingTest {
     }
 
     @Test
-    fun `UI-21zrodla ui i session-platform nie wywoluja API logowania`() {
+    fun `UI-21 zrodla ui i session-platform nie wywoluja API logowania`() {
         val base = "src/main/java/pl/twojanazwa/aapsremote"
         val roots = listOf(File("$base/ui"), File("$base/session/platform"))
         roots.forEach { assertTrue(it.isDirectory, "Brak katalogu: ${it.path}") }

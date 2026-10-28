@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.settings.secret
 
 import android.view.ViewGroup
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.view.CameraController
@@ -24,11 +25,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.Observer
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
@@ -61,6 +64,8 @@ fun QrScanner(
         // Jedna dostawa wartości: kolejne rozpoznania (ta sama klatka, następne klatki) są pomijane.
         val delivered = AtomicBoolean(false)
         var released = false
+        var cameraStateData: LiveData<CameraState>? = null
+        var cameraObserver: Observer<CameraState>? = null
 
         fun fail() {
             if (!released && delivered.compareAndSet(false, true)) currentOnCameraError.value()
@@ -103,7 +108,20 @@ fun QrScanner(
                         } catch (e: Exception) {
                             false
                         }
-                        if (!ready) fail()
+                        if (!ready) {
+                            fail()
+                        } else {
+                            // Aparat zajęty / wyłączony (UI-09, W4): błąd stanu kamery = onCameraError, nie czarny podgląd.
+                            val data = controller.cameraInfo?.cameraState
+                            if (data == null) {
+                                fail()
+                            } else {
+                                val observer = Observer<CameraState> { state -> if (state.error != null) fail() }
+                                cameraStateData = data
+                                cameraObserver = observer
+                                data.observe(lifecycleOwner, observer)
+                            }
+                        }
                     }
                 },
                 executor,
@@ -117,6 +135,7 @@ fun QrScanner(
 
         onDispose {
             released = true
+            cameraObserver?.let { cameraStateData?.removeObserver(it) }
             controller.clearImageAnalysisAnalyzer()
             controller.unbind()
             scanner.close()
