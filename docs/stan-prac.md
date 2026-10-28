@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-10-28_
+_Ostatnia aktualizacja: 2026-10-28 (po #215)_
 
 ## Zrobione
 
@@ -29,6 +29,8 @@ _Ostatnia aktualizacja: 2026-10-28_
 | Spec 009 UI polecenia | zatwierdzona, w całości zaimplementowana: `CommandLauncher`, `CurrentRun`, `CommandsViewModel` (BG, PUMP, CARBS, podsumowanie z PIN-em), `CommandRunViewModel` (przebieg, anulowanie, Wstecz), `ResultMapper`, ekrany panelu, przebiegu i wyniku, licznik `FLAG_SECURE`, ekran włączony | PR #158–#161, #163, #176, #177, #182, #185, #186, #188, #193, #195–#201, #204 |
 | Spec 010 UI historia | zatwierdzona, w całości zaimplementowana: `HistoryViewModel`, lista, szczegóły wpisu, czyszczenie z potwierdzeniem, strefa czasowa, `FLAG_SECURE` | PR #157, #168–#170 (kod: #178, #180, #183, #184, #189, #194, #203), poprawki jakości #179, #202 |
 | Proces | tańsze modele, agenci ogólni, Hermes z Codexem (`codex-latwe.sh`) dla łatwych issues bez `bezpieczenstwo` | PR #190, #192 |
+| Poprawki UI 009/010 | spec: czytnik ekranu (`stateDescription` kroków, CMDUI-17), `FLAG_SECURE` od startu polecenia do zamknięcia wyniku na każdej zakładce i w oknie „Na pewno” (CMDUI-09, CMDUI-23), przypadek brzegowy czyszczenia historii zapisany jako przyjęty (HISTUI-10); kod i testy | PR #207 (spec), #214, #215, #212 (issues #209–#211) |
+| Ikona aplikacji | adaptacyjna ikona wektorowa (dymek SMS z kroplą, warstwa monochrome), bez osobnej spec (same zasoby) | PR #213 (issue #208) |
 | Test na telefonie | pierwsza instalacja APK (debug) na telefonie z AAPS: Historia, `BG`, `CARBS 1` z kodem działają; `PUMP` bez pompy przy telefonie nie dostaje stanu pompy (AAPS odpowiada spóźnionym „Odczyt statusu nie powiodl sie”, aplikacja traktuje to jako wiadomość nieoczekiwaną) | zamknięte issue #205 |
 
 ## W toku
@@ -39,8 +41,8 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
-1. Dokończyć ręczną weryfikację na telefonie: W4–W12 ze [spec 009](specs/009-ui-polecenia/spec.md) (m.in. zrzut ekranu zablokowany na podsumowaniu, przebiegu i wyniku, Wstecz i „Wyjdź”, tryb samolotowy, AAPS wyłączony), W1–W8 ze [spec 010](specs/010-ui-historia/spec.md) (szczegóły, czyszczenie, `FLAG_SECURE` na Historii, kopia zapasowa, zmiana strefy czasowej), W7 ze spec 008 (aparat zajęty przez inną aplikację), punkty ze spec 005, 006 i 007. Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo.
-2. Decyzje do podjęcia (zmiana spec, potem kod): czytnik ekranu nie odróżnia statusu kroków przebiegu (`stateDescription`, CMDUI-17, spec 009); nowy wpis, który nadejdzie przy otwartym oknie czyszczenia historii, też zostanie usunięty, a okno pokaże starą liczbę (HISTUI-10, spec 010); `FLAG_SECURE` spada po zmianie zakładki w trakcie polecenia (CMDUI-23: chroniona tylko zakładka Polecenia); okno „Na pewno X g” (powyżej 40 g) nie ma `FLAG_SECURE`.
+1. Dokończyć ręczną weryfikację na telefonie (nowy APK): ikona aplikacji (#213), W13 i W10 ze spec 009 (TalkBack na krokach; `FLAG_SECURE` także po zmianie zakładki w trakcie polecenia i w oknie „Na pewno”), W6 ze spec 010, W4–W12 ze [spec 009](specs/009-ui-polecenia/spec.md) (m.in. zrzut ekranu zablokowany na podsumowaniu, przebiegu i wyniku, Wstecz i „Wyjdź”, tryb samolotowy, AAPS wyłączony), W1–W8 ze [spec 010](specs/010-ui-historia/spec.md) (szczegóły, czyszczenie, `FLAG_SECURE` na Historii, kopia zapasowa, zmiana strefy czasowej), W7 ze spec 008 (aparat zajęty przez inną aplikację), punkty ze spec 005, 006 i 007. Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo.
+2. Decyzja do podjęcia (zmiana spec, potem kod): CMDUI-11 zakłada, że zmiana zakładki czyści PIN i zamyka podsumowanie przez `ON_STOP`, a przy zmianie zakładki to zdarzenie może nie nadejść; spec 008 rozwiązuje to przez `DisposableEffect(onDispose { onStop() })`.
 3. Ewentualnie później: przyczyna w `SendResult.Failed` (zmiana spec 004), usługa pierwszoplanowa na czas polecenia (osobna spec), `TotpSecret.clear()` po zakończeniu polecenia (zmiana spec 001 i 004, „Przyszłe zmiany” w spec 006), doprecyzowanie w design 006: `encrypt` przy pustym tekście jawnym → `UNAVAILABLE`, `CancellationException` w szkicach `KeyGenerationPolicy`/klasyfikatora; numer AAPS ustalany raz na polecenie (zmiana spec 004/005, „Przyszłe zmiany” w spec 007); jawne rozpoznanie „Odczyt statusu nie powiodl sie” jako niepowodzenia `PUMP` (odrzucone na razie – limit 3 min zostaje).
 
 ## Ustalenia z użytkownikiem (decyzje)
@@ -61,4 +63,5 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 ## Otwarte (do ustalenia)
 
 - Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo – częściowo (kod w `CARBS 1` przyjęty przez AAPS), pełne porównanie jeszcze niezrobione.
-- Decyzje z „Następne kroki”, punkt 2 (dostępność kroków przebiegu, okno czyszczenia historii, `FLAG_SECURE` na innych zakładkach).
+- CMDUI-11: czyszczenie PIN-u przy zmianie zakładki (Następne kroki, punkt 2).
+- Rozstrzygnięte 2026-10-28: kroki przebiegu mają trzy statusy dla czytnika ekranu (wykonany, w toku, oczekuje); HISTUI-10 bez zmiany zachowania (okno pokazuje liczbę z chwili otwarcia); `FLAG_SECURE` trwa do końca polecenia na każdej zakładce (skutek: w trakcie polecenia zrzuty blokuje także zakładka Ustawienia); okno „Na pewno” chronione.
