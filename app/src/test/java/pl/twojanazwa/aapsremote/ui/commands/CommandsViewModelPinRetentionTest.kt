@@ -1,8 +1,11 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
+import androidx.lifecycle.viewModelScope
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -75,6 +78,29 @@ class CommandsViewModelPinRetentionTest {
         env.secrets.loadGate!!.complete(Unit)
         settle()
         assertEquals("", vm.state().pinText)
+    }
+
+    @Test
+    fun `CMDUI-11 anulowanie viewModelScope po Wyslij czysci PIN i nie startuje sesji`() = runTest(main.dispatcher) {
+        val env = env()
+        env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+        val real = env.launcher()
+        val pins = mutableListOf<AapsPin?>()
+        val launcher = mockk<CommandLauncher>()
+        coEvery { launcher.launch(any(), any()) } coAnswers {
+            pins.add(secondArg())
+            real.launch(firstArg(), secondArg())
+        }
+        val vm = env.viewModel(launcher)
+        vm.openSummary()
+        vm.onPinChanged("4321")
+        vm.onSendClicked()
+        vm.viewModelScope.cancel() // jak ViewModelStore.clear(), zanim ruszy dyspozytor
+        settle()
+        assertEquals(1, pins.size)
+        assertTrue(pins.single()!!.isCleared)
+        assertEquals("", vm.state().pinText)
+        assertNull(env.coordinator.activeSession.value)
     }
 
     @Test
