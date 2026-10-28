@@ -26,7 +26,10 @@ fun ResultCard(result: ResultView, onResultDismissed: () -> Unit, modifier: Modi
         ResultKind.NO_RESPONSE, ResultKind.UNKNOWN -> MaterialTheme.colorScheme.tertiaryContainer
         ResultKind.CANCELLED -> MaterialTheme.colorScheme.surfaceVariant
     }
-    Column(modifier = modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         if (result.commandGrams == null) {
             Text(stringResource(result.commandId.titleRes()), style = MaterialTheme.typography.headlineSmall)
         } else {
