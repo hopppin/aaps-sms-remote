@@ -28,7 +28,7 @@ class CommandsViewModelReadinessTest {
     private val session = SessionDoubles()
 
     private fun viewModel() =
-        CommandsViewModel(mockk(relaxed = true), session.coordinator, numbers, secrets, permissions)
+        CommandsViewModel(mockk(relaxed = true), session.coordinator, CurrentRun(), numbers, secrets, permissions)
 
     private fun settle() = main.dispatcher.scheduler.advanceUntilIdle()
 
@@ -106,7 +106,7 @@ class CommandsViewModelReadinessTest {
     fun `CMDUI-03 odczyt uprawnien po utworzeniu i dwoch odswiezeniach daje po trzy wywolania`() =
         runTest(main.dispatcher) {
             val counting = CountingPermissions()
-            val vm = CommandsViewModel(mockk(relaxed = true), session.coordinator, numbers, secrets, counting)
+            val vm = CommandsViewModel(mockk(relaxed = true), session.coordinator, CurrentRun(), numbers, secrets, counting)
             vm.refreshPermissions()
             vm.refreshPermissions()
             settle()

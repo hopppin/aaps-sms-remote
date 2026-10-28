@@ -25,7 +25,7 @@ class CommandsViewModelLargeAmountTest {
     private val launcher = mockk<CommandLauncher>(relaxed = true)
 
     private fun viewModel() = CommandsViewModel(
-        launcher, session.coordinator, numbers, secrets, FakeSmsPermissions(),
+        launcher, session.coordinator, CurrentRun(), numbers, secrets, FakeSmsPermissions(),
     )
 
     private fun settle() = main.dispatcher.scheduler.advanceUntilIdle()
