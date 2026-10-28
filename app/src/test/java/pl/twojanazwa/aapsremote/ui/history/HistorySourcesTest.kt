@@ -22,8 +22,17 @@ class HistorySourcesTest {
     }
 
     @Test
+    fun `HISTUI-06 zrodla ui history nie zawieraja HTML ani linkow`() {
+        val forbidden = listOf("AnnotatedString.fromHtml", "Html.fromHtml", "LinkAnnotation", "Linkify", "autoLink")
+        File("$ui/history").listFiles().orEmpty().filter { it.extension == "kt" }.forEach { file ->
+            val src = file.readText()
+            forbidden.forEach { word -> assertFalse(src.contains(word), "${file.name}: $word") }
+        }
+    }
+
+    @Test
     fun `HISTUI-14 Compose w ui history bez literalow tekstowych widocznych dla uzytkownika`() {
-        listOf("HistoryScreen.kt", "HistoryList.kt").forEach { name ->
+        listOf("HistoryScreen.kt", "HistoryList.kt", "HistoryDetailsView.kt", "HistoryClearDialog.kt").forEach { name ->
             val src = File("$ui/history/$name").readText()
             assertFalse(Regex("""Text\(\s*"""").containsMatchIn(src), name)
             assertFalse(Regex("""\btext\s*=\s*"""").containsMatchIn(src), name)
