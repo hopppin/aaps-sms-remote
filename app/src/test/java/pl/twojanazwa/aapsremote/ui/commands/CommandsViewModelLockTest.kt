@@ -1,10 +1,13 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.data.AapsNumberState
@@ -61,4 +64,24 @@ class CommandsViewModelLockTest {
         main.dispatcher.scheduler.advanceUntilIdle()
         coVerify(exactly = 1) { launcher.launch(any(), any()) }
     }
+
+    @Test
+    fun `CMDUI-10 CMDUI-11 Anuluj i Wstecz w trakcie uruchamiania nie ukrywaja podsumowania`() =
+        runTest(main.dispatcher) {
+            val gate = CompletableDeferred<LaunchResult>()
+            coEvery { launcher.launch(any(), any()) } coAnswers { gate.await() }
+            val vm = viewModel()
+            main.dispatcher.scheduler.advanceUntilIdle()
+            vm.onQuickValueClicked(20)
+            vm.onPinChanged("1234")
+            vm.onSendClicked()
+            main.dispatcher.scheduler.advanceUntilIdle()
+            assertTrue(vm.uiState.value.launching)
+            vm.onSummaryDismissed()
+            vm.onBack()
+            assertEquals(20, vm.uiState.value.summaryGrams)
+            gate.complete(LaunchResult.Started)
+            main.dispatcher.scheduler.advanceUntilIdle()
+            assertNull(vm.uiState.value.summaryGrams)
+        }
 }

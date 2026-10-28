@@ -27,10 +27,13 @@ class CommandsSourcesTest {
 
     @Test
     fun `CMDUI-10 CMDUI-23 podsumowanie maskuje PIN, a ekran chroni okno znacznikiem secureWindow`() {
-        val summary = File(commandsDirectory, "CarbsSummary.kt").readText()
+        val summary = withoutComments(File(commandsDirectory, "CarbsSummary.kt").readText())
         assertTrue("PasswordVisualTransformation()" in summary)
         assertTrue("KeyboardType.NumberPassword" in summary)
         assertTrue("autoCorrectEnabled = false" in summary)
-        assertTrue("SecureWindowEffect(commands.secureWindow)" in File(commandsDirectory, "CommandsScreen.kt").readText())
+        assertTrue("SecureWindowEffect(commands.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
     }
+
+    private fun withoutComments(source: String) =
+        source.replace(Regex("""/\*[\s\S]*?\*/"""), "").replace(Regex("//.*"), "")
 }
