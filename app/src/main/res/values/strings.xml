@@ -110,6 +110,9 @@
     <string name="run_step_prepare_code">Przygotowanie kodu</string>
     <string name="run_step_send_code">Wysyłanie kodu</string>
     <string name="run_step_await_confirmation">Czekanie na potwierdzenie AAPS (do %1$d min)</string>
+    <string name="run_step_status_done">wykonany</string>
+    <string name="run_step_status_current">w toku</string>
+    <string name="run_step_status_pending">oczekuje</string>
     <string name="run_foreground_hint">Nie wychodź z aplikacji i nie blokuj telefonu do końca polecenia. Ekran pozostanie włączony.</string>
     <string name="run_unexpected">Wiadomości od AAPS niezwiązane z tym poleceniem: %1$d (np. potwierdzenie polecenia wysłanego z innego telefonu).</string>
     <string name="run_cancel">Anuluj polecenie</string>

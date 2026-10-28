@@ -34,6 +34,13 @@ class CommandsSourcesTest {
         assertTrue("SecureWindowEffect(commands.secureWindow || run.secureWindow)" in withoutComments(File(commandsDirectory, "CommandsScreen.kt").readText()))
     }
 
+    @Test
+    fun `CMDUI-17 RunScreen ustawia stateDescription z odwzorowania statusu kroku`() {
+        val run = withoutComments(File(commandsDirectory, "RunScreen.kt").readText())
+        assertTrue("stateDescription = statusDescription" in run)
+        assertTrue("stringResource(step.status.descriptionRes())" in run)
+    }
+
     private fun withoutComments(source: String) =
         source.replace(Regex("""/\*[\s\S]*?\*/"""), "").replace(Regex("//.*"), "")
 }

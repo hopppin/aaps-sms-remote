@@ -23,6 +23,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
 
@@ -39,7 +42,9 @@ fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Mo
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             run.steps.forEach { step ->
+                val statusDescription = stringResource(step.status.descriptionRes())
                 ListItem(
+                    modifier = Modifier.semantics(mergeDescendants = true) { stateDescription = statusDescription },
                     headlineContent = {
                         val arg = ProgressSteps.minutesArg(step.id)
                         Text(if (arg == null) stringResource(step.id.textRes()) else stringResource(step.id.textRes(), arg))
@@ -47,7 +52,10 @@ fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Mo
                     leadingContent = {
                         when (step.status) {
                             StepStatus.DONE -> StepCheckmark()
-                            StepStatus.CURRENT -> CircularProgressIndicator(modifier = Modifier.padding(4.dp), strokeWidth = 2.dp)
+                            StepStatus.CURRENT -> CircularProgressIndicator(
+                                modifier = Modifier.padding(4.dp).clearAndSetSemantics {},
+                                strokeWidth = 2.dp,
+                            )
                             StepStatus.PENDING -> StepCircle()
                         }
                     },

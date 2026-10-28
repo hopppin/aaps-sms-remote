@@ -41,6 +41,7 @@ class RunTextsTest {
             "run_title_bg", "run_title_pump", "run_title_carbs",
             "run_step_send_command", "run_step_await_reply", "run_step_await_code_request",
             "run_step_prepare_code", "run_step_send_code", "run_step_await_confirmation",
+            "run_step_status_done", "run_step_status_current", "run_step_status_pending",
             "run_foreground_hint", "run_unexpected", "run_cancel", "run_stop_waiting",
             "run_stop_title", "run_stop_text", "run_stop_dismiss",
             "run_exit_title", "run_exit_text", "run_exit_stay", "run_exit_leave",
@@ -114,6 +115,18 @@ class RunTextsTest {
             "Przestano czekać po przekazaniu kodu do wysłania.",
             strings["result_unknown_cancelled_after_code"],
         )
+    }
+
+    @Test
+    fun `CMDUI-17 kazdy StepStatus ma niezerowy i rozny opis stanu`() {
+        assertDistinctNonZero(StepStatus.entries.map { it.descriptionRes() })
+    }
+
+    @Test
+    fun `CMDUI-17 opisy stanu krokow to wykonany, w toku, oczekuje`() {
+        assertEquals("wykonany", strings["run_step_status_done"])
+        assertEquals("w toku", strings["run_step_status_current"])
+        assertEquals("oczekuje", strings["run_step_status_pending"])
     }
 
     @Test
