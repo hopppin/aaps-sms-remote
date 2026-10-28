@@ -24,7 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
-import pl.twojanazwa.aapsremote.commands.CarbsLimits
 
 /** Zawartość zakładki w trybie panelu, bez stanu lokalnego zapisywanego przez Compose. */
 @Composable
@@ -88,7 +87,7 @@ fun CommandsPanel(
                     label = { Text(stringResource(R.string.commands_carbs_label)) },
                     isError = state.carbsError != null,
                     supportingText = state.carbsError?.let { error ->
-                        { Text(stringResource(error.textRes(), CarbsLimits.MIN_GRAMS, CarbsLimits.MAX_GRAMS)) }
+                        { Text(stringResource(error.textRes(), *error.textArgs().toTypedArray())) }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,

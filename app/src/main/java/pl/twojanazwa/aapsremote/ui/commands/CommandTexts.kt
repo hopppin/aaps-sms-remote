@@ -3,6 +3,7 @@ package pl.twojanazwa.aapsremote.ui.commands
 import androidx.annotation.StringRes
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
+import pl.twojanazwa.aapsremote.commands.CarbsLimits
 
 /** CMDUI-25: jedna funkcja wartość → zasób na typ; teksty wspólne ze Spec 008 są używane ponownie. */
 @StringRes
@@ -24,6 +25,12 @@ fun CarbsAmountError.textRes(): Int = when (this) {
     CarbsAmountError.INVALID_CHARACTERS -> R.string.commands_carbs_error_invalid_characters
     CarbsAmountError.BELOW_MIN -> R.string.commands_carbs_error_below_min
     CarbsAmountError.ABOVE_MAX -> R.string.commands_carbs_error_above_max
+}
+
+/** CMDUI-25: ABOVE_MAX podaje największą dozwoloną ilość; pozostałe błędy – najmniejszą i największą. */
+fun CarbsAmountError.textArgs(): List<Int> = when (this) {
+    CarbsAmountError.ABOVE_MAX -> listOf(CarbsLimits.MAX_GRAMS)
+    else -> listOf(CarbsLimits.MIN_GRAMS, CarbsLimits.MAX_GRAMS)
 }
 
 /** Gotowy numer nie ma banera (null). */
