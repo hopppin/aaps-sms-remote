@@ -143,7 +143,7 @@ fun CommandsPanel(
                     onClick = onBolusNextClicked,
                     enabled = state.canStartBolus,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.commands_carbs_next)) }
+                ) { Text(stringResource(R.string.commands_bolus_next)) }
             }
         }
     }

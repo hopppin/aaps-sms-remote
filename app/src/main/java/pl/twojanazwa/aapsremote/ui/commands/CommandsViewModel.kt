@@ -16,6 +16,7 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
+import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.data.CommandLimitsStore
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
@@ -57,6 +58,12 @@ class CommandsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { secrets.refreshState() }
+        // Utrata limitów (nie `Loaded`) zamyka okno „Na pewno”, żeby niewidoczne okno nie trzymało ochrony okna.
+        viewModelScope.launch {
+            limitsStore.state.collect { limits ->
+                if (limits !is CommandLimitsState.Loaded) local.update { it.copy(confirming = null) }
+            }
+        }
         // Kolektor tylko wyłącza przekazanie; drugi warunek chroni przed spóźnioną wartością null (CMDUI-23).
         viewModelScope.launch {
             currentRun.state.collect { run ->
@@ -105,8 +112,10 @@ class CommandsViewModel @Inject constructor(
         val state = compose()
         val limits = state.loadedLimits
         if (!state.canStartCarbs || limits == null) return
-        // Szybka wartość nie omija limitów ani progu „Na pewno” (LIM-09).
+        // Idzie przez Command.Carbs.of, więc ponad limit nie otwiera podsumowania; próg „Na pewno” sprawdza dalej
+        // launcher (LIM-09). Szybkie wartości są <= progu (LIM-08); gdyby jednak przekraczała, nie ma podsumowania.
         val carbs = (Command.Carbs.of(grams, limits) as? CarbsValidation.Valid)?.command ?: return
+        if (carbs.requiresExtraConfirmation(limits)) return
         local.update {
             it.copy(carbsInput = grams.toString(), carbsError = null, confirming = null)
         }

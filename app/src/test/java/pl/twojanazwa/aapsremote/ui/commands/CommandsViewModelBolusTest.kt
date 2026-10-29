@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.commands.BolusAmountError
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
+import pl.twojanazwa.aapsremote.commands.LimitsValidation
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.data.HistoryOutcome
 import pl.twojanazwa.aapsremote.data.HistorySnapshot
@@ -204,11 +206,103 @@ class CommandsViewModelBolusTest {
     }
 
     @Test
-    fun `BOL-15 zrodlo ViewModelu ma jedno miejsce wywolania launch`() {
+    fun `BOL-15 zrodlo ViewModelu ma launch tylko w startCommand, a startCommand wolane tylko ze startNoCode i Wyslij`() {
         val source = java.io.File("src/main/java/pl/twojanazwa/aapsremote/ui/commands/CommandsViewModel.kt").readText()
-        assertEquals(1, Regex("""launcher\.launch\(""").findAll(source).count())
-        // definicja + startNoCode (BG, PUMP) + Wyślij
-        assertEquals(3,Regex("""startCommand\(""").findAll(source).count())
+        val launches = Regex("""launcher\.launch\(""").findAll(source).toList()
+        assertEquals(1, launches.size)
+        assertEquals("startCommand", source.substring(0, launches[0].range.first).substringAfterLast("fun ").substringBefore("("))
+        val callers = Regex("""(?<!fun )startCommand\(""").findAll(source).map { m ->
+            source.substring(0, m.range.first).substringAfterLast("fun ").substringBefore("(")
+        }.toList()
+        assertEquals(setOf("startNoCode", "onSendClicked"), callers.toSet())
+    }
+
+    @Test
+    fun `BOL-14 BOL-15 extraConfirmed false bez okna i true po Tak`() = runTest(main.dispatcher) {
+        val launcher = mockk<CommandLauncher>(relaxed = true)
+        val vm = env().viewModel(launcher)
+        vm.next("0,1")
+        vm.onPinChanged("4321")
+        vm.onSendClicked()
+        settle()
+        coVerify(exactly = 1) { launcher.launch(match { it is Command.Bolus }, any(), false) }
+        coVerify(exactly = 0) { launcher.launch(any(), any(), true) }
+        vm.next("3")
+        vm.onBolusLargeConfirmed()
+        vm.onPinChanged("4321")
+        vm.onSendClicked()
+        settle()
+        coVerify(exactly = 1) { launcher.launch(match { it is Command.Bolus }, any(), true) }
+    }
+
+    @Test
+    fun `BOL-13 LIM-09 limit zmniejszony po otwarciu podsumowania daje AMOUNT_ABOVE_LIMIT bez launch`() =
+        runTest(main.dispatcher) {
+            val launcher = mockk<CommandLauncher>(relaxed = true)
+            val env = env()
+            val vm = env.viewModel(launcher)
+            vm.next("1")
+            vm.onPinChanged("4321")
+            env.limits.setState(CommandLimitsState.Loaded((CommandLimits.of(30, 50, 15) as LimitsValidation.Valid).limits))
+            settle()
+            vm.onSendClicked()
+            val state = vm.state()
+            assertEquals(CommandMessage.AMOUNT_ABOVE_LIMIT, state.message)
+            assertEquals("", state.pinText)
+            assertNull(state.summary)
+            coVerify(exactly = 0) { launcher.launch(any(), any(), any()) }
+        }
+
+    @Test
+    fun `BOL-13 LIM-09 limity LoadFailed po otwarciu podsumowania daja LIMITS_UNAVAILABLE bez launch`() =
+        runTest(main.dispatcher) {
+            val launcher = mockk<CommandLauncher>(relaxed = true)
+            val env = env()
+            val vm = env.viewModel(launcher)
+            vm.next("1")
+            vm.onPinChanged("4321")
+            env.limits.setState(CommandLimitsState.LoadFailed)
+            settle()
+            vm.onSendClicked()
+            val state = vm.state()
+            assertEquals(CommandMessage.LIMITS_UNAVAILABLE, state.message)
+            assertEquals("", state.pinText)
+            assertNull(state.summary)
+            coVerify(exactly = 0) { launcher.launch(any(), any(), any()) }
+        }
+
+    @Test
+    fun `BOL-14 utrata limitow zamyka okno Na pewno razem z ochrona okna i Wstecz`() = runTest(main.dispatcher) {
+        val env = env()
+        val vm = env.viewModel()
+        vm.next("3")
+        assertTrue(vm.state().secureWindow)
+        env.limits.setState(CommandLimitsState.LoadFailed)
+        val state = vm.state()
+        assertNull(state.confirming)
+        assertFalse(state.secureWindow)
+        assertFalse(state.interceptsBack)
+    }
+
+    @Test
+    fun `BOL-14 onBack przy oknie bolusa zamyka okno bez podsumowania`() = runTest(main.dispatcher) {
+        val vm = env().viewModel()
+        vm.next("3")
+        assertTrue(vm.state().interceptsBack)
+        vm.onBack()
+        assertNull(vm.state().confirming)
+        assertNull(vm.state().summary)
+        assertEquals("3", vm.state().bolusInput)
+    }
+
+    @Test
+    fun `BOL-15 podsumowanie bolusa ma secureWindow i przechwytuje Wstecz`() = runTest(main.dispatcher) {
+        val vm = env().viewModel()
+        vm.next("0,1")
+        assertTrue(vm.state().secureWindow)
+        assertTrue(vm.state().interceptsBack)
+        vm.onBack()
+        assertFalse(vm.state().secureWindow)
     }
 
     @Test

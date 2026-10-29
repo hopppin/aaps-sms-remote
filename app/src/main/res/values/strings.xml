@@ -74,6 +74,7 @@
     <string name="commands_carbs_label">Węglowodany (g)</string>
     <string name="commands_carbs_quick">%1$d g</string>
     <string name="commands_carbs_next">Dalej</string>
+    <string name="commands_bolus_next">Dalej</string>
     <string name="commands_carbs_error_empty">Podaj ilość węglowodanów (%1$d–%2$d g).</string>
     <string name="commands_carbs_error_invalid_characters">Podaj liczbę całkowitą – tylko cyfry.</string>
     <string name="commands_carbs_error_below_min">Najmniejsza ilość to %1$d g.</string>
