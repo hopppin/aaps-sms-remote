@@ -24,6 +24,8 @@ object HistoryCodec {
         when (outcome) {
             is SessionOutcome.Completed -> { kind = "COMPLETED"; reason = null; text = outcome.text }
             is SessionOutcome.CarbsConfirmed -> { kind = "CARBS_CONFIRMED"; reason = null; text = outcome.text }
+            // Zapis bez ilości; odczyt (HistoryOutcome.BolusConfirmed) i kolumna w zad. 5 (spec 012).
+            is SessionOutcome.BolusConfirmed -> { kind = "BOLUS_CONFIRMED"; reason = null; text = outcome.text }
             is SessionOutcome.Failed -> { kind = "FAILED"; reason = encode(outcome.reason); text = outcome.text }
             is SessionOutcome.TimedOut -> { kind = "TIMED_OUT"; reason = encode(outcome.phase); text = null }
             is SessionOutcome.Unknown -> { kind = "UNKNOWN"; reason = encode(outcome.reason); text = outcome.text }

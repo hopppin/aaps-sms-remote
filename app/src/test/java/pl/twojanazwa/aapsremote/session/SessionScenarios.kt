@@ -43,6 +43,7 @@ class SessionScenario(
 fun SessionOutcome.key(): String = when (this) {
     is SessionOutcome.Completed -> "Completed"
     is SessionOutcome.CarbsConfirmed -> "CarbsConfirmed"
+    is SessionOutcome.BolusConfirmed -> "BolusConfirmed"
     is SessionOutcome.Failed -> "Failed.$reason"
     is SessionOutcome.TimedOut -> "TimedOut.$phase"
     is SessionOutcome.Unknown -> "Unknown.$reason"
