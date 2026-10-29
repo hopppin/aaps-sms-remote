@@ -96,9 +96,10 @@ class CommandRunViewModel @Inject constructor(
 
     /** PROF-14: wybór pozycji listy zamyka wynik i przekazuje wybór do panelu; nieaktywny przy ABSENT / INVALIDATED. */
     fun onProfileChosen(number: Int) {
-        val state = mutableState.value
-        if (state.secret == SecretReadiness.ABSENT || state.secret == SecretReadiness.INVALIDATED) return
-        val item = (state.view as? RunView.Finished)?.result?.profileItems?.firstOrNull { it.number == number } ?: return
+        // Bieżący stan sekretu, nie kolektor (ten może jeszcze nie zdążyć zaktualizować uiState).
+        val secret = secrets.state.value.toReadiness()
+        if (secret == SecretReadiness.ABSENT || secret == SecretReadiness.INVALIDATED) return
+        val item = (mutableState.value.view as? RunView.Finished)?.result?.profileItems?.firstOrNull { it.number == number } ?: return
         profileSelection.select(item)
         onResultDismissed()
     }

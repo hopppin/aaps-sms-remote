@@ -84,7 +84,26 @@ class CommandRunViewModelProfileTest {
     }
 
     @Test
-    fun `PROF-14 RunUiState z wynikiem listy nie ujawnia nazw w toString`() = runTest(main.dispatcher) {
+    fun `PROF-14 sekret zmieniony na ABSENT lub INVALIDATED przed kolektorem blokuje wybor`() = runTest(main.dispatcher) {
+        for (secret in listOf(SecretState.ABSENT, SecretState.INVALIDATED)) {
+            val env = CommandTestEnv(this)
+            env.secrets.setState(SecretState.PRESENT)
+            val selection = ProfileSelection()
+            val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, selection, env.secrets)
+            finishedList(env)
+
+            // Bez runCurrent: kolektor jeszcze nie widzi nowego stanu, decyzja musi opierać się na secrets.state.value.
+            env.secrets.setState(secret)
+            viewModel.onProfileChosen(1)
+            runCurrent()
+
+            assertNull(selection.choice.value, "sekret $secret")
+            assertNotNull(env.currentRun.state.value)
+        }
+    }
+
+    @Test
+    fun `PROF-14 RunUiState z wynikiem listy nie ujawnia nazw w toString`()= runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
         val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
         finishedList(env)
