@@ -15,6 +15,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -24,7 +25,7 @@ class CarbsSessionBeforeCodeTest {
     private val source = FakeIncomingSmsSource()
     private val chat = "Czesc, kupisz chleb?"
 
-    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private suspend fun TestScope.emitAt(millis: Long, body: String) {
         advanceTimeBy(millis - currentTime)

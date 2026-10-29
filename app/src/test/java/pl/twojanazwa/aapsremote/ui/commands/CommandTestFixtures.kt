@@ -7,6 +7,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.test.TestScope
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.AapsNumberState
 import pl.twojanazwa.aapsremote.data.FakeCommandHistory
 import pl.twojanazwa.aapsremote.data.SessionHistoryRecorder
@@ -31,7 +32,7 @@ object CommandTestFixtures {
 
     fun pin(): AapsPin = AapsPin.fromChars(PIN_TEXT.toCharArray())
 
-    fun carbs(grams: Int): Command.Carbs = (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+    fun carbs(grams: Int): Command.Carbs = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 }
 
 /** Zestaw atrap i prawdziwy koordynator na czasie wirtualnym [testScope]; launcher składany z nich. */

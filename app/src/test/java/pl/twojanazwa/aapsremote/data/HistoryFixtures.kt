@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.data
 
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 import pl.twojanazwa.aapsremote.parser.ExpectedCommand
@@ -16,7 +17,7 @@ import pl.twojanazwa.aapsremote.session.UnknownReason
 object HistoryFixtures {
     const val T0 = 1111111051000L
 
-    val carbs20: Command.Carbs = (Command.Carbs.of(20) as CarbsValidation.Valid).command
+    val carbs20: Command.Carbs = (Command.Carbs.of(20, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     fun sms(body: String) = IncomingSms(body, T0 + 2000)
 

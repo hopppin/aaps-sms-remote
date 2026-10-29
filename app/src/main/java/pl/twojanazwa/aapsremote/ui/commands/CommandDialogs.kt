@@ -8,7 +8,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
 import pl.twojanazwa.aapsremote.R
-import pl.twojanazwa.aapsremote.commands.CarbsLimits
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 
 /** CMDUI-09: dodatkowe pytanie dla ilości powyżej limitu, przed PIN-em. */
 @Composable
@@ -18,7 +18,7 @@ fun LargeAmountDialog(grams: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) 
         // CMDUI-09: osobne okno systemowe nie dziedziczy FLAG_SECURE z Activity.
         properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
         title = { Text(stringResource(R.string.commands_large_title, grams)) },
-        text = { Text(stringResource(R.string.commands_large_text, CarbsLimits.EXTRA_CONFIRMATION_ABOVE_GRAMS)) },
+        text = { Text(stringResource(R.string.commands_large_text, CommandLimits.DEFAULT.carbsExtraConfirmationAboveGrams)) },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text(stringResource(R.string.commands_large_confirm, grams)) }
         },

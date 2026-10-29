@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 import java.util.concurrent.CountDownLatch
@@ -27,7 +28,7 @@ class SessionCancelTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs1(): Command = (Command.Carbs.of(1) as CarbsValidation.Valid).command
+    private fun carbs1(): Command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
     fun `SESSION-17 CARBS 1 anulowane w AWAITING_CODE_REQUEST ignoruje pozniejsza prosbe o kod`() = runTest {

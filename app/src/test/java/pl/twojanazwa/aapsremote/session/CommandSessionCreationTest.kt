@@ -10,12 +10,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CommandSessionCreationTest {
 
-    private fun carbs20(): Command = (Command.Carbs.of(20) as CarbsValidation.Valid).command
+    private fun carbs20(): Command = (Command.Carbs.of(20, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private fun TestScope.session(command: Command, credentials: CodeCredentials?): CommandSession {
         val clock = virtualClock()

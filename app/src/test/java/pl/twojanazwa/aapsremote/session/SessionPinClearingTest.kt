@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
@@ -43,7 +44,7 @@ class SessionPinClearingTest {
         val totp = mockk<UsableTotpProvider>()
         coEvery { totp.awaitUsableCode(any()) } throws IllegalStateException("TOTP_PROVIDER_FAILURE_MARKER")
         val session = CommandSession(
-            command = (Command.Carbs.of(1) as CarbsValidation.Valid).command,
+            command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command,
             credentials = credentials,
             sender = sender,
             incoming = source,

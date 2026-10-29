@@ -23,8 +23,6 @@ object CommandCatalog {
             keyword = "CARBS",
             parameter = CommandParameter.Grams(
                 min = CarbsLimits.MIN_GRAMS,
-                max = CarbsLimits.MAX_GRAMS,
-                extraConfirmationAboveGrams = CarbsLimits.EXTRA_CONFIRMATION_ABOVE_GRAMS,
                 quickValues = CarbsLimits.QUICK_VALUES,
             ),
             requiresCode = true,

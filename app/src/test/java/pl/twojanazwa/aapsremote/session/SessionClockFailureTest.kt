@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
@@ -51,7 +52,7 @@ class SessionClockFailureTest {
             }
         }
         val session = CommandSession(
-            command = (Command.Carbs.of(1) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid).command,
+            command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid).command,
             credentials = credentials,
             sender = sender,
             incoming = source,

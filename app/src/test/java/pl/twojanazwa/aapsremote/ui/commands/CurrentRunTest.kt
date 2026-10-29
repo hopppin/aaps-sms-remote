@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.session.CommandSession
 import pl.twojanazwa.aapsremote.session.SessionPhase
 import pl.twojanazwa.aapsremote.session.SessionState
@@ -45,7 +46,7 @@ class CurrentRunTest {
 
     @Test
     fun `CMDUI-26 toString danych uruchomienia nie zawiera ilosci gramow`() {
-        val carbs = (Command.Carbs.of(37) as CarbsValidation.Valid).command
+        val carbs = (Command.Carbs.of(37, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
         val text = data(carbs).toString()
         assertFalse(text.contains("37"), text)
     }

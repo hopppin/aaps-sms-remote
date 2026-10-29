@@ -9,10 +9,10 @@ import org.junit.jupiter.params.provider.ValueSource
 class CarbsInputParseTest {
 
     private fun grams(input: String): Int? =
-        (Command.Carbs.parse(input) as? CarbsValidation.Valid)?.command?.grams
+        (Command.Carbs.parse(input, CommandLimits.DEFAULT) as? CarbsValidation.Valid)?.command?.grams
 
     private fun error(input: String): CarbsAmountError? =
-        (Command.Carbs.parse(input) as? CarbsValidation.Invalid)?.error
+        (Command.Carbs.parse(input, CommandLimits.DEFAULT) as? CarbsValidation.Invalid)?.error
 
     @ParameterizedTest(name = "CMD-04 tekst {0} daje {1} g")
     @CsvSource("20,20", "1,1", "50,50", "020,20", "0050,50", "001,1")

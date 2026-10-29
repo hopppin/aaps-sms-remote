@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -21,7 +22,7 @@ class SessionUnexpectedMessagesTest {
 
     @Test
     fun `SESSION-18 dwie wiadomosci nieoczekiwane w kolejnosci odbioru a faza bez zmian`() = runTest {
-        val command = (Command.Carbs.of(1) as CarbsValidation.Valid).command
+        val command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
         val session = testSession(command, sender, source, SessionTestFixtures.credentials())
         val run = async { session.run() }
         runCurrent()

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.TotpCode
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
@@ -28,7 +29,7 @@ class CarbsSessionCodeValidityTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs1(): Command = (Command.Carbs.of(1) as CarbsValidation.Valid).command
+    private fun carbs1(): Command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     /**
      * Polecenie wysłane w 1111110811000, prośba przetwarzana przy zegarze 1111111111000 (po 300 000 ms).

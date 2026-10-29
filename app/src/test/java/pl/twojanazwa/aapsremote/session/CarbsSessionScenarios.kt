@@ -9,10 +9,11 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
 /** Wspólne scenariusze CARBS po wysłaniu kodu (używane też przez testy niezmienników). */
-fun carbsCommand(grams: Int): Command = (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+fun carbsCommand(grams: Int): Command = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
 /** Przesuwa czas wirtualny do [millis] i dostarcza SMS odebrany w tej chwili. */
 @OptIn(ExperimentalCoroutinesApi::class)

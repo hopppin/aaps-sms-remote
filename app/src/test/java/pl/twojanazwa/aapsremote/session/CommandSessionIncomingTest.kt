@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
@@ -53,7 +54,7 @@ class CommandSessionIncomingTest {
 
     @Test
     fun `SESSION-05 CARBS 1 prosba o kod o T0 minus 1 jest ignorowana i kod nie jest wysylany`() = runTest {
-        val carbs = (Command.Carbs.of(1) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid).command
+        val carbs = (Command.Carbs.of(1, CommandLimits.DEFAULT) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid).command
         val session = testSession(carbs, sender, source, SessionTestFixtures.credentials())
         val run = async { session.run() }
         runCurrent()

@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsLimits
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 
 data class CommandsUiState(
     val number: NumberReadiness = NumberReadiness.LOADING,
@@ -23,7 +24,7 @@ data class CommandsUiState(
      */
     val runHandoff: Boolean = false,
 ) {
-    val quickValues: List<Int> get() = CarbsLimits.QUICK_VALUES
+    val quickValues: List<Int> get() = CommandLimits.DEFAULT.carbsQuickValues
 
     private val ready: Boolean
         get() = number == NumberReadiness.CONFIGURED && smsGranted && !commandActive && !launching
