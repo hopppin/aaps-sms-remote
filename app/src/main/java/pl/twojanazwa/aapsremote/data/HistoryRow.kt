@@ -13,6 +13,7 @@ data class HistoryRow(
     val finishedAtEpochMillis: Long?,
     val replyText: String?,
     val unexpectedMessageCount: Int,
+    val bolusCentiUnits: Int?,
 ) {
     override fun toString(): String = "HistoryRow(***)"
 }

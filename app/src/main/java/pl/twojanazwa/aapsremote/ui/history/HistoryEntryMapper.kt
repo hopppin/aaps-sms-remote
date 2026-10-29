@@ -44,7 +44,8 @@ object HistoryEntryMapper {
         HistoryCommand.PUMP -> HistoryCommandLabel.PUMP
         HistoryCommand.CARBS ->
             if (entry.carbsGrams != null) HistoryCommandLabel.CARBS else HistoryCommandLabel.CARBS_NO_AMOUNT
-        HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
+        // Etykieta BOLUS w historii: zad. 5 (spec 012); do tego czasu jak nierozpoznane.
+        HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
     }
 
     private fun carbsGrams(entry: HistoryEntry): Int? =
@@ -61,7 +62,7 @@ object HistoryEntryMapper {
                 message = when (entry.command) {
                     HistoryCommand.BG -> ResultMessage.BG_REPLY
                     HistoryCommand.PUMP -> ResultMessage.PUMP_REPLY
-                    HistoryCommand.CARBS, HistoryCommand.UNRECOGNIZED -> null
+                    HistoryCommand.CARBS, HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED -> null
                 }
             }
             HistoryOutcome.CarbsConfirmed -> {
@@ -88,7 +89,8 @@ object HistoryEntryMapper {
                 kind = ResultKind.CANCELLED
                 message = ResultMessage.CANCELLED
             }
-            HistoryOutcome.Unrecognized -> {
+            // BolusConfirmed: wynik w UI w zad. 5 (spec 012); do tego czasu jak nierozpoznany.
+            HistoryOutcome.BolusConfirmed, HistoryOutcome.Unrecognized -> {
                 kind = null
                 message = null
             }

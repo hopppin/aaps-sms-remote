@@ -12,6 +12,7 @@ data class HistoryEntry(
     val finishedAtEpochMillis: Long?,
     val replyText: String?,
     val unexpectedMessageCount: Int,
+    val bolusCentiUnits: Int?,
 ) {
     override fun toString(): String = "HistoryEntry(***)"
 }
