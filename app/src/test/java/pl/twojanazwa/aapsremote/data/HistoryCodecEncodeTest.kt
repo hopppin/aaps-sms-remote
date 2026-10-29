@@ -8,6 +8,7 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import pl.twojanazwa.aapsremote.data.HistoryFixtures.T0
 import pl.twojanazwa.aapsremote.parser.AapsSamples
+import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionResult
 
 class HistoryCodecEncodeTest {
@@ -40,6 +41,18 @@ class HistoryCodecEncodeTest {
         assertEquals(outcome, row.outcome)
         assertEquals(reason, row.reason)
         assertEquals(text, row.replyText)
+    }
+
+    @Test
+    fun `BOL-11 wynik BolusConfirmed jest zapisywany bez ilosci a odczyt daje Unrecognized`() {
+        val row = HistoryCodec.toRow(
+            HistoryFixtures.withOutcome(SessionOutcome.BolusConfirmed(120, AapsSamples.bolusDone)),
+        )
+        assertEquals("BOLUS_CONFIRMED", row.outcome)
+        assertNull(row.reason)
+        assertNull(row.carbsGrams)
+        assertEquals(AapsSamples.bolusDone, row.replyText)
+        assertEquals(HistoryOutcome.Unrecognized, HistoryCodec.toEntry(row).outcome)
     }
 
     @Test

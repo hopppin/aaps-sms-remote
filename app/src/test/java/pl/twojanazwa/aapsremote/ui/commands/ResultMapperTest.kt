@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandLimits
@@ -137,6 +138,15 @@ class ResultMapperTest {
         assertEquals(ResultMessage.CARBS_CONFIRMED, done.message)
         assertEquals(1, done.messageArg)
         assertEquals(1, done.commandGrams)
+    }
+
+    @Test
+    fun `BOL-11 BolusConfirmed daje SUCCESS z DETAILS_MISSING bez argumentu`() {
+        val bolus = (Command.Bolus.of(120, CommandLimits.DEFAULT) as BolusValidation.Valid).command
+        val view = ResultMapper.map(result(bolus, SessionOutcome.BolusConfirmed(120, "t")))
+        assertEquals(ResultKind.SUCCESS, view.kind)
+        assertEquals(ResultMessage.DETAILS_MISSING, view.message)
+        assertNull(view.messageArg)
     }
 
     @Test

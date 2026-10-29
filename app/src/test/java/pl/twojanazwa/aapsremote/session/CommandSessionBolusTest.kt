@@ -20,7 +20,8 @@ import pl.twojanazwa.aapsremote.commands.LimitsValidation
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsSamples
-import java.io.File
+import pl.twojanazwa.aapsremote.otp.EpochClock
+import kotlin.time.Duration.Companion.minutes
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CommandSessionBolusTest {
@@ -214,7 +215,8 @@ class CommandSessionBolusTest {
     @Test
     fun `BOL-19 prosba o kod profilu w sesji BOLUS to UNRECOGNIZED_REPLY bez kodu`() = runTest {
         val (_, run) = start(bolus(10))
-        deliver(60_000, File("../docs/specs/013-profil/dane/profile-prosba-o-kod.txt").readText())
+        // Typ profilowy (spec 013) jeszcze nie istnieje (AapsReply jest sealed), wiec decyduje prawdziwy parser.
+        deliver(60_000, PROFILE_REQUEST)
         assertEquals(FailureReason.UNRECOGNIZED_REPLY, (run.await().outcome as SessionOutcome.Failed).reason)
         assertNoCode()
     }
@@ -245,5 +247,87 @@ class CommandSessionBolusTest {
         deliver(120_000, "druga")
         assertEquals(UnknownReason.UNRECOGNIZED_REPLY, (run.await().outcome as SessionOutcome.Unknown).reason)
         assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `BOL-10 prosba z inna ilosc niz wyslana (parser zwraca 0,99) nie wysyla kodu`() = runTest {
+        val (_, run) = startWithParser(bolus(10)) { _, _ -> AapsReply.BolusCodeRequest(99, "x") }
+        deliver(60_000, "dowolna tresc")
+        assertEquals(FailureReason.UNRECOGNIZED_REPLY, (run.await().outcome as SessionOutcome.Failed).reason)
+        assertNoCode()
+    }
+
+    @Test
+    fun `BOL-11 potwierdzenie z inna ilosc niz wyslana (parser zwraca 0,99) to Unknown UNRECOGNIZED_REPLY`() = runTest {
+        var calls = 0
+        val (_, run) = startWithParser(bolus(10)) { _, _ ->
+            if (calls++ == 0) AapsReply.BolusCodeRequest(10, "x") else AapsReply.BolusDone(99, "x")
+        }
+        deliver(60_000, "pierwsza")
+        deliver(120_000, "druga")
+        assertEquals(UnknownReason.UNRECOGNIZED_REPLY, (run.await().outcome as SessionOutcome.Unknown).reason)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `BOL-10 limit przygotowania kodu 10 s - 9999 ms PREPARING_CODE a 10000 ms CODE_PREPARATION_TIMEOUT`() = runTest {
+        val stopped = 1111111109000
+        val session = testSession(
+            bolus(10), sender, source, SessionTestFixtures.credentials(), clock = EpochClock { stopped },
+        )
+        val run = async { session.run() }
+        runCurrent()
+        source.emit(IncomingSms(AapsSamples.bolusCodeRequest, stopped))
+        runCurrent()
+        advanceTimeBy(9_999)
+        runCurrent()
+        assertEquals(SessionPhase.PREPARING_CODE, session.state.value.phase)
+        advanceTimeBy(1)
+        runCurrent()
+        assertOutcome(SessionOutcome.Failed(FailureReason.CODE_PREPARATION_TIMEOUT, null), run.await())
+        assertNoCode()
+    }
+
+    @Test
+    fun `BOL-10 prosba starsza niz 240 s to CODE_REQUEST_EXPIRED bez kodu`() = runTest {
+        val base = 1111110811000
+        val session = testSession(
+            bolus(10), sender, source, SessionTestFixtures.credentials(),
+            timeouts = SessionTimeouts(reply = 10.minutes), clock = EpochClock { base + currentTime },
+        )
+        val run = async { session.run() }
+        runCurrent()
+        advanceTimeBy(300_000)
+        runCurrent()
+        source.emit(IncomingSms(AapsSamples.bolusCodeRequest, 1111110870999))
+        runCurrent()
+        assertOutcome(SessionOutcome.Failed(FailureReason.CODE_REQUEST_EXPIRED, AapsSamples.bolusCodeRequest), run.await())
+        assertNoCode()
+    }
+
+    @Test
+    fun `BOL-11 limit potwierdzenia 6 min konczy sesje Unknown CONFIRMATION_TIMEOUT dopiero w chwili 420000`() = runTest {
+        val (session, run) = confirming(10)
+        advanceTimeBy(419_999 - currentTime)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        advanceTimeBy(1)
+        runCurrent()
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.CONFIRMATION_TIMEOUT, null), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `BOL-11 anulowanie po wyslaniu kodu daje Unknown CANCELLED_AFTER_CODE`() = runTest {
+        val (session, run) = confirming(10)
+        session.cancel()
+        runCurrent()
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.CANCELLED_AFTER_CODE, null), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    private companion object {
+        const val PROFILE_REQUEST = "Aby przelaczyc profil na LocalProfile1 100% odpowiedz kodem z aplikacji " +
+            "Authenticator dla: Jan, z doklejonym PIN-em"
     }
 }

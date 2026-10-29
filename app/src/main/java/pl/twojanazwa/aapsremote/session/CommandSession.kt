@@ -294,8 +294,20 @@ class CommandSession(
             is AapsReply.MatchingCodeRequest -> ReplyMatch.isCodeRequestFor(command.id, reply)
             is AapsReply.MatchingDone -> ReplyMatch.isDoneFor(command.id, reply)
             else -> true
-        }
+        } && amountMatches(reply)
         return if (matches) reply else AapsReply.Unrecognized(sms.body)
+    }
+
+    /** Druga linia obrony (BOL-10, BOL-11): ilość w prośbie/potwierdzeniu musi być równa wysłanej, niezależnie od parsera. */
+    private fun amountMatches(reply: AapsReply): Boolean {
+        val sent = command
+        return when (reply) {
+            is AapsReply.BolusCodeRequest -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
+            is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
+            is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
+            is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
+            else -> true
+        }
     }
 
     /** Tylko dla odpowiedzi zgodnej z poleceniem (po [parseMatching]). */
