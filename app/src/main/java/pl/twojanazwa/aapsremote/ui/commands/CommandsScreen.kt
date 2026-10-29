@@ -67,7 +67,7 @@ fun CommandsScreen(
         }
         commandsViewModel.refreshPermissions()
     }
-    val message = commands.message?.let { stringResource(it.textRes()) }
+    val message = commands.message?.let { stringResource(it.textRes(), *commands.messageArgs.toTypedArray()) }
     val actionLabel = if (commands.message?.opensSettings == true) {
         stringResource(R.string.commands_msg_action_settings)
     } else {
@@ -119,17 +119,27 @@ fun CommandsScreen(
         )
     }
 
+    val bolusLimits = commands.loadedLimits
+    commands.confirmingLargeCentiUnits?.takeIf { bolusLimits != null }?.let { centiUnits ->
+        BolusLargeDialog(
+            centiUnits = centiUnits,
+            halfLimitText = formatHalfLimit(checkNotNull(bolusLimits).bolusMaxCentiUnits),
+            onConfirm = commandsViewModel::onBolusLargeConfirmed,
+            onDismiss = commandsViewModel::onBolusLargeDismissed,
+        )
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
-        val summaryGrams = commands.summaryGrams
+        val summary = commands.summary
         // Treść chroniona wybierana z tego samego pola, z którego liczona jest flaga (run.secureWindow).
         val runView = run.view
         if (runView is RunView.Active) {
             RunScreen(run = runView, onCancel = runViewModel::onCancelClicked)
         } else if (runView is RunView.Finished) {
             ResultCard(result = runView.result, onResultDismissed = runViewModel::onResultDismissed)
-        } else if (summaryGrams != null) {
-            CarbsSummary(
-                grams = summaryGrams,
+        } else if (summary != null) {
+            CommandSummary(
+                command = summary.command,
                 pinText = commands.pinText,
                 canSubmit = commands.canSubmitPin,
                 launching = commands.launching,
@@ -145,6 +155,8 @@ fun CommandsScreen(
                 onCarbsInputChanged = commandsViewModel::onCarbsInputChanged,
                 onQuickValueClicked = commandsViewModel::onQuickValueClicked,
                 onCarbsNextClicked = commandsViewModel::onCarbsNextClicked,
+                onBolusInputChanged = commandsViewModel::onBolusInputChanged,
+                onBolusNextClicked = commandsViewModel::onBolusNextClicked,
                 onOpenSettings = onOpenSettings,
                 smsPermissions = {
                     SmsPermissionsSection(

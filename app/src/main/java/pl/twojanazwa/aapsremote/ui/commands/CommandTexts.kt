@@ -1,9 +1,13 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.commands.BolusAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsLimits
+import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 
@@ -60,4 +64,41 @@ fun SecretReadiness.bannerRes(): Int? = when (this) {
     SecretReadiness.UNKNOWN, SecretReadiness.PRESENT -> null
     SecretReadiness.ABSENT -> R.string.commands_banner_secret_absent
     SecretReadiness.INVALIDATED -> R.string.commands_banner_secret_invalidated
+}
+
+@StringRes
+fun BolusAmountError.textRes(): Int = when (this) {
+    BolusAmountError.EMPTY -> R.string.commands_bolus_error_empty
+    BolusAmountError.INVALID_CHARACTERS -> R.string.commands_bolus_error_invalid_characters
+    BolusAmountError.TOO_MANY_DECIMALS -> R.string.commands_bolus_error_too_many_decimals
+    BolusAmountError.BELOW_MIN -> R.string.commands_bolus_error_below_min
+    BolusAmountError.ABOVE_MAX -> R.string.commands_bolus_error_above_max
+    BolusAmountError.NOT_STEP -> R.string.commands_bolus_error_not_step
+}
+
+/** BOL-13: X = limit bolusa z przecinkiem i dwoma miejscami (tylko EMPTY i ABOVE_MAX mają argument). */
+fun BolusAmountError.textArgs(limits: CommandLimits): List<String> = when (this) {
+    BolusAmountError.EMPTY, BolusAmountError.ABOVE_MAX -> listOf(formatCentiUnits(limits.bolusMaxCentiUnits))
+    else -> emptyList()
+}
+
+/** BOL-14: Y = połowa limitu; dla nieparzystego limitu (setne) trzecia cyfra, bez zaokrąglania. */
+fun formatHalfLimit(limitCentiUnits: Int): String {
+    val thousandths = limitCentiUnits * 5
+    val text = "${thousandths / 1000},${(thousandths % 1000).toString().padStart(3, '0')}"
+    return if (thousandths % 10 == 0) text.dropLast(1) else text
+}
+
+@Composable
+fun summaryTitle(command: Command): String = when (command) {
+    is Command.Carbs -> stringResource(R.string.commands_summary_title, command.grams)
+    is Command.Bolus -> stringResource(R.string.commands_bolus_summary_title, formatCentiUnits(command.centiUnits))
+    Command.Bg, Command.Pump -> ""
+}
+
+@Composable
+fun summaryText(command: Command): String = when (command) {
+    is Command.Carbs -> stringResource(R.string.commands_summary_text, command.grams)
+    is Command.Bolus -> stringResource(R.string.commands_bolus_summary_text, formatCentiUnits(command.centiUnits))
+    Command.Bg, Command.Pump -> ""
 }

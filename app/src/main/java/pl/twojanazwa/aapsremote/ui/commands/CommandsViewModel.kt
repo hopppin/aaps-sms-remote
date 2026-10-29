@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.data.CommandLimitsStore
@@ -71,7 +72,7 @@ class CommandsViewModel @Inject constructor(
     }
 
     fun onMessageShown() {
-        local.update { it.copy(message = null) }
+        local.update { it.copy(message = null, messageArgs = emptyList()) }
     }
 
     fun onBgClicked() = startNoCode(Command.Bg)
@@ -92,41 +93,76 @@ class CommandsViewModel @Inject constructor(
             is CarbsValidation.Valid -> {
                 val carbs = result.command
                 if (carbs.requiresExtraConfirmation(limits)) {
-                    local.update { it.copy(confirmingLargeGrams = carbs.grams) }
+                    local.update { it.copy(confirming = carbs) }
                 } else {
-                    local.update { it.copy(summaryGrams = carbs.grams, pinText = "", extraConfirmed = false) }
+                    openSummary(carbs, extraConfirmed = false)
                 }
             }
         }
     }
 
     fun onQuickValueClicked(grams: Int) {
-        if (!compose().canStartCarbs) return
+        val state = compose()
+        val limits = state.loadedLimits
+        if (!state.canStartCarbs || limits == null) return
+        // Szybka wartość nie omija limitów ani progu „Na pewno” (LIM-09).
+        val carbs = (Command.Carbs.of(grams, limits) as? CarbsValidation.Valid)?.command ?: return
         local.update {
-            it.copy(
-                extraConfirmed = false,
-                carbsInput = grams.toString(),
-                carbsError = null,
-                summaryGrams = grams,
-                confirmingLargeGrams = null,
-                pinText = "",
-            )
+            it.copy(carbsInput = grams.toString(), carbsError = null, confirming = null)
         }
+        openSummary(carbs, extraConfirmed = false)
     }
 
     fun onLargeAmountConfirmed() {
-        val grams = local.value.confirmingLargeGrams ?: return
-        local.update {
-            it.copy(confirmingLargeGrams = null, summaryGrams = grams, pinText = "", extraConfirmed = true)
-        }
+        val carbs = local.value.confirming as? Command.Carbs ?: return
+        openSummary(carbs, extraConfirmed = true)
     }
 
     fun onLargeAmountDismissed() {
-        local.update { it.copy(confirmingLargeGrams = null) }
+        local.update { if (it.confirming is Command.Carbs) it.copy(confirming = null) else it }
+    }
+
+    /** BOL-13: zmiana tekstu usuwa błąd. */
+    fun onBolusInputChanged(text: String) {
+        local.update { it.copy(bolusInput = text, bolusError = null) }
+    }
+
+    /** BOL-13, BOL-14: walidacja z bieżącymi limitami; bolus nigdy nie startuje stąd, tylko otwiera okno albo podsumowanie. */
+    fun onBolusNextClicked() {
+        val state = compose()
+        val limits = state.loadedLimits
+        if (!state.canStartBolus || limits == null) return
+        when (val result = Command.Bolus.parse(local.value.bolusInput, limits)) {
+            is BolusValidation.Invalid -> local.update { it.copy(bolusError = result.error) }
+            is BolusValidation.Valid -> {
+                val bolus = result.command
+                if (bolus.requiresExtraConfirmation(limits)) {
+                    local.update { it.copy(confirming = bolus) }
+                } else {
+                    openSummary(bolus, extraConfirmed = false)
+                }
+            }
+        }
+    }
+
+    /** `extraConfirmed = true` tylko po „Tak” (BOL-14, LIM-09). */
+    fun onBolusLargeConfirmed() {
+        val bolus = local.value.confirming as? Command.Bolus ?: return
+        openSummary(bolus, extraConfirmed = true)
+    }
+
+    fun onBolusLargeDismissed() {
+        local.update { if (it.confirming is Command.Bolus) it.copy(confirming = null) else it }
+    }
+
+    private fun openSummary(command: Command, extraConfirmed: Boolean) {
+        local.update {
+            it.copy(confirming = null, summary = SummaryState(command), pinText = "", extraConfirmed = extraConfirmed)
+        }
     }
 
     fun onPinChanged(text: String) {
-        if (local.value.summaryGrams == null || local.value.launching) return
+        if (local.value.summary == null || local.value.launching) return
         if (text.length > PIN_MAX_LENGTH || !text.all { it in '0'..'9' }) return
         local.update { it.copy(pinText = text) }
     }
@@ -134,42 +170,46 @@ class CommandsViewModel @Inject constructor(
     /** PIN trafia z pola do [AapsPin] i pole jest czyszczone przed `launch` (CMDUI-11). */
     fun onSendClicked() {
         val state = compose()
-        val grams = state.summaryGrams
-        if (grams == null || !state.canSubmitPin) return
+        val summary = state.summary
+        if (summary == null || !state.canSubmitPin) return
         val chars = state.pinText.toCharArray()
         local.update { it.copy(pinText = "") }
         val pin = AapsPin.fromChars(chars)
         val limits = state.loadedLimits
         if (limits == null) {
             pin.clear()
-            local.update { it.copy(summaryGrams = null, message = CommandMessage.LIMITS_UNAVAILABLE) }
+            local.update { it.copy(summary = null, message = CommandMessage.LIMITS_UNAVAILABLE) }
             return
         }
-        val carbs = (Command.Carbs.of(grams, limits) as? CarbsValidation.Valid)?.command
-        if (carbs == null) {
-            // LIM-09: limit zmniejszony po otwarciu podsumowania; ilość nie jest przycinana.
+        // LIM-09: limit zmniejszony po otwarciu podsumowania; ilość nie jest przycinana.
+        val command = when (val c = summary.command) {
+            is Command.Carbs -> (Command.Carbs.of(c.grams, limits) as? CarbsValidation.Valid)?.command
+            is Command.Bolus -> (Command.Bolus.of(c.centiUnits, limits) as? BolusValidation.Valid)?.command
+            else -> null
+        }
+        if (command == null) {
             pin.clear()
-            local.update { it.copy(summaryGrams = null, message = CommandMessage.AMOUNT_ABOVE_LIMIT) }
+            local.update { it.copy(summary = null, message = CommandMessage.AMOUNT_ABOVE_LIMIT) }
             return
         }
-        startCommand(carbs, pin, state.extraConfirmed)
+        startCommand(command, pin, state.extraConfirmed, limits.bolusMinIntervalMinutes)
     }
 
     /** W trakcie uruchamiania „Anuluj” i Wstecz nie ukrywają podsumowania (CMDUI-10, CMDUI-11). */
     fun onSummaryDismissed() {
         if (local.value.launching) return
-        local.update { it.copy(summaryGrams = null, pinText = "", extraConfirmed = false) }
+        local.update { it.copy(summary = null, pinText = "", extraConfirmed = false) }
     }
 
     /** Okno „Na pewno” -> zamknij; podsumowanie -> jak „Anuluj” (CMDUI-24). */
     fun onBack() {
         if (local.value.launching) return
-        if (local.value.confirmingLargeGrams != null) onLargeAmountDismissed() else onSummaryDismissed()
+        if (local.value.confirming != null) local.update { it.copy(confirming = null) } else onSummaryDismissed()
     }
 
     /** Aplikacja schodzi z ekranu albo zmiana zakładki: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
     fun onStop() {
-        local.update { it.copy(pinText = "", summaryGrams = null, confirmingLargeGrams = null, extraConfirmed = false) }
+        local.update { it.copy(pinText = "", summary = null, confirming = null, extraConfirmed = false) }
     }
 
     private fun startNoCode(command: Command) {
@@ -183,7 +223,7 @@ class CommandsViewModel @Inject constructor(
      * więc podwójne dotknięcie nie woła launchera drugi raz. Sesję uruchamia launcher w zakresie aplikacji,
      * nie `viewModelScope` (CMDUI-13).
      */
-    private fun startCommand(command: Command, pin: AapsPin?, extraConfirmed: Boolean = false) {
+    private fun startCommand(command: Command, pin: AapsPin?, extraConfirmed: Boolean = false, intervalMinutes: Int = 0) {
         if (local.value.launching) {
             pin?.clear()
             return
@@ -204,9 +244,18 @@ class CommandsViewModel @Inject constructor(
             local.update {
                 when (result) {
                     LaunchResult.Started -> it.copy(
-                        summaryGrams = null, extraConfirmed = false, carbsInput = "", carbsError = null, runHandoff = true,
+                        summary = null, extraConfirmed = false, runHandoff = true,
+                    ).let { s ->
+                        if (command is Command.Bolus) s.copy(bolusInput = "", bolusError = null)
+                        else s.copy(carbsInput = "", carbsError = null)
+                    }
+                    is LaunchResult.Rejected -> it.copy(
+                        summary = null,
+                        extraConfirmed = false,
+                        message = result.reason.toMessage(),
+                        // BOL-12: N = odstęp z limitów, M = minutesLeft z odrzucenia.
+                        messageArgs = result.minutesLeft?.let { left -> listOf(intervalMinutes, left) }.orEmpty(),
                     )
-                    is LaunchResult.Rejected -> it.copy(summaryGrams = null, extraConfirmed = false, message = result.reason.toMessage())
                 }
             }
         }

@@ -27,7 +27,7 @@ class CommandsSourcesTest {
 
     @Test
     fun `CMDUI-10 CMDUI-23 podsumowanie maskuje PIN, a ekran chroni okno znacznikiem secureWindow`() {
-        val summary = withoutComments(File(commandsDirectory, "CarbsSummary.kt").readText())
+        val summary = withoutComments(File(commandsDirectory, "CommandSummary.kt").readText())
         assertTrue("PasswordVisualTransformation()" in summary)
         assertTrue("KeyboardType.NumberPassword" in summary)
         assertTrue("autoCorrectEnabled = false" in summary)
@@ -47,6 +47,21 @@ class CommandsSourcesTest {
         val dialogs = withoutComments(File(commandsDirectory, "CommandDialogs.kt").readText())
         val large = dialogs.substringAfter("fun LargeAmountDialog").substringBefore("@Composable")
         assertTrue("properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)" in large)
+    }
+
+    @Test
+    fun `BOL-14 okno Na pewno bolusa ma securePolicy SecureOn`() {
+        val dialogs = withoutComments(File(commandsDirectory, "CommandDialogs.kt").readText())
+        val bolus = dialogs.substringAfter("fun BolusLargeDialog").substringBefore("@Composable")
+        assertTrue("properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)" in bolus)
+    }
+
+    @Test
+    fun `BOL-13 sekcja Bolus nie ma szybkich wartosci i uzywa klawiatury dziesietnej`() {
+        val panel = withoutComments(File(commandsDirectory, "CommandsPanel.kt").readText())
+        val section = panel.substringAfter("commands_bolus_title").substringBefore("@Composable")
+        assertTrue("KeyboardType.Decimal" in section)
+        assertFalse("QuickValue" in section)
     }
 
     @Test

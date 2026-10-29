@@ -20,11 +20,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.commands.Command
 
 /** CMDUI-10: podsumowanie z maskowanym PIN-em; wartość pola wyłącznie z [pinText], bez stanu lokalnego. */
 @Composable
-fun CarbsSummary(
-    grams: Int,
+fun CommandSummary(
+    command: Command,
     pinText: String,
     canSubmit: Boolean,
     launching: Boolean,
@@ -37,8 +38,8 @@ fun CarbsSummary(
         modifier = modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
-        Text(stringResource(R.string.commands_summary_title, grams), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.commands_summary_text, grams), style = MaterialTheme.typography.bodyMedium)
+        Text(summaryTitle(command), style = MaterialTheme.typography.headlineSmall)
+        Text(summaryText(command), style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(
             value = pinText,
             onValueChange = onPinChanged,
