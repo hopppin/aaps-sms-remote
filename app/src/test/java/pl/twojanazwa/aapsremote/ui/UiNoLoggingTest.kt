@@ -45,6 +45,19 @@ class UiNoLoggingTest {
     }
 
     @Test
+    fun `LIM-12 zrodla ui-settings-limits nie wywoluja API logowania`() {
+        val root = File("src/main/java/pl/twojanazwa/aapsremote/ui/settings/limits")
+        assertTrue(root.isDirectory, "Brak katalogu: ${root.path}")
+        val sources = root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        assertTrue(sources.any { it.name == "CommandLimitsViewModel.kt" }, "Brak CommandLimitsViewModel.kt")
+        val violations = sources.flatMap { file ->
+            val text = file.readText()
+            forbidden.filter { it.containsMatchIn(text) }.map { "${file.name}: ${it.pattern}" }
+        }
+        assertTrue(violations.isEmpty(), "Użycie API logowania: $violations")
+    }
+
+    @Test
     fun `UI-21 zrodla ui i session-platform nie wywoluja API logowania`() {
         val base = "src/main/java/pl/twojanazwa/aapsremote"
         val roots = listOf(File("$base/ui"), File("$base/session/platform"))

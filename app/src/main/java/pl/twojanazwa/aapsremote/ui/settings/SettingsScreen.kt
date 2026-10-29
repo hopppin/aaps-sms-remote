@@ -39,6 +39,9 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.ui.permissions.CameraPermission
 import pl.twojanazwa.aapsremote.ui.permissions.SmsPermissionsViewModel
+import pl.twojanazwa.aapsremote.ui.settings.limits.CommandLimitsSection
+import pl.twojanazwa.aapsremote.ui.settings.limits.CommandLimitsViewModel
+import pl.twojanazwa.aapsremote.ui.settings.limits.textRes
 import pl.twojanazwa.aapsremote.ui.settings.number.AapsNumberViewModel
 import pl.twojanazwa.aapsremote.ui.settings.number.NumberSection
 import pl.twojanazwa.aapsremote.ui.settings.number.textRes
@@ -58,12 +61,14 @@ fun SettingsScreen(
     numberViewModel: AapsNumberViewModel = hiltViewModel(),
     smsViewModel: SmsPermissionsViewModel = hiltViewModel(),
     secretViewModel: TotpSecretViewModel = hiltViewModel(),
+    limitsViewModel: CommandLimitsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val activity = LocalActivity.current
     val numberState by numberViewModel.uiState.collectAsStateWithLifecycle()
     val smsState by smsViewModel.uiState.collectAsStateWithLifecycle()
     val secretState by secretViewModel.uiState.collectAsStateWithLifecycle()
+    val limitsState by limitsViewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
@@ -116,6 +121,14 @@ fun SettingsScreen(
         if (numberMessage != null) {
             numberViewModel.onMessageShown()
             snackbarScope.launch { snackbarHostState.showSnackbar(numberMessage) }
+        }
+    }
+
+    val limitsMessage = limitsState.message?.let { stringResource(it.textRes()) }
+    LaunchedEffect(limitsMessage) {
+        if (limitsMessage != null) {
+            limitsViewModel.onMessageShown()
+            snackbarScope.launch { snackbarHostState.showSnackbar(limitsMessage) }
         }
     }
 
@@ -185,6 +198,13 @@ fun SettingsScreen(
                     }
                 },
                 onOpenAppSettings = openAppSettings,
+            )
+            CommandLimitsSection(
+                state = limitsState,
+                onCarbsChanged = limitsViewModel::onCarbsChanged,
+                onBolusChanged = limitsViewModel::onBolusChanged,
+                onIntervalChanged = limitsViewModel::onIntervalChanged,
+                onSaveClicked = limitsViewModel::onSaveClicked,
             )
         }
         if (secretState.mode == SecretInputMode.PASTE) {

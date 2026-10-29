@@ -103,6 +103,23 @@
     <string name="commands_msg_amount_above_limit">Ilość przekracza limit z Ustawień. Popraw ilość i spróbuj ponownie.</string>
     <string name="commands_msg_extra_confirmation_required">Limit w Ustawieniach się zmienił i ta ilość wymaga potwierdzenia. Sprawdź ilość i spróbuj ponownie.</string>
     <string name="commands_msg_action_settings">Ustawienia</string>
+    <string name="limits_section_title">Limity poleceń</string>
+    <string name="limits_note">Limity aplikacji działają obok limitów AAPS i ich nie zastępują.</string>
+    <string name="limits_command_active">Trwa polecenie. Limity możesz zmienić po jego zakończeniu.</string>
+    <string name="limits_load_failed">Nie udało się wczytać limitów. Sprawdź wartości i zapisz je ponownie.</string>
+    <string name="limits_carbs_label">Największa ilość węglowodanów (g)</string>
+    <string name="limits_bolus_label">Największa ilość bolusa (j.)</string>
+    <string name="limits_interval_label">Najkrótszy odstęp między bolusami (min, 0 = bez sprawdzania)</string>
+    <string name="limits_action_save">Zapisz limity</string>
+    <string name="limits_msg_saved">Zapisano limity.</string>
+    <string name="limits_msg_save_failed">Nie udało się zapisać limitów. Spróbuj ponownie.</string>
+    <string name="limits_error_empty">Podaj wartość (%1$s–%2$s).</string>
+    <string name="limits_error_invalid_digits">Tylko cyfry</string>
+    <string name="limits_error_invalid_decimal">Podaj liczbę, np. 2,5.</string>
+    <string name="limits_error_below_min">Najmniejsza wartość to %1$s.</string>
+    <string name="limits_error_above_max">Największa wartość to %1$s.</string>
+    <string name="limits_error_not_step">Podaj wielokrotność 0,05 j.</string>
+    <string name="limits_error_decimals">Najwyżej 2 miejsca po przecinku.</string>
 
     <!-- 009: przebieg -->
     <string name="run_title_bg">Polecenie BG</string>
