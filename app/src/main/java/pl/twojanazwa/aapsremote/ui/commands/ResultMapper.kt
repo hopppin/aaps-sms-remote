@@ -35,6 +35,12 @@ object ResultMapper {
                 arg = outcome.grams
                 text = outcome.text
             }
+            // Minimalna gałąź; pełne teksty wyniku bolusa w zad. 5 (spec 012).
+            is SessionOutcome.BolusConfirmed -> {
+                kind = ResultKind.SUCCESS
+                message = ResultMessage.DETAILS_MISSING
+                text = outcome.text
+            }
             is SessionOutcome.Failed -> {
                 kind = ResultKind.FAILURE
                 message = outcome.reason.toResultMessage()

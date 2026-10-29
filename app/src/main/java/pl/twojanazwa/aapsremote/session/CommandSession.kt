@@ -22,6 +22,7 @@ import pl.twojanazwa.aapsremote.otp.TotpCode
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
+import pl.twojanazwa.aapsremote.parser.ExpectedCommand
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeMark
@@ -45,6 +46,8 @@ class CommandSession(
     private val timeouts: SessionTimeouts = SessionTimeouts(),
     /** Czas korutyn dla terminów limitów; w testach testScheduler.timeSource. */
     private val timeSource: TimeSource.WithComparableMarks = TimeSource.Monotonic,
+    /** Tylko do testów BOL-19 (podstawiony parser); domyślnie prawdziwy parser. */
+    private val parse: (String, ExpectedCommand) -> AapsReply = AapsReplyParser::parse,
 ) {
     private enum class Lifecycle { NOT_STARTED, RUNNING, CANCELLED_BEFORE_START, RESULT_TAKEN }
 
@@ -238,26 +241,26 @@ class CommandSession(
         if (sms.receivedAtEpochMillis < sentAt) return null
         when (_state.value.phase) {
             SessionPhase.AWAITING_REPLY -> {
-                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                val reply = parseMatching(sms)
                 return when (reply) {
                     is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
             SessionPhase.AWAITING_CODE_REQUEST, SessionPhase.PREPARING_CODE -> {
-                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                val reply = parseMatching(sms)
                 val preparing = _state.value.phase == SessionPhase.PREPARING_CODE
                 return when (reply) {
-                    is AapsReply.CodeRequest ->
+                    is AapsReply.MatchingCodeRequest ->
                         if (preparing) {
                             SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
                         } else {
                             startPreparingCode(sms)
                             null
                         }
-                    is AapsReply.CarbsAmountMismatch -> SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, sms.body)
+                    is AapsReply.CommandMismatch -> SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, sms.body)
                     // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
-                    is AapsReply.CarbsDone -> addUnexpected(sms)
+                    is AapsReply.MatchingDone -> addUnexpected(sms)
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
                     // Unrecognized oraz wyniki niemożliwe dla CARBS (BgReport, PumpStatus).
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
@@ -265,23 +268,52 @@ class CommandSession(
             }
             // Po kodzie (SESSION-12, SESSION-13). SENDING_CODE nie trafia tu: wiadomości są wtedy odkładane.
             SessionPhase.AWAITING_CONFIRMATION -> {
-                val reply = AapsReplyParser.parse(sms.body, command.toExpectedCommand())
+                val reply = parseMatching(sms)
                 return when (reply) {
-                    is AapsReply.CarbsDone ->
+                    is AapsReply.MatchingDone ->
                         if (sms.receivedAtEpochMillis >= checkNotNull(codeSentAt)) {
-                            SessionOutcome.CarbsConfirmed(reply.grams, sms.body)
+                            confirmed(reply, sms.body)
                         } else {
                             addUnexpected(sms)
                         }
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.WRONG_CODE, sms.body)
-                    is AapsReply.CarbsAmountMismatch ->
+                    is AapsReply.CommandMismatch ->
                         SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, sms.body)
-                    is AapsReply.CodeRequest -> SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, sms.body)
+                    is AapsReply.MatchingCodeRequest -> SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, sms.body)
                     else -> SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
             else -> return null
         }
+    }
+
+    /** BOL-19: prośba o kod / potwierdzenie innego rodzaju niż polecenie sesji = Unrecognized. */
+    private fun parseMatching(sms: IncomingSms): AapsReply {
+        val reply = parse(sms.body, command.toExpectedCommand())
+        val matches = when (reply) {
+            is AapsReply.MatchingCodeRequest -> ReplyMatch.isCodeRequestFor(command.id, reply)
+            is AapsReply.MatchingDone -> ReplyMatch.isDoneFor(command.id, reply)
+            else -> true
+        } && amountMatches(reply)
+        return if (matches) reply else AapsReply.Unrecognized(sms.body)
+    }
+
+    /** Druga linia obrony (BOL-10, BOL-11): ilość w prośbie/potwierdzeniu musi być równa wysłanej, niezależnie od parsera. */
+    private fun amountMatches(reply: AapsReply): Boolean {
+        val sent = command
+        return when (reply) {
+            is AapsReply.BolusCodeRequest -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
+            is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
+            is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
+            is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
+            else -> true
+        }
+    }
+
+    /** Tylko dla odpowiedzi zgodnej z poleceniem (po [parseMatching]). */
+    private fun confirmed(reply: AapsReply.MatchingDone, text: String): SessionOutcome = when (reply) {
+        is AapsReply.CarbsDone -> SessionOutcome.CarbsConfirmed(reply.grams, text)
+        is AapsReply.BolusDone -> SessionOutcome.BolusConfirmed(reply.centiUnits, text)
     }
 
     /** Wiadomość nieoczekiwana (SESSION-18): trafia do wyniku, nie zmienia fazy ani limitów. Zawsze null. */

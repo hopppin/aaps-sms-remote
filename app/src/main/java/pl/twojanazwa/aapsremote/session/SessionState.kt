@@ -48,6 +48,11 @@ sealed interface SessionOutcome {
         override fun toString(): String = "CarbsConfirmed(***)"
     }
 
+    /** „AAPS potwierdził podanie bolusa” – nie dowód wykonania z aplikacji (BOL-11). */
+    data class BolusConfirmed(val centiUnits: Int, val text: String) : SessionOutcome {
+        override fun toString(): String = "BolusConfirmed(***)"
+    }
+
     data class Failed(val reason: FailureReason, val text: String?) : SessionOutcome {
         override fun toString(): String = "Failed(reason=$reason)"
     }
