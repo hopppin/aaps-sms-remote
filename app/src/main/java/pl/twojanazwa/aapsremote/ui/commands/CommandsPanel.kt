@@ -34,6 +34,8 @@ fun CommandsPanel(
     onCarbsInputChanged: (String) -> Unit,
     onQuickValueClicked: (Int) -> Unit,
     onCarbsNextClicked: () -> Unit,
+    onBolusInputChanged: (String) -> Unit,
+    onBolusNextClicked: () -> Unit,
     onOpenSettings: () -> Unit,
     smsPermissions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
@@ -112,6 +114,36 @@ fun CommandsPanel(
                     enabled = state.canStartCarbs,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.commands_carbs_next)) }
+            }
+        }
+
+        // BOL-13: bez szybkich wartości.
+        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.commands_bolus_title), style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(
+                    value = state.bolusInput,
+                    onValueChange = onBolusInputChanged,
+                    enabled = state.canStartBolus,
+                    label = { Text(stringResource(R.string.commands_bolus_label)) },
+                    isError = state.bolusError != null,
+                    supportingText = state.bolusError?.let { error ->
+                        state.loadedLimits?.let { limits ->
+                            { Text(stringResource(error.textRes(), *error.textArgs(limits).toTypedArray())) }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = onBolusNextClicked,
+                    enabled = state.canStartBolus,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.commands_bolus_next)) }
             }
         }
     }

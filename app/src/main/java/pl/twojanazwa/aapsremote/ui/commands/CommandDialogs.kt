@@ -27,6 +27,25 @@ fun LargeAmountDialog(grams: Int, thresholdGrams: Int, onConfirm: () -> Unit, on
     )
 }
 
+/** BOL-14: „Na pewno X j.?” powyżej połowy limitu bolusa, przed PIN-em. */
+@Composable
+fun BolusLargeDialog(centiUnits: Int, halfLimitText: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val amount = formatCentiUnits(centiUnits)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        // BOL-14: osobne okno systemowe nie dziedziczy FLAG_SECURE z Activity.
+        properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
+        title = { Text(stringResource(R.string.commands_bolus_large_title, amount)) },
+        text = { Text(stringResource(R.string.commands_bolus_large_text, halfLimitText)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.commands_bolus_large_confirm, amount)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.commands_large_dismiss)) }
+        },
+    )
+}
+
 /** CMDUI-18: ostrzeżenie przed zakończeniem czekania po przekazaniu kodu. */
 @Composable
 fun StopWaitingDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
