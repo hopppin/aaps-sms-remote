@@ -56,6 +56,11 @@ class ParserRedactionTest {
     }
 
     @Test
+    fun `BOL-09 toString kontekstu Bolus nie zawiera ilosci`() {
+        assertFalse(ExpectedCommand.Bolus(137).toString().contains("137"))
+    }
+
+    @Test
     fun `PARSER-10 toString kontekstu CARBS nie zawiera ilosci`() {
         assertFalse(ExpectedCommand.Carbs(37).toString().contains("37"))
     }
@@ -65,5 +70,15 @@ class ParserRedactionTest {
         val e = runCatching { ExpectedCommand.Carbs(-5) }.exceptionOrNull()
         assertTrue(e is IllegalArgumentException)
         assertFalse(e?.message.orEmpty().contains("5"))
+    }
+
+    @Test
+    fun `BOL-08 toString niezgodnej ilosci bolusa nie zawiera ilosci`() {
+        for (stage in CarbsStage.values()) {
+            val text = AapsReply.BolusAmountMismatch(737, 419, stage, "Bolus 4,19 U podany prawidlowo").toString()
+            for (word in listOf("737", "419", "7,37", "4,19", "podany")) {
+                assertFalse(text.contains(word), "zawiera zabroniony fragment")
+            }
+        }
     }
 }
