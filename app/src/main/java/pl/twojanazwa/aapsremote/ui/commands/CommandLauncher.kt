@@ -4,13 +4,17 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.data.AapsNumberState
+import pl.twojanazwa.aapsremote.data.CommandHistory
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.data.CommandLimitsStore
+import pl.twojanazwa.aapsremote.data.HistorySnapshot
 import pl.twojanazwa.aapsremote.data.SessionHistoryRecorder
+import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.LoadResult
 import pl.twojanazwa.aapsremote.security.TotpSecretProvider
@@ -33,6 +37,8 @@ class CommandLauncher @Inject constructor(
     private val permissions: SmsPermissions,
     private val secrets: TotpSecretProvider,
     private val recorder: SessionHistoryRecorder,
+    private val history: CommandHistory,
+    private val clock: EpochClock,
     private val currentRun: CurrentRun,
     @CommandRunScope private val scope: CoroutineScope,
 ) {
@@ -58,15 +64,21 @@ class CommandLauncher @Inject constructor(
             if (!permissions.canSend() || !permissions.canReceive()) {
                 return LaunchResult.Rejected(LaunchRejection.SMS_PERMISSIONS_MISSING)
             }
-            if (command is Command.Carbs) {
+            if (command is Command.Carbs || command is Command.Bolus) {
                 // LIM-09: jedna migawka stanu limitów na całe sprawdzenie; ilość nie jest przycinana.
                 val limits = (limitsStore.state.value as? CommandLimitsState.Loaded)?.limits
                     ?: return LaunchResult.Rejected(LaunchRejection.LIMITS_UNAVAILABLE)
-                if (command.grams > limits.carbsMaxGrams) {
-                    return LaunchResult.Rejected(LaunchRejection.AMOUNT_ABOVE_LIMIT)
+                val aboveMax = when (command) {
+                    is Command.Carbs -> command.grams > limits.carbsMaxGrams
+                    is Command.Bolus -> command.centiUnits > limits.bolusMaxCentiUnits
+                    else -> false
                 }
+                if (aboveMax) return LaunchResult.Rejected(LaunchRejection.AMOUNT_ABOVE_LIMIT)
                 if (!extraConfirmed && command.requiresExtraConfirmation(limits)) {
                     return LaunchResult.Rejected(LaunchRejection.EXTRA_CONFIRMATION_REQUIRED)
+                }
+                if (command is Command.Bolus) {
+                    checkBolusInterval(limits.bolusMinIntervalMinutes)?.let { return it }
                 }
             }
             val credentials = if (pin == null) {
@@ -106,5 +118,28 @@ class CommandLauncher @Inject constructor(
         } finally {
             if (!started) pin?.clear()
         }
+    }
+
+    /** BOL-12: odstęp 0 = bez czytania historii; historia niedostępna = blokada. */
+    private suspend fun checkBolusInterval(intervalMinutes: Int): LaunchResult.Rejected? {
+        if (intervalMinutes == 0) return null
+        val snapshot = try {
+            history.entries.first()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            HistorySnapshot.Unavailable
+        }
+        val entries = (snapshot as? HistorySnapshot.Entries)?.entries
+            ?: return LaunchResult.Rejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE)
+        // Wyjątek zegara lub obliczenia = bezpieczna strona (blokada), launch nie rzuca.
+        val left = try {
+            BolusInterval.minutesLeft(entries, clock.nowEpochMillis(), intervalMinutes)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return LaunchResult.Rejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE)
+        } ?: return null
+        return LaunchResult.Rejected(LaunchRejection.BOLUS_INTERVAL, left)
     }
 }

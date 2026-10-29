@@ -90,7 +90,7 @@ class RunTextsTest {
         ResultMessage.entries.forEach { message ->
             val line = source.lines().single { it.trim().startsWith("ResultMessage.${message.name} ->") }
             val key = keyPattern.find(line)!!.groupValues[1]
-            val hasArg = strings[key]!!.contains("%1\$d")
+            val hasArg = Regex("""%1\$[ds]""").containsMatchIn(strings[key]!!)
             assertEquals(byMessage.getValue(message).messageArg != null, hasArg, "$message / $key")
             assertEquals(message in ResultMapperTest.MESSAGES_WITH_ARG, hasArg, "$message / $key")
         }

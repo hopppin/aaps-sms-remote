@@ -22,7 +22,7 @@ object ProgressSteps {
 
     /** CMDUI-17. Faza niemożliwa dla polecenia albo FINISHED → wszystkie PENDING. */
     fun of(command: CommandId, phase: SessionPhase): List<ProgressStep> {
-        val ids = if (command == CommandId.CARBS) carbsSteps else simpleSteps
+        val ids = if (command == CommandId.CARBS || command == CommandId.BOLUS) carbsSteps else simpleSteps
         val current = currentIndex(phase)
         return ids.mapIndexed { index, id ->
             val status = when {

@@ -14,7 +14,7 @@ class FakeCommandHistory : CommandHistory {
     /** Gdy ustawione, record rzuca ten wyjatek (po zapamietaniu wyniku). */
     var throwOnRecord: Throwable? = null
 
-    override val entries: Flow<HistorySnapshot> = flowOf(HistorySnapshot.Entries(emptyList()))
+    override var entries: Flow<HistorySnapshot> = flowOf(HistorySnapshot.Entries(emptyList()))
 
     override suspend fun record(result: SessionResult): RecordResult {
         recorded.add(result)

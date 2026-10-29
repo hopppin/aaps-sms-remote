@@ -30,6 +30,13 @@ fun UnknownReason.toResultMessage(): ResultMessage = when (this) {
     UnknownReason.INTERNAL_ERROR -> ResultMessage.UNKNOWN_INTERNAL_ERROR
 }
 
+/** BOL-16: bolus ma osobne teksty niezgodnej ilości i nierozpoznanej odpowiedzi po kodzie. */
+fun ResultMessage.forBolus(): ResultMessage = when (this) {
+    ResultMessage.AMOUNT_MISMATCH -> ResultMessage.BOLUS_AMOUNT_MISMATCH
+    ResultMessage.UNKNOWN_UNRECOGNIZED_REPLY -> ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY
+    else -> this
+}
+
 /** SENDING_COMMAND -> SEND_TIMEOUT; każda inna faza i null -> NO_RESPONSE. */
 fun timedOutResultMessage(phase: SessionPhase?): ResultMessage = when (phase) {
     SessionPhase.SENDING_COMMAND -> ResultMessage.SEND_TIMEOUT
@@ -53,6 +60,9 @@ fun ResultMessage.minutesArg(timeouts: SessionTimeouts = SessionTimeouts()): Int
     ResultMessage.BG_REPLY,
     ResultMessage.PUMP_REPLY,
     ResultMessage.CARBS_CONFIRMED,
+    ResultMessage.BOLUS_CONFIRMED,
+    ResultMessage.BOLUS_AMOUNT_MISMATCH,
+    ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
     ResultMessage.DETAILS_MISSING,
     ResultMessage.SEND_FAILED,
     ResultMessage.UNRECOGNIZED_REPLY,

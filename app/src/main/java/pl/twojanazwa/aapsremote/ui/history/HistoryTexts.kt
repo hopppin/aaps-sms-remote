@@ -1,7 +1,10 @@
 package pl.twojanazwa.aapsremote.ui.history
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.ui.commands.resultMessageText
 import pl.twojanazwa.aapsremote.ui.commands.textRes
 import pl.twojanazwa.aapsremote.ui.commands.titleRes
 
@@ -12,6 +15,8 @@ fun HistoryCommandLabel.textRes(): Int = when (this) {
     HistoryCommandLabel.PUMP -> R.string.commands_pump
     HistoryCommandLabel.CARBS -> R.string.history_command_carbs
     HistoryCommandLabel.CARBS_NO_AMOUNT -> R.string.history_command_carbs_no_amount
+    HistoryCommandLabel.BOLUS -> R.string.history_command_bolus
+    HistoryCommandLabel.BOLUS_NO_AMOUNT -> R.string.history_command_bolus_no_amount
     HistoryCommandLabel.UNRECOGNIZED -> R.string.history_command_unrecognized
 }
 
@@ -36,3 +41,8 @@ fun HistoryResultView.titleRes(): Int = kind?.titleRes() ?: R.string.history_kin
 /** message == null -> history_result_details_missing, inaczej ResultMessage.textRes() (Spec 009). */
 @StringRes
 fun HistoryResultView.messageRes(): Int = message?.textRes() ?: R.string.history_result_details_missing
+
+/** Tekst wyniku z argumentem (gramy, minuty albo ilość bolusa). */
+@Composable
+internal fun historyMessageText(result: HistoryResultView): String =
+    result.message?.let { resultMessageText(it, result.messageArg) } ?: stringResource(result.messageRes())

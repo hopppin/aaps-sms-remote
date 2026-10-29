@@ -6,10 +6,12 @@ import pl.twojanazwa.aapsremote.commands.CommandId
 sealed interface RunView {
     val commandId: CommandId
     val commandGrams: Int?
+    val commandCentiUnits: Int?
 
     data class Active(
         override val commandId: CommandId,
         override val commandGrams: Int?,
+        override val commandCentiUnits: Int?,
         val steps: List<ProgressStep>,
         val cancelMode: CancelMode,
         val unexpectedCount: Int,
@@ -21,6 +23,7 @@ sealed interface RunView {
     data class Finished(val result: ResultView) : RunView {
         override val commandId: CommandId get() = result.commandId
         override val commandGrams: Int? get() = result.commandGrams
+        override val commandCentiUnits: Int? get() = result.commandCentiUnits
     }
 }
 

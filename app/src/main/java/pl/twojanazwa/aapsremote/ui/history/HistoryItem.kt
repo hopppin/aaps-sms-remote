@@ -8,6 +8,8 @@ data class HistoryItem(
     val result: HistoryResultView,
     /** startedAt ?: finishedAt (HISTUI-05). */
     val listTimeEpochMillis: Long?,
+    /** Tylko dla BOLUS (setne jednostki). */
+    val bolusCentiUnits: Int? = null,
 ) {
     /** HISTUI-15: bez gramów, wyniku i czasów. */
     override fun toString(): String = "HistoryItem(id=$id, ***)"
@@ -23,6 +25,7 @@ data class HistoryDetails(
     val replyText: String?,
     /** null, gdy liczba = 0 (HISTUI-06). */
     val unexpectedCount: Int?,
+    val bolusCentiUnits: Int? = null,
 ) {
     /** HISTUI-15: bez gramów, treści i czasów. */
     override fun toString(): String = "HistoryDetails(id=$id, ***)"

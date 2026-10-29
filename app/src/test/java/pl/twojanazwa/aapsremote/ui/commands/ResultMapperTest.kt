@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
+import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandId
 import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.FailureReason
@@ -140,14 +142,57 @@ class ResultMapperTest {
         assertEquals(1, done.commandGrams)
     }
 
+    private fun bolus(centiUnits: Int): Command =
+        (Command.Bolus.of(centiUnits, CommandLimits.DEFAULT) as BolusValidation.Valid).command
+
     @Test
-    fun `BOL-11 BolusConfirmed daje SUCCESS z DETAILS_MISSING bez argumentu`() {
-        val bolus = (Command.Bolus.of(120, CommandLimits.DEFAULT) as BolusValidation.Valid).command
-        val view = ResultMapper.map(result(bolus, SessionOutcome.BolusConfirmed(120, "t")))
+    fun `BOL-16 BolusConfirmed 120 daje sukces z argumentem 120 i trescia potwierdzenia`() {
+        val text = fileText("bolus-sukces-1-20.txt")
+        val view = ResultMapper.map(result(bolus(120), SessionOutcome.BolusConfirmed(120, text)))
         assertEquals(ResultKind.SUCCESS, view.kind)
-        assertEquals(ResultMessage.DETAILS_MISSING, view.message)
-        assertNull(view.messageArg)
-        assertEquals("t", view.replyText)
+        assertEquals(ResultMessage.BOLUS_CONFIRMED, view.message)
+        assertEquals(120, view.messageArg)
+        assertEquals(120, view.commandCentiUnits)
+        assertEquals(text, view.replyText)
+        assertEquals("1,20", formatCentiUnits(120))
+        assertEquals("AAPS potwierdził podanie %1\$s j.", strings["result_bolus_confirmed"])
+    }
+
+    @Test
+    fun `BOL-16 kazdy UnknownReason bolusa ma ostrzezenie bolusowe, CARBS ogolne`() {
+        UnknownReason.entries.forEach {
+            assertTrue(ResultMapper.map(result(bolus(120), SessionOutcome.Unknown(it, null))).unknownWarning, "$it")
+        }
+        assertEquals(R.string.result_unknown_warning_bolus, unknownWarningRes(bolus = true))
+        assertEquals(R.string.result_unknown_warning, unknownWarningRes(bolus = false))
+        assertEquals(
+            "Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.",
+            strings["result_unknown_warning_bolus"],
+        )
+    }
+
+    @Test
+    fun `BOL-16 AMOUNT_MISMATCH i UNRECOGNIZED_REPLY bolusa maja osobne teksty niz CARBS`() {
+        val failed = ResultMapper.map(result(bolus(120), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null)))
+        assertEquals(ResultMessage.BOLUS_AMOUNT_MISMATCH, failed.message)
+        assertEquals(
+            ResultMessage.AMOUNT_MISMATCH,
+            ResultMapper.map(result(carbs(5), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null))).message,
+        )
+        val unknown = ResultMapper.map(result(bolus(120), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, "x")))
+        assertEquals(ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY, unknown.message)
+        assertEquals(
+            "Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS. Przeczytaj treść SMS i sprawdź w AAPS.",
+            strings["result_bolus_unknown_unrecognized_reply"],
+        )
+        assertTrue(failed.codeNotSent)
+    }
+
+    @Test
+    fun `BOL-16 BOLUS ma w kazdej fazie te same kroki co CARBS`() {
+        SessionPhase.entries.forEach {
+            assertEquals(ProgressSteps.of(CommandId.CARBS, it), ProgressSteps.of(CommandId.BOLUS, it), "$it")
+        }
     }
 
     @Test
@@ -222,6 +267,12 @@ class ResultMapperTest {
         )
         assertEquals(2, view.unexpectedCount)
         assertEquals(1, view.commandGrams)
+    }
+
+    private val strings: Map<String, String> by lazy {
+        Regex("""<string name="([^"]+)"[^>]*>([^<]*)</string>""")
+            .findAll(File("src/main/res/values/strings.xml").readText())
+            .associate { it.groupValues[1] to it.groupValues[2] }
     }
 
     private fun fileText(name: String): String =
@@ -323,6 +374,9 @@ class ResultMapperTest {
             result(Command.Pump, SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
             result(c, SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
             result(c, SessionOutcome.CarbsConfirmed(20, "t")),
+            result(bolus(120), SessionOutcome.BolusConfirmed(120, "t")),
+            result(bolus(120), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null)),
+            result(bolus(120), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, null)),
             result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.SENDING_COMMAND)),
             result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY)),
             result(c, SessionOutcome.Cancelled),
@@ -334,6 +388,7 @@ class ResultMapperTest {
         /** Komunikaty z argumentem `%1$d` (design, tabela odwzorowania). */
         val MESSAGES_WITH_ARG = setOf(
             ResultMessage.CARBS_CONFIRMED,
+            ResultMessage.BOLUS_CONFIRMED,
             ResultMessage.NO_RESPONSE,
             ResultMessage.SEND_TIMEOUT,
             ResultMessage.UNKNOWN_CONFIRMATION_TIMEOUT,

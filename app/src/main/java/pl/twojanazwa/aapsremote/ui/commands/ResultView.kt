@@ -5,7 +5,9 @@ import pl.twojanazwa.aapsremote.commands.CommandId
 enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
 
 enum class ResultMessage {
-    BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED,
+    BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED, BOLUS_CONFIRMED,
+    /** Bolus: osobne teksty niezgodnej ilości przed kodem i nierozpoznanej odpowiedzi po kodzie (BOL-16). */
+    BOLUS_AMOUNT_MISMATCH, BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
     /** Completed dla CARBS (nie występuje, Spec 004); jak „brak szczegółów” w HISTUI-04 (Spec 010). */
     DETAILS_MISSING,
     SEND_FAILED, UNRECOGNIZED_REPLY, AMOUNT_MISMATCH, UNEXPECTED_REPLY, WRONG_CODE,
@@ -20,6 +22,8 @@ data class ResultView(
     val commandId: CommandId,
     /** Ilość z polecenia CARBS (nagłówek „Polecenie CARBS X g”), null dla BG/PUMP. */
     val commandGrams: Int?,
+    /** Ilość z polecenia BOLUS w setnych (nagłówek „Polecenie BOLUS X j.”), inaczej null. */
+    val commandCentiUnits: Int? = null,
     val kind: ResultKind,
     val message: ResultMessage,
     /** Argument komunikatu: gramy (CARBS_CONFIRMED) albo minuty (NO_RESPONSE, SEND_TIMEOUT, UNKNOWN_CONFIRMATION_TIMEOUT). */

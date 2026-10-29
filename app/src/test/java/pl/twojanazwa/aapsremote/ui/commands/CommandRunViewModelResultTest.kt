@@ -209,6 +209,7 @@ class CommandRunViewModelResultTest {
         val active = RunView.Active(
             pl.twojanazwa.aapsremote.commands.CommandId.CARBS,
             37,
+            null,
             emptyList(),
             CancelMode.CANCEL,
             0,

@@ -7,6 +7,9 @@ import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionResult
 import pl.twojanazwa.aapsremote.session.SessionTimeouts
 
+private fun ResultMessage.forCommand(command: Command): ResultMessage =
+    if (command is Command.Bolus) forBolus() else this
+
 object ResultMapper {
     /** CMDUI-19, CMDUI-20. Powody i fazy odwzorowuje ResultMessages.kt (wspólne z historią, HISTUI-04). */
     fun map(result: SessionResult, timeouts: SessionTimeouts = SessionTimeouts()): ResultView {
@@ -35,15 +38,15 @@ object ResultMapper {
                 arg = outcome.grams
                 text = outcome.text
             }
-            // Minimalna gałąź; pełne teksty wyniku bolusa w zad. 5 (spec 012).
             is SessionOutcome.BolusConfirmed -> {
                 kind = ResultKind.SUCCESS
-                message = ResultMessage.DETAILS_MISSING
+                message = ResultMessage.BOLUS_CONFIRMED
+                arg = outcome.centiUnits
                 text = outcome.text
             }
             is SessionOutcome.Failed -> {
                 kind = ResultKind.FAILURE
-                message = outcome.reason.toResultMessage()
+                message = outcome.reason.toResultMessage().forCommand(command)
                 text = outcome.text
             }
             is SessionOutcome.TimedOut -> {
@@ -53,7 +56,7 @@ object ResultMapper {
             }
             is SessionOutcome.Unknown -> {
                 kind = ResultKind.UNKNOWN
-                message = outcome.reason.toResultMessage()
+                message = outcome.reason.toResultMessage().forCommand(command)
                 arg = message.minutesArg(timeouts)
                 text = outcome.text
             }
@@ -73,6 +76,7 @@ object ResultMapper {
         return ResultView(
             commandId = command.id,
             commandGrams = (command as? Command.Carbs)?.grams,
+            commandCentiUnits = (command as? Command.Bolus)?.centiUnits,
             kind = kind,
             message = message,
             messageArg = arg,

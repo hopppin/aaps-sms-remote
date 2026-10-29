@@ -22,6 +22,8 @@ fun CommandMessage.textRes(): Int = when (this) {
     CommandMessage.LIMITS_UNAVAILABLE -> R.string.commands_banner_limits_load_failed
     CommandMessage.AMOUNT_ABOVE_LIMIT -> R.string.commands_msg_amount_above_limit
     CommandMessage.EXTRA_CONFIRMATION_REQUIRED -> R.string.commands_msg_extra_confirmation_required
+    CommandMessage.BOLUS_INTERVAL -> R.string.commands_msg_bolus_interval
+    CommandMessage.BOLUS_HISTORY_UNAVAILABLE -> R.string.commands_msg_bolus_history_unavailable
 }
 
 @StringRes

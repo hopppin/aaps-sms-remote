@@ -66,6 +66,7 @@ class CommandRunViewModel @Inject constructor(
                 val view = RunView.Active(
                     commandId = run.command.id,
                     commandGrams = (run.command as? Command.Carbs)?.grams,
+                    commandCentiUnits = (run.command as? Command.Bolus)?.centiUnits,
                     steps = ProgressSteps.of(run.command.id, state.phase),
                     cancelMode = state.phase.cancelMode(),
                     unexpectedCount = state.unexpectedMessages.size,
