@@ -8,12 +8,20 @@ import pl.twojanazwa.aapsremote.session.SessionTimeouts
 import pl.twojanazwa.aapsremote.ui.commands.ResultKind
 import pl.twojanazwa.aapsremote.ui.commands.ResultMessage
 import pl.twojanazwa.aapsremote.ui.commands.forBolus
+import pl.twojanazwa.aapsremote.ui.commands.forProfile
 import pl.twojanazwa.aapsremote.ui.commands.minutesArg
 import pl.twojanazwa.aapsremote.ui.commands.timedOutResultMessage
 import pl.twojanazwa.aapsremote.ui.commands.toResultMessage
 
 private fun ResultMessage.forCommand(entry: HistoryEntry): ResultMessage =
-    if (entry.command == HistoryCommand.BOLUS) forBolus() else this
+    when (entry.command) {
+        HistoryCommand.BOLUS -> forBolus()
+        HistoryCommand.PROFILE_SWITCH -> forProfile()
+        else -> this
+    }
+
+/** Polecenia z kodem: tylko dla nich wynik mówi „kod nie został wysłany”. */
+private val codeCommands = setOf(HistoryCommand.CARBS, HistoryCommand.BOLUS, HistoryCommand.PROFILE_SWITCH)
 
 object HistoryEntryMapper {
     /** HISTUI-03, HISTUI-05. */
@@ -24,6 +32,8 @@ object HistoryEntryMapper {
         result = result(entry, timeouts),
         listTimeEpochMillis = entry.startedAtEpochMillis ?: entry.finishedAtEpochMillis,
         bolusCentiUnits = bolusCentiUnits(entry),
+        profileNumber = profileNumber(entry),
+        profilePercent = profilePercent(entry),
     )
 
     /** HISTUI-05, HISTUI-06. */
@@ -43,6 +53,8 @@ object HistoryEntryMapper {
         replyText = entry.replyText,
         unexpectedCount = entry.unexpectedMessageCount.takeIf { it > 0 },
         bolusCentiUnits = bolusCentiUnits(entry),
+        profileNumber = profileNumber(entry),
+        profilePercent = profilePercent(entry),
     )
 
     private fun commandLabel(entry: HistoryEntry): HistoryCommandLabel = when (entry.command) {
@@ -52,11 +64,22 @@ object HistoryEntryMapper {
             if (entry.carbsGrams != null) HistoryCommandLabel.CARBS else HistoryCommandLabel.CARBS_NO_AMOUNT
         HistoryCommand.BOLUS ->
             if (entry.bolusCentiUnits != null) HistoryCommandLabel.BOLUS else HistoryCommandLabel.BOLUS_NO_AMOUNT
-        // Zad. 5 spec 013 doda etykiety profilu; do tego czasu wpisy profilu mają etykietę neutralną.
-        HistoryCommand.PROFILE_STATUS, HistoryCommand.PROFILE_LIST, HistoryCommand.PROFILE_SWITCH,
-        HistoryCommand.UNRECOGNIZED,
-        -> HistoryCommandLabel.UNRECOGNIZED
+        HistoryCommand.PROFILE_STATUS -> HistoryCommandLabel.PROFILE_STATUS
+        HistoryCommand.PROFILE_LIST -> HistoryCommandLabel.PROFILE_LIST
+        HistoryCommand.PROFILE_SWITCH ->
+            if (profileNumber(entry) != null && profilePercent(entry) != null) {
+                HistoryCommandLabel.PROFILE_SWITCH
+            } else {
+                HistoryCommandLabel.PROFILE_SWITCH_NO_DETAILS
+            }
+        HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
     }
+
+    private fun profileNumber(entry: HistoryEntry): Int? =
+        if (entry.command == HistoryCommand.PROFILE_SWITCH) entry.profileNumber else null
+
+    private fun profilePercent(entry: HistoryEntry): Int? =
+        if (entry.command == HistoryCommand.PROFILE_SWITCH) entry.profilePercent else null
 
     private fun carbsGrams(entry: HistoryEntry): Int? =
         if (entry.command == HistoryCommand.CARBS) entry.carbsGrams else null
@@ -75,8 +98,10 @@ object HistoryEntryMapper {
                 message = when (entry.command) {
                     HistoryCommand.BG -> ResultMessage.BG_REPLY
                     HistoryCommand.PUMP -> ResultMessage.PUMP_REPLY
+                    HistoryCommand.PROFILE_STATUS -> ResultMessage.PROFILE_STATUS_REPLY
+                    HistoryCommand.PROFILE_LIST -> ResultMessage.PROFILE_LIST_REPLY
                     HistoryCommand.CARBS, HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED,
-                    HistoryCommand.PROFILE_STATUS, HistoryCommand.PROFILE_LIST, HistoryCommand.PROFILE_SWITCH,
+                    HistoryCommand.PROFILE_SWITCH,
                     -> null
                 }
             }
@@ -123,7 +148,7 @@ object HistoryEntryMapper {
             ResultMessage.BOLUS_CONFIRMED -> entry.bolusCentiUnits
             else -> message.minutesArg(timeouts)
         }
-        val codeNotSent = (entry.command == HistoryCommand.CARBS || entry.command == HistoryCommand.BOLUS) &&
+        val codeNotSent = entry.command in codeCommands &&
             (
                 (outcome is HistoryOutcome.Failed && outcome.reason != null && outcome.reason != FailureReason.WRONG_CODE) ||
                     outcome is HistoryOutcome.TimedOut ||

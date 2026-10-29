@@ -15,9 +15,9 @@ class UiNoLoggingTest {
     )
 
     @Test
-    fun `CMDUI-26 zrodla ui-commands i ui-platform nie wywoluja API logowania`() {
+    fun `CMDUI-26 zrodla ui-commands, ui-platform i ui-history nie wywoluja API logowania`() {
         val base = "src/main/java/pl/twojanazwa/aapsremote/ui"
-        val sources = listOf("commands", "platform").flatMap { dir ->
+        val sources = listOf("commands", "platform", "history").flatMap { dir ->
             val root = File("$base/$dir")
             assertTrue(root.isDirectory, "Brak katalogu: ${root.path}")
             root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()

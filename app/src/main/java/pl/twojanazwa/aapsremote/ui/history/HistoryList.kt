@@ -37,7 +37,7 @@ fun HistoryList(items: List<HistoryItem>, onEntryClicked: (Long) -> Unit) {
 @Composable
 private fun HistoryRow(item: HistoryItem, zone: ZoneId, onClick: () -> Unit) {
     val result = item.result
-    val command = historyCommandText(item.command, item.grams, item.bolusCentiUnits)
+    val command = historyCommandText(item.command, item.grams, item.bolusCentiUnits, item.profileNumber, item.profilePercent)
     val time = item.listTimeEpochMillis
         ?.let { HistoryTimeFormat.row(it, zone) }
         ?: stringResource(R.string.history_time_none)

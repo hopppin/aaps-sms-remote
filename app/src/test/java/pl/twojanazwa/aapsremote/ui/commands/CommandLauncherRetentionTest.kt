@@ -70,7 +70,7 @@ class CommandLauncherRetentionTest {
             val secret = SessionTestFixtures.secret()
             env.secrets.loadResults.add(LoadResult.Loaded(secret))
             val launcher = env.launcher()
-            val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits)
+            val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits, ProfileSelection())
             env.secrets.setState(pl.twojanazwa.aapsremote.security.SecretState.PRESENT)
             main.dispatcher.scheduler.advanceUntilIdle()
             vm.onCarbsInputChanged("20")

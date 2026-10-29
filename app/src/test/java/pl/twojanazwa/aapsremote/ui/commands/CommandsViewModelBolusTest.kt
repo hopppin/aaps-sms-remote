@@ -39,7 +39,7 @@ class CommandsViewModelBolusTest {
     private fun TestScope.env() = CommandTestEnv(this).also { it.secrets.setState(SecretState.PRESENT) }
 
     private fun CommandTestEnv.viewModel(launcher: CommandLauncher = launcher()) =
-        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions, limits).also { settle() }
+        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions, limits, ProfileSelection()).also { settle() }
 
     private fun CommandsViewModel.state(): CommandsUiState {
         settle()

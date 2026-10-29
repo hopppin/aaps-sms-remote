@@ -2,6 +2,7 @@ package pl.twojanazwa.aapsremote.ui.history
 
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -26,7 +27,7 @@ class HistoryTextsTest {
         "history_details_title", "history_time_started", "history_time_command_sent",
         "history_time_code_sent", "history_time_finished", "history_time_none", "history_clear",
         "history_clear_title", "history_clear_text", "history_clear_confirm",
-        "history_msg_cleared", "history_msg_clear_failed",
+        "history_msg_cleared", "history_msg_clear_failed", "history_result_profile_list_reply",
     )
 
     private fun assertDistinctNonZero(ids: List<Int>) {
@@ -67,12 +68,22 @@ class HistoryTextsTest {
         val ids = ResultMessage.entries.map { view(null, it).messageRes() } + view(null, null).messageRes()
         assertDistinctNonZero(ids)
         assertEquals(R.string.history_result_details_missing, view(null, null).messageRes())
-        ResultMessage.entries.forEach { assertEquals(it.textRes(), view(null, it).messageRes()) }
+        ResultMessage.entries.filter { it != ResultMessage.PROFILE_LIST_REPLY }
+            .forEach { assertEquals(it.textRes(), view(null, it).messageRes()) }
+    }
+
+    @Test
+    fun `PROF-17 historia PROFILE LIST ma neutralny tekst bez Wybierz profil`() {
+        val id = view(ResultKind.SUCCESS, ResultMessage.PROFILE_LIST_REPLY).messageRes()
+        assertEquals(R.string.history_result_profile_list_reply, id)
+        assertEquals("Odpowiedź AAPS na PROFILE LIST.", strings["history_result_profile_list_reply"])
+        assertFalse(strings.getValue("history_result_profile_list_reply").contains("Wybierz"))
+        assertNotEquals(R.string.result_profile_list_reply, id)
     }
 
     @Test
     fun `HISTUI-14 kazdy nowy klucz history ma niepusty tekst`() {
-        assertEquals(22, historyKeys.size)
+        assertEquals(23, historyKeys.size)
         historyKeys.forEach { assertTrue(!strings[it].isNullOrBlank(), "Brak niepustego tekstu: $it") }
     }
 

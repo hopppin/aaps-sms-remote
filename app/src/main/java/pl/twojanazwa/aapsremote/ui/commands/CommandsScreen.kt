@@ -142,6 +142,14 @@ fun CommandsScreen(
                 onProfileChosen = runViewModel::onProfileChosen,
                 onResultDismissed = runViewModel::onResultDismissed,
             )
+        } else if (commands.profile != null && summary == null) {
+            ProfileForm(
+                form = checkNotNull(commands.profile),
+                canProceed = commands.canStartProfile,
+                onPercentChanged = commandsViewModel::onProfilePercentChanged,
+                onNext = commandsViewModel::onProfileNextClicked,
+                onCancel = commandsViewModel::onProfileFormCancelled,
+            )
         } else if (summary != null) {
             CommandSummary(
                 command = summary.command,

@@ -4,6 +4,8 @@ import pl.twojanazwa.aapsremote.commands.BolusAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandLimits
+import pl.twojanazwa.aapsremote.commands.ProfileChoice
+import pl.twojanazwa.aapsremote.commands.ProfileSwitchError
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 
 /** Podsumowanie z PIN-em dla polecenia z kodem (CMDUI-10, BOL-15); `toString()` bez ilości. */
@@ -13,6 +15,19 @@ class SummaryState(val command: Command) {
     override fun hashCode(): Int = command.hashCode()
 
     override fun toString(): String = "SummaryState(***)"
+}
+
+/** Formularz procentu dla wybranego profilu (PROF-15); `toString()` bez nazwy i procentu. */
+class ProfileFormState(val choice: ProfileChoice, val percentText: String, val error: ProfileSwitchError? = null) {
+    fun copy(percentText: String = this.percentText, error: ProfileSwitchError? = this.error) =
+        ProfileFormState(choice, percentText, error)
+
+    override fun equals(other: Any?): Boolean =
+        other is ProfileFormState && other.choice == choice && other.percentText == percentText && other.error == error
+
+    override fun hashCode(): Int = 31 * (31 * choice.hashCode() + percentText.hashCode()) + (error?.hashCode() ?: 0)
+
+    override fun toString(): String = "ProfileFormState(***)"
 }
 
 data class CommandsUiState(
@@ -33,6 +48,8 @@ data class CommandsUiState(
     val confirming: Command? = null,
     /** Podsumowanie otwarte dla tego polecenia (CMDUI-10, BOL-15). */
     val summary: SummaryState? = null,
+    /** Formularz zmiany profilu (PROF-15), otwarty po wyborze z wyniku listy. */
+    val profile: ProfileFormState? = null,
     val pinText: String = "",
     val message: CommandMessage? = null,
     /** Argumenty komunikatu (BOLUS_INTERVAL: N i M minut). */
@@ -67,17 +84,21 @@ data class CommandsUiState(
     /** BOL-13: dostępność jak CARBS (numer, SMS, sekret, limity `Loaded`, brak polecenia w toku). */
     val canStartBolus: Boolean get() = canStartCarbs
 
+    /** PROF-15: „Dalej” wymaga numeru, SMS, sekretu i braku polecenia; limity nie są potrzebne. */
+    val canStartProfile: Boolean
+        get() = ready && secret != SecretReadiness.ABSENT && secret != SecretReadiness.INVALIDATED
+
     val canSubmitPin: Boolean get() = summary != null && pinText.isNotEmpty() && !launching
 
     /** CMDUI-09, CMDUI-23: okno „Na pewno”, podsumowanie, uruchamianie albo przekazanie do przebiegu. */
-    val secureWindow: Boolean get() = confirming != null || summary != null || launching || runHandoff
+    val secureWindow: Boolean get() = confirming != null || summary != null || profile != null || launching || runHandoff
 
     /** CMDUI-24: Wstecz obsługuje ten ViewModel. */
-    val interceptsBack: Boolean get() = confirming != null || summary != null
+    val interceptsBack: Boolean get() = confirming != null || summary != null || profile != null
 
     /** Bez PIN-u, tekstów pól i ilości (CMDUI-26, BOL-18). */
     override fun toString(): String =
         "CommandsUiState(number=$number, smsGranted=$smsGranted, secret=$secret, commandActive=$commandActive, limits=${limits::class.simpleName}, " +
             "launching=$launching, carbsError=$carbsError, bolusError=$bolusError, confirming=${confirming != null}, " +
-            "summary=${summary != null}, message=$message, runHandoff=$runHandoff)"
+            "summary=${summary != null}, profile=${profile != null}, message=$message, runHandoff=$runHandoff)"
 }

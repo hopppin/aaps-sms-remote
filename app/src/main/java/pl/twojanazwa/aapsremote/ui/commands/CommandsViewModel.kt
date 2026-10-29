@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
+import pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.data.CommandLimitsStore
@@ -37,6 +38,7 @@ class CommandsViewModel @Inject constructor(
     private val secrets: TotpSecretStore,
     private val permissions: SmsPermissions,
     private val limitsStore: CommandLimitsStore,
+    private val profileSelection: ProfileSelection,
 ) : ViewModel() {
     /** Część stanu własna ViewModelu (początkowy odczyt uprawnień, CMDUI-03); gotowość dokłada `combine`. */
     private val local = MutableStateFlow(CommandsUiState(smsGranted = readPermissions()))
@@ -68,6 +70,16 @@ class CommandsViewModel @Inject constructor(
         viewModelScope.launch {
             currentRun.state.collect { run ->
                 if (run == null && currentRun.state.value == null) local.update { it.copy(runHandoff = false) }
+            }
+        }
+        // PROF-14: wybór z wyniku listy otwiera formularz (procent 100) i jest od razu zużywany.
+        viewModelScope.launch {
+            profileSelection.choice.collect { choice ->
+                if (choice == null) return@collect
+                local.update {
+                    it.copy(profile = ProfileFormState(choice, Command.ProfileSwitch.DEFAULT_PERCENT.toString()))
+                }
+                profileSelection.clear()
             }
         }
     }
@@ -169,6 +181,34 @@ class CommandsViewModel @Inject constructor(
         local.update { if (it.confirming is Command.Bolus) it.copy(confirming = null) else it }
     }
 
+    /** PROF-15: zmiana tekstu usuwa błąd. */
+    fun onProfilePercentChanged(text: String) {
+        local.update { s -> s.copy(profile = s.profile?.copy(percentText = text, error = null)) }
+    }
+
+    /** PROF-15: poprawny procent otwiera podsumowanie z PIN-em, niepoprawny zostawia błąd pod polem. */
+    fun onProfileNextClicked() {
+        val form = local.value.profile ?: return
+        if (!compose().canStartProfile) return
+        when (val result = Command.ProfileSwitch.parsePercent(form.choice, form.percentText)) {
+            is ProfileSwitchValidation.Invalid ->
+                local.update { it.copy(profile = form.copy(error = result.error)) }
+            // Jedna aktualizacja: nigdy nie ma chwili bez formularza i bez podsumowania (secureWindow).
+            is ProfileSwitchValidation.Valid -> local.update {
+                it.copy(
+                    profile = null, confirming = null, summary = SummaryState(result.command),
+                    pinText = "", extraConfirmed = false,
+                )
+            }
+        }
+    }
+
+    /** „Anuluj” formularza: wybór jest już zużyty, więc wystarczy zamknąć formularz. */
+    fun onProfileFormCancelled() {
+        if (local.value.launching) return
+        local.update { it.copy(profile = null) }
+    }
+
     private fun openSummary(command: Command, extraConfirmed: Boolean) {
         local.update {
             it.copy(confirming = null, summary = SummaryState(command), pinText = "", extraConfirmed = extraConfirmed)
@@ -190,21 +230,17 @@ class CommandsViewModel @Inject constructor(
         local.update { it.copy(pinText = "") }
         val pin = AapsPin.fromChars(chars)
         val limits = state.loadedLimits
-        if (limits == null) {
+        // Zmiana profilu nie zależy od limitów ilości (procent sprawdzony w „Dalej”).
+        if (limits == null && summary.command !is Command.ProfileSwitch) {
             pin.clear()
             local.update { it.copy(summary = null, message = CommandMessage.LIMITS_UNAVAILABLE) }
             return
         }
         // LIM-09: limit zmniejszony po otwarciu podsumowania; ilość nie jest przycinana.
         val command = when (val c = summary.command) {
-            is Command.Carbs -> (Command.Carbs.of(c.grams, limits) as? CarbsValidation.Valid)?.command
-            is Command.Bolus -> (Command.Bolus.of(c.centiUnits, limits) as? BolusValidation.Valid)?.command
-            // Polecenia profilu nie mają jeszcze UI (spec 013, zad. 4+); nic nie wysyłamy.
-            is Command.ProfileSwitch -> {
-                pin.clear()
-                local.update { it.copy(summary = null) }
-                return
-            }
+            is Command.Carbs -> limits?.let { (Command.Carbs.of(c.grams, it) as? CarbsValidation.Valid)?.command }
+            is Command.Bolus -> limits?.let { (Command.Bolus.of(c.centiUnits, it) as? BolusValidation.Valid)?.command }
+            is Command.ProfileSwitch -> c
             Command.ProfileStatus, Command.ProfileList, Command.Bg, Command.Pump -> null
         }
         if (command == null) {
@@ -212,7 +248,7 @@ class CommandsViewModel @Inject constructor(
             local.update { it.copy(summary = null, message = CommandMessage.AMOUNT_ABOVE_LIMIT) }
             return
         }
-        startCommand(command, pin, state.extraConfirmed, limits.bolusMinIntervalMinutes)
+        startCommand(command, pin, state.extraConfirmed, limits?.bolusMinIntervalMinutes ?: 0)
     }
 
     /** W trakcie uruchamiania „Anuluj” i Wstecz nie ukrywają podsumowania (CMDUI-10, CMDUI-11). */
@@ -224,12 +260,20 @@ class CommandsViewModel @Inject constructor(
     /** Okno „Na pewno” -> zamknij; podsumowanie -> jak „Anuluj” (CMDUI-24). */
     fun onBack() {
         if (local.value.launching) return
-        if (local.value.confirming != null) local.update { it.copy(confirming = null) } else onSummaryDismissed()
+        when {
+            local.value.confirming != null -> local.update { it.copy(confirming = null) }
+            local.value.profile != null -> local.update { it.copy(profile = null) }
+            else -> onSummaryDismissed()
+        }
     }
 
     /** Aplikacja schodzi z ekranu albo zmiana zakładki: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
     fun onStop() {
-        local.update { it.copy(pinText = "", summary = null, confirming = null, extraConfirmed = false) }
+        // PROF-15: wybór profilu też jest porzucany (lista mogła się zestarzeć).
+        profileSelection.clear()
+        local.update {
+            it.copy(pinText = "", summary = null, confirming = null, extraConfirmed = false, profile = null)
+        }
     }
 
     private fun startNoCode(command: Command) {
@@ -266,8 +310,11 @@ class CommandsViewModel @Inject constructor(
                     LaunchResult.Started -> it.copy(
                         summary = null, extraConfirmed = false, runHandoff = true,
                     ).let { s ->
-                        if (command is Command.Bolus) s.copy(bolusInput = "", bolusError = null)
-                        else s.copy(carbsInput = "", carbsError = null)
+                        when (command) {
+                            is Command.Bolus -> s.copy(bolusInput = "", bolusError = null)
+                            is Command.Carbs -> s.copy(carbsInput = "", carbsError = null)
+                            else -> s
+                        }
                     }
                     is LaunchResult.Rejected -> it.copy(
                         summary = null,

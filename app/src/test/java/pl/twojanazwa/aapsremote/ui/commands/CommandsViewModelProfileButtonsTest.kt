@@ -22,7 +22,7 @@ class CommandsViewModelProfileButtonsTest {
     private fun TestScope.setup(): Pair<CommandTestEnv, CommandsViewModel> {
         val env = CommandTestEnv(this)
         val vm = CommandsViewModel(
-            env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits,
+            env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits, ProfileSelection(),
         )
         main.dispatcher.scheduler.runCurrent()
         return env to vm

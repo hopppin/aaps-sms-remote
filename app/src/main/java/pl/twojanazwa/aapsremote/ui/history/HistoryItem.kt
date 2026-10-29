@@ -10,6 +10,9 @@ data class HistoryItem(
     val listTimeEpochMillis: Long?,
     /** Tylko dla BOLUS (setne jednostki). */
     val bolusCentiUnits: Int? = null,
+    /** Tylko dla PROFILE_SWITCH (numer i procent; bez nazwy). */
+    val profileNumber: Int? = null,
+    val profilePercent: Int? = null,
 ) {
     /** HISTUI-15: bez gramów, wyniku i czasów. */
     override fun toString(): String = "HistoryItem(id=$id, ***)"
@@ -26,6 +29,9 @@ data class HistoryDetails(
     /** null, gdy liczba = 0 (HISTUI-06). */
     val unexpectedCount: Int?,
     val bolusCentiUnits: Int? = null,
+    /** Tylko dla PROFILE_SWITCH (numer i procent; bez nazwy). */
+    val profileNumber: Int? = null,
+    val profilePercent: Int? = null,
 ) {
     /** HISTUI-15: bez gramów, treści i czasów. */
     override fun toString(): String = "HistoryDetails(id=$id, ***)"
