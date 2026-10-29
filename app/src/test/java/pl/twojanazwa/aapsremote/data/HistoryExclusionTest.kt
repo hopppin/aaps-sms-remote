@@ -15,7 +15,7 @@ class HistoryExclusionTest {
     private val entryFields = setOf(
         "id", "command", "carbsGrams", "outcome", "startedAtEpochMillis",
         "commandSentAtEpochMillis", "codeSentAtEpochMillis", "finishedAtEpochMillis",
-        "replyText", "unexpectedMessageCount", "bolusCentiUnits",
+        "replyText", "unexpectedMessageCount", "bolusCentiUnits", "profileNumber", "profilePercent",
     )
 
     private val forbiddenTypes: List<Class<*>> = listOf(
