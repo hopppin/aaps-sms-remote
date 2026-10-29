@@ -34,6 +34,31 @@ sealed interface AapsReply {
         override fun toString(): String = "AapsReply.BolusDone(***)"
     }
 
+    /** PROF-07 */
+    data class ProfileListItem(val number: Int, val name: String) {
+        override fun toString(): String = "ProfileListItem(***)"
+    }
+
+    /** PROF-06 */
+    data class ProfileStatusReport(val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.ProfileStatusReport(***)"
+    }
+
+    /** PROF-07 */
+    data class ProfileListReport(val items: List<ProfileListItem>, val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.ProfileListReport(***)"
+    }
+
+    /** PROF-08. Istnieje tylko, gdy nazwa i procent są równe ExpectedCommand.ProfileSwitch. */
+    data class ProfileCodeRequest(val text: String) : MatchingCodeRequest {
+        override fun toString(): String = "AapsReply.ProfileCodeRequest(***)"
+    }
+
+    /** PROF-09 */
+    data class ProfileSwitchMismatch(val text: String) : CommandMismatch {
+        override fun toString(): String = "AapsReply.ProfileSwitchMismatch(***)"
+    }
+
     /** PARSER-03 */
     data class BgReport(val glucoseMgdl: Int, val text: String) : AapsReply {
         override fun toString(): String = "AapsReply.BgReport(***)"

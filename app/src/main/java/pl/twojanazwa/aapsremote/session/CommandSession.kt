@@ -308,6 +308,10 @@ class CommandSession(
             is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
             is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
+            // Zad. 3 spec 013 (#234) doda sprawdzenie profilu; do tego czasu te wyniki nie przechodzą.
+            is AapsReply.ProfileCodeRequest, is AapsReply.ProfileSwitchMismatch,
+            is AapsReply.ProfileStatusReport, is AapsReply.ProfileListReport,
+            -> false
             is AapsReply.BolusAmountMismatch, is AapsReply.CarbsAmountMismatch,
             is AapsReply.BgReport, is AapsReply.PumpStatus,
             AapsReply.WrongCode, is AapsReply.Unrecognized,

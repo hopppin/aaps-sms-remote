@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import pl.twojanazwa.aapsremote.parser.AapsReply
-import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import pl.twojanazwa.aapsremote.parser.ExpectedCommand
 
 class ProfileCommandTest {
@@ -130,23 +128,5 @@ class ProfileCommandTest {
         assertEquals(switch(1, 100).hashCode(), switch(1, 100).hashCode())
         assertFalse(switch(1, 100) == switch(1, 101))
         assertFalse(switch(1, 100) == switch(2, 100))
-    }
-
-    @Test
-    fun `PROF-05 parser do zad 2 zwraca Unrecognized dla polecen profilu`() {
-        val all = listOf(ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, ExpectedCommand.ProfileSwitch("LocalProfile1", 100))
-        val bodies = listOf(
-            "A (100%)",
-            "LocalProfile1 (115%)",
-            "Aby przelaczyc profil na LocalProfile1 100% odpowiedz kodem z Authenticatora",
-            "1. LocalProfile1\n2. LocalProfile2",
-            "Bledny format",
-            "",
-        )
-        for (e in all) {
-            for (b in bodies) {
-                assertTrue(AapsReplyParser.parse(b, e) is AapsReply.Unrecognized, b)
-            }
-        }
     }
 }
