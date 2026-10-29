@@ -16,6 +16,9 @@ import kotlinx.coroutines.SupervisorJob
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.data.AapsNumberSettings
 import pl.twojanazwa.aapsremote.data.CommandHistory
+import pl.twojanazwa.aapsremote.data.CommandLimitsSettings
+import pl.twojanazwa.aapsremote.data.CommandLimitsStorage
+import pl.twojanazwa.aapsremote.data.CommandLimitsStore
 import pl.twojanazwa.aapsremote.data.DataDispatcher
 import pl.twojanazwa.aapsremote.data.DataScope
 import pl.twojanazwa.aapsremote.data.HistoryRepository
@@ -39,6 +42,12 @@ abstract class DataModule {
 
     @Binds
     abstract fun settingsStorage(impl: SharedPreferencesSettingsStorage): SettingsStorage
+
+    @Binds
+    abstract fun commandLimitsStore(impl: CommandLimitsSettings): CommandLimitsStore
+
+    @Binds
+    abstract fun commandLimitsStorage(impl: SharedPreferencesCommandLimitsStorage): CommandLimitsStorage
 
     @Binds
     abstract fun commandHistory(impl: HistoryRepository): CommandHistory
