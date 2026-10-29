@@ -12,7 +12,7 @@ Użytkownik widzi w zakładce Historia ostatnie polecenia wysłane z aplikacji (
 ## Zakres
 
 - Zakładka Historia zamiast zaślepki ze Spec 008 (UI-03): stany „wczytywanie”, „pusto”, „błąd odczytu” z ponowieniem, lista wpisów.
-- Wiersz listy: polecenie (`BG`, `PUMP`, `CARBS X g`), czas, rodzaj wyniku i komunikat.
+- Wiersz listy: polecenie (`BG`, `PUMP`, `CARBS X g`, `BOLUS X j.`, `PROFILE STATUS`, `PROFILE LIST`, zmiana profilu), czas, rodzaj wyniku i komunikat.
 - Szczegóły wpisu po dotknięciu (P1): wynik z dodatkami, cztery czasy, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych.
 - Wspólne odwzorowanie powodów wyniku na komunikaty z `ui.commands` (bez kopii tabeli ze Spec 009) i bezpieczne pokazanie wpisów nierozpoznanych (DATA-09).
 - Czyszczenie całej historii z potwierdzeniem i komunikatem wyniku.
@@ -77,7 +77,7 @@ Lista zawiera wszystkie wpisy ze stanu `Entries` w tej samej kolejności (od naj
 
 ### HISTUI-03: Polecenie we wpisie
 
-Wiersz i szczegóły pokazują polecenie według tabeli. Ilość pochodzi z `HistoryEntry.carbsGrams`.
+Wiersz i szczegóły pokazują polecenie według tabeli. Ilość pochodzi z `HistoryEntry.carbsGrams` (`CARBS`) albo `HistoryEntry.bolusCentiUnits` (`BOLUS`, zapisywana w setnych jednostki, pokazywana z przecinkiem i dwoma miejscami; BOL-17), numer i procent profilu z `HistoryEntry.profileNumber` i `profilePercent` (PROF-17). Nazwa profilu nie jest we wpisie.
 
 | Wpis | Tekst |
 | --- | --- |
@@ -85,11 +85,20 @@ Wiersz i szczegóły pokazują polecenie według tabeli. Ilość pochodzi z `His
 | `PUMP` | „PUMP” |
 | `CARBS`, ilość X | „CARBS X g” |
 | `CARBS`, ilość = `null` | „CARBS (ilość nieznana)” |
+| `BOLUS`, ilość X | „BOLUS X j.” |
+| `BOLUS`, ilość = `null` | „BOLUS (ilość nieznana)” |
+| `PROFILE_STATUS` | „PROFILE STATUS” |
+| `PROFILE_LIST` | „PROFILE LIST” |
+| `PROFILE_SWITCH`, numer N i procent P | „Zmiana profilu N, P%” |
+| `PROFILE_SWITCH`, brak numeru lub procentu | „Zmiana profilu (szczegóły nieznane)” |
 | `UNRECOGNIZED` | „Nieznane polecenie” |
 
 **Kryteria akceptacji:**
 
 - **Zakładając** wpisy `BG`, `PUMP`, `CARBS` z ilością 20, `CARBS` z ilością `null` i `UNRECOGNIZED`, **gdy** odwzorowano je na wiersze, **wtedy** etykieta polecenia to kolejno `BG`, `PUMP`, `CARBS` z argumentem 20, `CARBS` bez ilości, nieznane polecenie.
+- **Zakładając** wpisy `BOLUS` 120, `BOLUS` bez ilości, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` (2, 115) i `PROFILE_SWITCH` bez numeru, **gdy** odwzorowano je na wiersze, **wtedy** etykiety to kolejno `BOLUS` z argumentem 120, `BOLUS` bez ilości, `PROFILE STATUS`, `PROFILE LIST`, zmiana profilu z argumentami 2 i 115, zmiana profilu bez szczegółów (BOL-17, PROF-17).
+- **Zakładając** wpis `BOLUS` 120, **gdy** go odwzorowano, **wtedy** tekst to dokładnie „BOLUS 1,20 j.”; dla ilości 1 – „BOLUS 0,01 j.”.
+- **Zakładając** wpisy `PROFILE_SWITCH` (numer 2, procent `null`) i (numer `null`, procent 115), **gdy** je odwzorowano, **wtedy** w obu tekst to dokładnie „Zmiana profilu (szczegóły nieznane)”.
 
 ### HISTUI-04: Wynik wpisu – wspólne odwzorowanie ze Spec 009
 
@@ -97,28 +106,33 @@ Wynik wpisu jest wyliczany jedną czystą funkcją z wyczerpującym `when` po `H
 
 | Wynik wpisu | Rodzaj | Komunikat |
 | --- | --- | --- |
-| `Completed`, polecenie `BG` / `PUMP` | sukces | jak CMDUI-19 („Odpowiedź AAPS na BG” / „… na PUMP”) |
-| `Completed`, polecenie `CARBS` albo `UNRECOGNIZED` | sukces | „Brak szczegółów wyniku (wpis z innej wersji aplikacji).” |
+| `Completed`, polecenie `BG` / `PUMP` / `PROFILE_STATUS` | sukces | jak CMDUI-19 („Odpowiedź AAPS na BG” / „… na PUMP” / „… na PROFILE STATUS”) |
+| `Completed`, polecenie `PROFILE_LIST` | sukces | „Odpowiedź AAPS na PROFILE LIST.” (inny tekst niż na ekranie wyniku, gdzie jest „Lista profili z AAPS. Wybierz profil, aby go zmienić.”, bo w historii nie ma przycisków wyboru; PROF-17) |
+| `Completed`, polecenie `CARBS`, `BOLUS`, `PROFILE_SWITCH` albo `UNRECOGNIZED` | sukces | „Brak szczegółów wyniku (wpis z innej wersji aplikacji).” |
 | `CarbsConfirmed`, polecenie `CARBS` z ilością X | sukces | „AAPS potwierdził wprowadzenie X g” |
-| `CarbsConfirmed`, ilość `null` albo polecenie inne niż `CARBS` | sukces | „Brak szczegółów wyniku …” |
-| `Failed(r)` | błąd | jak CMDUI-19 dla `r` |
-| `Failed(null)` | błąd | „Brak szczegółów wyniku …” |
+| `CarbsConfirmed`, ilość `null` albo polecenie inne niż `CARBS` | sukces | „Brak szczegółów wyniku.” |
+| `BolusConfirmed`, polecenie `BOLUS` z ilością X | sukces | „AAPS potwierdził podanie X j.” (BOL-17) |
+| `BolusConfirmed`, ilość `null` albo polecenie inne niż `BOLUS` | sukces | „Brak szczegółów wyniku.” |
+| `Failed(r)` | błąd | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu teksty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16) |
+| `Failed(null)` | błąd | „Brak szczegółów wyniku.” |
 | `TimedOut(p)` (także `p = null`) | brak odpowiedzi | jak CMDUI-19 (`SENDING_COMMAND` → „Telefon nie potwierdził wysłania SMS w ciągu 3 min.”; inna faza i `null` → „Brak odpowiedzi AAPS w ciągu 3 min.”) |
-| `Unknown(r)` | nieznany | jak CMDUI-19 dla `r` |
-| `Unknown(null)` | nieznany | „Brak szczegółów wyniku …” |
+| `Unknown(r)` | nieznany | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu – jak w BOL-16 i PROF-16) |
+| `Unknown(null)` | nieznany | „Brak szczegółów wyniku.” |
 | `Cancelled` | anulowane | „Polecenie anulowane.” |
-| `Unrecognized` | nierozpoznany → nagłówek „Nierozpoznany wynik” | „Brak szczegółów wyniku …” |
+| `Unrecognized` | nierozpoznany → nagłówek „Nierozpoznany wynik” | „Brak szczegółów wyniku.” |
 
 `Completed` dla `CARBS` ma odpowiednik na ekranie wyniku Spec 009 (CMDUI-19, korekta 2026-10-21): ten sam rodzaj (sukces) i komunikat „brak szczegółów” (`ResultMessage.DETAILS_MISSING`, „Brak szczegółów wyniku.”). Historia zostawia dla tego wiersza własny tekst z wyjaśnieniem o wpisie z innej wersji aplikacji; HISTUI-04 i jego kryteria się nie zmieniają.
 
 Dodatki (w szczegółach, P5) – reguły jak w CMDUI-19, z ograniczeniem do danych pewnych:
 
-- „Kod nie został wysłany.” – polecenie `CARBS` i wynik `Failed` z powodem innym niż `WRONG_CODE` i różnym od `null`, `TimedOut` albo `Cancelled`.
-- „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – każdy `Unknown`, także z powodem `null`.
+- „Kod nie został wysłany.” – polecenie z kodem (`CARBS`, `BOLUS`, `PROFILE_SWITCH`) i wynik `Failed` z powodem innym niż `WRONG_CODE` i różnym od `null`, `TimedOut` albo `Cancelled`.
+- „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – każdy `Unknown`, także z powodem `null`; dla `BOLUS` ostrzeżenie bolusowe „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.” (BOL-16).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** każdy `FailureReason` (8), każdy `UnknownReason` (7) i `TimedOut` z fazą `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, **gdy** odwzorowano wpis `CARBS 20` z tym wynikiem oraz `SessionResult` z tym samym wynikiem przez `ResultMapper` ze Spec 009, **wtedy** rodzaj, komunikat i argument są równe w obu odwzorowaniach.
+- **Zakładając** wpisy `BOLUS` 120/`BolusConfirmed`, `BOLUS` bez ilości/`BolusConfirmed`, `PROFILE_STATUS`/`Completed`, `PROFILE_LIST`/`Completed`, `PROFILE_SWITCH`/`Completed`, **gdy** odwzorowano, **wtedy** odpowiednio: sukces/„AAPS potwierdził podanie 1,20 j.”, sukces/brak szczegółów („Brak szczegółów wyniku.”), sukces/„Odpowiedź AAPS na PROFILE STATUS”, sukces/„Odpowiedź AAPS na PROFILE LIST.” (bez wezwania do wyboru profilu), sukces/„Brak szczegółów wyniku (wpis z innej wersji aplikacji).”.
+- **Zakładając** wpisy `BOLUS` z `Failed(AMOUNT_MISMATCH)` i `Unknown(UNRECOGNIZED_REPLY)` oraz `PROFILE_SWITCH` z `Failed(AMOUNT_MISMATCH)`, `Unknown(AMOUNT_MISMATCH)` i `Unknown(UNRECOGNIZED_REPLY)`, **gdy** odwzorowano, **wtedy** komunikaty są takie jak w BOL-16 i PROF-16, „Kod nie został wysłany” = `true` tylko dla `Failed`, a ostrzeżenie bolusowe tylko dla `BOLUS`.
 - **Zakładając** wpisy `BG`/`Completed`, `PUMP`/`Completed`, `CARBS 1`/`CarbsConfirmed`, `BG`/`Cancelled`, **gdy** odwzorowano, **wtedy** rodzaj i komunikat są jak w CMDUI-19, a dla `CarbsConfirmed` argument = 1.
 - **Zakładając** wpisy `Failed(null)`, `Unknown(null)`, `TimedOut(null)`, `Unrecognized`, `CARBS`/`Completed`, `CARBS` z ilością `null`/`CarbsConfirmed`, **gdy** odwzorowano, **wtedy** odpowiednio: błąd/brak szczegółów, nieznany/brak szczegółów, brak odpowiedzi/„Brak odpowiedzi AAPS” z argumentem 3, nierozpoznany/brak szczegółów, sukces/brak szczegółów, sukces/brak szczegółów – bez wyjątku.
 - **Zakładając** wpis `CARBS 20` z wynikami `Failed(AMOUNT_MISMATCH)`, `TimedOut(AWAITING_CODE_REQUEST)`, `Cancelled`, **gdy** odwzorowano, **wtedy** „Kod nie został wysłany” = `true`; dla `Failed(WRONG_CODE)`, `Failed(null)`, `CarbsConfirmed`, `Unknown(CONFIRMATION_TIMEOUT)` = `false`; dla `BG` z `Cancelled` = `false`.
@@ -243,7 +257,7 @@ Wszystkie teksty z tej specyfikacji są w `app/src/main/res/values/strings.xml`,
 | Sytuacja | Oczekiwane zachowanie | Wymaganie |
 | --- | --- | --- |
 | Błąd odczytu bazy (`Unavailable`) | tekst błędu, „Spróbuj ponownie”, lista i czyszczenie niedostępne | HISTUI-09 |
-| Nieznane polecenie / rodzaj / powód w wierszu bazy (DATA-09) | „Nieznane polecenie”, „Nierozpoznany wynik”, „Brak szczegółów wyniku …”, bez wyjątku | HISTUI-03, HISTUI-04 |
+| Nieznane polecenie / rodzaj / powód w wierszu bazy (DATA-09) | „Nieznane polecenie”, „Nierozpoznany wynik”, „Brak szczegółów wyniku.”, bez wyjątku | HISTUI-03, HISTUI-04 |
 | `CARBS` bez ilości w wierszu | „CARBS (ilość nieznana)”, brak dodatku o ilości | HISTUI-03, HISTUI-04 |
 | Wszystkie czasy `null` (`Cancelled` przed startem) | „brak” | HISTUI-05 |
 | Treść z niecodziennymi znakami / bardzo długa | zwykły tekst w całości, bez linków | HISTUI-06 |
@@ -284,7 +298,7 @@ Kompozycje, okno, `FLAG_SECURE` i nawigacja nie mają testów automatycznych (de
 | W4 | „Wyczyść historię” → okno z liczbą wpisów; „Anuluj” i Wstecz nic nie usuwają; „Wyczyść” → komunikat i stan pusty; po ponownym starcie historia pusta, a nowy wpis ma w bazie (`sqlite3` na kopii) identyfikator większy od wcześniejszych (W5 ze Spec 007) | HISTUI-08, HISTUI-10, HISTUI-11, HISTUI-12 |
 | W5 | `adb shell bmgr backupnow pl.twojanazwa.aapsremote` przy niepustej historii: kopia nie jest wykonywana (W6 ze Spec 007, część historii) | – (DATA-16) |
 | W6 | `FLAG_SECURE`: zrzut zablokowany na liście i szczegółach, podgląd w ostatnich aplikacjach pusty; po przejściu na panel Polecenia (bez przebiegu i wyniku) zrzut działa; w trakcie `BG` przejście z Historii na Ustawienia → zrzut nadal zablokowany, po zamknięciu wyniku działa (sprawdzane w PR zadania 9 Spec 009) | HISTUI-13 |
-| W7 | Wpis nierozpoznany: w kopii bazy zmienić w jednym wierszu `command` na `TBR`, w drugim `outcome` na `PARTIAL`, w trzecim `reason` na `NO_SIGNAL` (rodzaj `FAILED`), zapisać bazę jak w W4 ze Spec 007; aplikacja pokazuje „Nieznane polecenie”, „Nierozpoznany wynik”, „Brak szczegółów wyniku …”, bez awarii | HISTUI-03, HISTUI-04 |
+| W7 | Wpis nierozpoznany: w kopii bazy zmienić w jednym wierszu `command` na `TBR`, w drugim `outcome` na `PARTIAL`, w trzecim `reason` na `NO_SIGNAL` (rodzaj `FAILED`), zapisać bazę jak w W4 ze Spec 007; aplikacja pokazuje „Nieznane polecenie”, „Nierozpoznany wynik”, „Brak szczegółów wyniku.”, bez awarii | HISTUI-03, HISTUI-04 |
 | W8 | Wynik po zamknięciu aplikacji (P7 w Spec 009): w trakcie `BG` Wstecz → „Wyjdź”, po odpowiedzi AAPS zabić proces, uruchomić aplikację – wynik tylko w Historii; zmiana strefy czasowej telefonu → po ponownym wejściu na zakładkę czasy w nowej strefie | HISTUI-02, HISTUI-05 |
 
 Stanu „błąd odczytu” (HISTUI-09) nie da się wywołać ręcznie bez uszkadzania bazy – sprawdza go tylko test JVM.
@@ -304,9 +318,9 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - HISTUI-03: etykiety „BOLUS X j.”, „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%” (BOL-17, PROF-17).
-  - HISTUI-04: wynik `BolusConfirmed` → „AAPS potwierdził podanie X j.” (BOL-17); komunikaty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16.
+  - HISTUI-04: wynik `BolusConfirmed` → „AAPS potwierdził podanie X j.” (BOL-17); komunikaty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16; wpis `PROFILE_LIST` ma w historii tekst „Odpowiedź AAPS na PROFILE LIST.” (bez wezwania do wyboru profilu); „Kod nie został wysłany” i ostrzeżenie bolusowe dla nowych poleceń z kodem.
 - **2026-10-28 – doprecyzowanie po przeglądzie jakości UI (razem ze zmianą Spec 009, P11, P12).**
   - HISTUI-10: jawny przypadek brzegowy (wpis zapisany przy otwartym oknie) z kryterium JVM i wierszem w „Przypadkach błędów”; zachowanie bez zmian (P6).
   - HISTUI-13: flaga po zejściu z Historii w trakcie polecenia zostaje (CMDUI-23 na każdej zakładce); nowe kryterium i rozszerzony W6. `HistoryScreen` nadal zgłasza `SecureWindowEffect(true)`.

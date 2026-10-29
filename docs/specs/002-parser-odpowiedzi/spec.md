@@ -26,7 +26,7 @@ Aplikacja musi rozpoznać, co AAPS odpisał na wysłane polecenie, i odesłać k
 - Składanie odpowiedzi `<6 cyfr TOTP><PIN>` i jej wysyłanie – `session` (z użyciem [Spec 001](../001-totp/spec.md)).
 - Katalog poleceń (nazwy, szablony SMS, zakres ilości `CARBS`) – specyfikacja `commands`, jeszcze nie istnieje. Parser definiuje własny minimalny typ kontekstu (patrz PARSER-01 i [design.md](design.md#zależność-od-commands)).
 - Inne wersje i języki AAPS, komunikaty ze znakami diakrytycznymi, glikemia w mmol/L, format czasu 12-godzinny (AM/PM). Takie wiadomości dają wynik „nierozpoznana”.
-- Polecenia spoza MVP (bolus, cele, LOOP, profile) i ich komunikaty.
+- Polecenia spoza MVP i spoza Spec 012 – 013 (cele, LOOP itd.) i ich komunikaty. Bolus i profile opisują [Spec 012](../012-bolus/spec.md) i [Spec 013](../013-profil/spec.md).
 - Zamiana pól IOB, COB, delta, baza tymczasowa, bateria na liczby – w MVP są pokazywane użytkownikowi jako tekst wiadomości.
 - Teksty komunikatów UI.
 
@@ -43,7 +43,7 @@ Aplikacja musi rozpoznać, co AAPS odpisał na wysłane polecenie, i odesłać k
 
 ### PARSER-01: Wejście, kontekst i zamknięty typ wyniku
 
-Parser to czysta funkcja: treść + oczekiwane polecenie → wynik. Oczekiwane polecenie to jedno z: `BG`, `PUMP`, `CARBS` z ilością gramów ≥ 1. Wynik jest jednym z rodzajów: „odpowiedź BG”, „stan pompy”, „prośba o kod”, „niezgodna ilość”, „wykonano CARBS”, „zły kod”, „nierozpoznana”. Każdy wynik poza „zły kod” zawiera treść wejściową bez zmian (do pokazania użytkownikowi). Parser nie ma stanu: te same argumenty dają zawsze ten sam wynik. Dla dowolnej treści (pustej, z dowolnymi znakami Unicode, dowolnej długości) parser zwraca wynik i nie rzuca wyjątku. Wyjątek (`IllegalArgumentException`) jest dopuszczalny tylko przy tworzeniu kontekstu `CARBS` z ilością < 1.
+Parser to czysta funkcja: treść + oczekiwane polecenie → wynik. Oczekiwane polecenie to jedno z: `BG`, `PUMP`, `CARBS` z ilością gramów ≥ 1, `BOLUS` z ilością ≥ 1 setnej jednostki ([Spec 012](../012-bolus/spec.md), BOL-06), „stan profilu”, „lista profili” i „zmiana profilu” z nazwą (niepustą, bez LF) i procentem ≥ 1 ([Spec 013](../013-profil/spec.md), PROF-05). Wynik jest jednym z rodzajów: „odpowiedź BG”, „stan pompy”, „prośba o kod”, „niezgodna ilość”, „wykonano CARBS”, „zły kod”, „nierozpoznana” oraz rodzajów opisanych w Spec 012 i 013 (prośba o kod i niezgodna ilość dla bolusa, wykonano bolus, stan profilu, lista profili, prośba o kod i niezgodny profil dla zmiany profilu). Rodzaje „prośba o kod” (dla `CARBS`, `BOLUS` i zmiany profilu) mają wspólny nadtyp „prośba o kod zgodna z poleceniem”, „niezgodna ilość/profil” – nadtyp „niezgodność z poleceniem”, a „wykonano CARBS” i „wykonano bolus” – nadtyp „potwierdzenie zgodne z poleceniem” (interfejsy znacznikowe; `session` rozpoznaje prośbę o kod i niezgodność po nadtypie, BOL-19). Nadtypy nie zmieniają pól ani `toString()` istniejących rodzajów. Każdy wynik poza „zły kod” zawiera treść wejściową bez zmian (do pokazania użytkownikowi). Parser nie ma stanu: te same argumenty dają zawsze ten sam wynik. Dla dowolnej treści (pustej, z dowolnymi znakami Unicode, dowolnej długości) parser zwraca wynik i nie rzuca wyjątku. Wyjątek (`IllegalArgumentException`) jest dopuszczalny tylko przy tworzeniu kontekstu z wartością niedozwoloną: `CARBS` z ilością < 1, `BOLUS` z ilością < 1, zmiana profilu z pustą nazwą, nazwą z LF albo procentem < 1 (komunikat bez danych SMS).
 
 Kontekst ogranicza rozpoznawane rodzaje:
 
@@ -52,6 +52,10 @@ Kontekst ogranicza rozpoznawane rodzaje:
 | `BG` | „odpowiedź BG”, „nierozpoznana” |
 | `PUMP` | „stan pompy”, „nierozpoznana” |
 | `CARBS g` | „prośba o kod”, „niezgodna ilość”, „wykonano CARBS”, „zły kod”, „nierozpoznana” |
+| `BOLUS x` | prośba o kod (bolus), niezgodna ilość (bolus), wykonano bolus, „zły kod”, „nierozpoznana” (BOL-07 – BOL-09) |
+| stan profilu | stan profilu, „nierozpoznana” (PROF-06) |
+| lista profili | lista profili, „nierozpoznana” (PROF-07) |
+| zmiana profilu | prośba o kod (profil), niezgodny profil, „zły kod”, „nierozpoznana” (PROF-08 – PROF-10) |
 
 **Kryteria akceptacji:**
 
@@ -60,6 +64,8 @@ Kontekst ogranicza rozpoznawane rodzaje:
 - **Zakładając** treść z `dane/carbs-prosba-o-kod.txt`, `dane/carbs-sukces.txt` albo `dane/zly-kod.txt`, **gdy** oczekiwane polecenie to `BG` albo `PUMP`, **wtedy** wynik to „nierozpoznana”.
 - **Zakładając** treść pustą (`""`), **gdy** oczekiwane polecenie to `BG`, `PUMP` albo `CARBS 1`, **wtedy** wynik to „nierozpoznana” z treścią `""`, bez wyjątku.
 - **Zakładając** ilość 0 albo −5, **gdy** tworzony jest kontekst `CARBS`, **wtedy** rzucany jest `IllegalArgumentException`.
+- **Zakładając** ilość 0 dla kontekstu `BOLUS` albo pustą nazwę, nazwę z LF lub procent 0 dla kontekstu zmiany profilu, **gdy** tworzony jest kontekst, **wtedy** rzucany jest `IllegalArgumentException` bez danych SMS w komunikacie (BOL-06, PROF-05).
+- **Zakładając** wynik każdego rodzaju „prośba o kod” (`CARBS`, `BOLUS`, zmiana profilu) i każdego rodzaju niezgodności, **gdy** sprawdzono nadtypy, **wtedy** pierwsze są „prośbą o kod zgodną z poleceniem”, drugie – „niezgodnością z poleceniem” (BOL-19).
 - **Zakładając** treść z `dane/bg.txt` i kontekst `BG`, **gdy** parser jest wywołany dwa razy, **wtedy** oba wyniki są równe (`==`).
 
 ### PARSER-02: Normalizacja białych znaków
@@ -258,6 +264,4 @@ Warianty oznaczone w kryteriach jako „syntetyczne” to modyfikacje tych wiado
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
-  - PARSER-01: nowe konteksty – `BOLUS` ([Spec 012](../012-bolus/spec.md), BOL-06 – BOL-09) oraz stan profilu, lista profili i zmiana profilu ([Spec 013](../013-profil/spec.md), PROF-05 – PROF-10) – z nowymi rodzajami wyników opisanymi tam. Wyniki dla `BG`, `PUMP` i `CARBS` bez zmian.
-  - Design: wspólne interfejsy znacznikowe `AapsReply` (prośba o kod zgodna z poleceniem, niezgodność, potwierdzenie) – [design 012](../012-bolus/design.md#interfejsy); istniejące typy dostają nadtyp, bez zmiany pól i `toString()`.
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).** PARSER-01: konteksty `BOLUS`, stan profilu, lista profili i zmiana profilu z nowymi rodzajami wyników (opisanymi w BOL-06 – BOL-09 i PROF-05 – PROF-10); wspólne nadtypy znacznikowe wyników (prośba o kod, niezgodność, potwierdzenie) zgodnie z kodem; wyjątek przy tworzeniu kontekstu dla nowych poleceń. Wyniki dla `BG`, `PUMP` i `CARBS` bez zmian. Zakres i „Poza zakresem” doprecyzowane (bolus i profile opisują Spec 012 i 013). Design 002 bez zmian (interfejsy opisuje [design 012](../012-bolus/design.md#interfejsy)).

@@ -7,15 +7,16 @@
 
 ## Cel
 
-Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `CARBS` po wpisaniu ilości i PIN-u AAPS, i na jednym ekranie widzi przebieg polecenia na żywo oraz jednoznaczny wynik. Ta specyfikacja opisuje ekran Polecenia (zastępuje zaślepkę ze Spec 008), ekran podsumowania z PIN-em, ekran przebiegu i wyniku oraz uruchamianie sesji w zakresie korutyn aplikacji z zapisem do historii.
+Użytkownik wysyła z zakładki Polecenia `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` jednym dotknięciem, a `CARBS`, `BOLUS` i zmianę profilu po wpisaniu ilości (procentu) i PIN-u AAPS, i na jednym ekranie widzi przebieg polecenia na żywo oraz jednoznaczny wynik. Ta specyfikacja opisuje ekran Polecenia (zastępuje zaślepkę ze Spec 008), ekran podsumowania z PIN-em, ekran przebiegu i wyniku oraz uruchamianie sesji w zakresie korutyn aplikacji z zapisem do historii.
 
 ## Zakres
 
-- Zakładka Polecenia: przyciski `BG`, `PUMP`, sekcja `CARBS` (pole ilości, szybkie wartości 10/20/30 g, przycisk „Dalej”), banery gotowości (numer AAPS, uprawnienia SMS, sekret TOTP) z przejściem do Ustawień.
-- Dostępność przycisków: polecenie w toku, uruchamianie polecenia, stan numeru AAPS, uprawnienia SMS, stan sekretu (dla `CARBS`).
-- Dodatkowe pytanie „Na pewno X g?” dla ilości > 40 g.
-- Podsumowanie `CARBS` z polem PIN-u AAPS (maskowane), PIN tylko w pamięci; `FLAG_SECURE` na oknie „Na pewno X g?”, podsumowaniu oraz od startu polecenia do zamknięcia wyniku (na każdej zakładce).
-- Odczyt sekretu (`TotpSecretProvider.load`) tuż przed startem polecenia z kodem i komunikaty jego wyników.
+- Zakładka Polecenia: przyciski `BG`, `PUMP`, sekcja `CARBS` (pole ilości, szybkie wartości 10/20/30 g ograniczone do progu, przycisk „Dalej”), sekcja „Bolus” (BOL-13), sekcja „Profil” z przyciskami „Aktualny profil” i „Zmień profil…” (PROF-13), banery gotowości (numer AAPS, uprawnienia SMS, sekret TOTP, limity poleceń) z przejściem do Ustawień.
+- Dostępność przycisków: polecenie w toku, uruchamianie polecenia, stan numeru AAPS, uprawnienia SMS, stan sekretu (dla poleceń z kodem), stan limitów (dla `CARBS` i `BOLUS`, LIM-05).
+- Dodatkowe pytanie „Na pewno X?” powyżej progu: `CARBS` > 80% limitu (LIM-07), `BOLUS` > połowy limitu (BOL-04).
+- Formularz procentu zmiany profilu i wybór profilu z wyniku `PROFILE LIST` (PROF-14, PROF-15).
+- Podsumowanie polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu) z polem PIN-u AAPS (maskowane), PIN tylko w pamięci; `FLAG_SECURE` na oknie „Na pewno X?”, formularzu profilu, podsumowaniu oraz od startu polecenia do zamknięcia wyniku (na każdej zakładce).
+- Ponowne sprawdzenie limitów i odstępu między bolusami tuż przed startem (LIM-09, BOL-12), odczyt sekretu (`TotpSecretProvider.load`) tuż przed startem polecenia z kodem i komunikaty tych wyników.
 - Start przez `SessionCoordinator` w zakresie korutyn aplikacji (moduł Hilt), `SessionHistoryRecorder.track` zaraz po starcie.
 - Ekran przebiegu: kroki według fazy sesji, anulowanie (przed kodem i po kodzie), wynik z komunikatem dla każdego `SessionOutcome`, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych, zamknięcie wyniku.
 - Ekran włączony w trakcie polecenia i komunikat zachęcający do pozostania w aplikacji; obsługa przycisku Wstecz w trakcie polecenia.
@@ -27,15 +28,15 @@ Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `
 - Ekran Historia (lista wpisów, czyszczenie) – spec 010.
 - Usługa pierwszoplanowa i odbiór SMS w tle albo przy wygaszonym ekranie – przyszła osobna specyfikacja (Spec 005, P2).
 - Ostatnia znana glikemia na ekranie Polecenia (plan) – poza zakresem 009 (decyzja użytkownika, P5).
-- Zmiany w pakietach `session`, `commands`, `sms`, `security`, `data` (logika) – ta specyfikacja ich nie zmienia; braki są w „Przyszłych zmianach”.
+- Zmiany w pakietach `session`, `commands`, `sms`, `security`, `data` (logika) – ta specyfikacja ich nie zmienia (reguły `BOLUS`, profilu i limitów opisują Spec 011 – 013); braki są w „Przyszłych zmianach”.
 - Przyczyna błędu wysyłania SMS (`SendResult.Failed` jej nie niesie – „Przyszłe zmiany” w Spec 005).
-- Polecenia spoza MVP, ustawienia limitów czasu.
+- Polecenia spoza katalogu, ustawienia limitów czasu. Ustawienia limitów poleceń to sekcja ze [Spec 011](../011-limity-polecen/spec.md) (LIM-10).
 - Testy Robolectric i testy Compose UI (decyzja użytkownika); kompozycje sprawdzane ręcznie (sekcja „Weryfikacja na urządzeniu”).
 
 ## Założenia i zależności
 
 - **Spec 008 zaimplementowana przed 009** (co najmniej zadania 1, 2, 3, 8 i 10 z design 008): nawigacja (`AppScaffold`, `AppDestination`), `SessionModule` (jeden `SessionCoordinator`), `SmsPermissionsViewModel` i `SmsPermissionsSection`, `SecureWindowEffect`, `MainDispatcherExtension`, `SessionDoubles`. 009 zastępuje `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` (UI-03 ze Spec 008 przewiduje to zastąpienie).
-- **Polecenia i walidacja ilości:** jedynym źródłem poleceń jest `commands` (`Command.Bg`, `Command.Pump`, `Command.Carbs.parse`/`of`, `requiresExtraConfirmation`, `CarbsLimits.QUICK_VALUES`, `definition.requiresCode`); `ui` nie powtarza reguł 1–50 g ani progu 40 g.
+- **Polecenia i walidacja ilości:** jedynym źródłem poleceń jest `commands` (`Command.Bg`, `Command.Pump`, `Command.Carbs.parse`/`of` z `CommandLimits`, `Command.Bolus.parse`/`of`, `Command.ProfileSwitch.parsePercent`/`of`, `Command.ProfileStatus`, `Command.ProfileList`, `requiresExtraConfirmation(limits)`, `CommandLimits.carbsQuickValues`, `definition.requiresCode`); `ui` nie powtarza reguł zakresu ilości ani progów.
 - **Sesja:** `ui` uruchamia polecenia wyłącznie przez `SessionCoordinator.start` (SESSION-22, UI-19) i nie zmienia `session`. Reguły anulowania i wyników – Spec 004 (SESSION-14, SESSION-17).
 - **Sekret:** `TotpSecretProvider.load()` nie rzuca poza `CancellationException` (SECRET-06); zwrócony `TotpSecret` należy do wywołującego i trafia do `CodeCredentials`. `TotpSecret` nie ma metody czyszczenia („Przyszłe zmiany” w Spec 006); tablica wewnątrz zostaje do odśmiecenia.
 - **Numer:** `AapsNumberSettingsStore.state` (DATA-02). Zmiana numeru w trakcie polecenia jest zablokowana w Ustawieniach (UI-15).
@@ -44,10 +45,11 @@ Użytkownik wysyła z zakładki Polecenia `BG` i `PUMP` jednym dotknięciem, a `
 
 ## Pojęcia
 
-- **Panel poleceń** – zawartość zakładki Polecenia, gdy nie jest pokazany przebieg ani wynik: banery gotowości, `BG`, `PUMP`, sekcja `CARBS`.
-- **Podsumowanie** – tryb zakładki Polecenia (bez osobnej trasy nawigacji) z pytaniem „Wysłać CARBS X g do AAPS?”, polem PIN-u i przyciskami „Wyślij”/„Anuluj”.
+- **Panel poleceń** – zawartość zakładki Polecenia, gdy nie jest pokazany przebieg, wynik, podsumowanie ani formularz profilu: banery gotowości, `BG`, `PUMP`, sekcje `CARBS`, „Bolus” i „Profil”.
+- **Podsumowanie** – tryb zakładki Polecenia (bez osobnej trasy nawigacji) z pytaniem „Wysłać CARBS X g do AAPS?” (dla `BOLUS` i zmiany profilu – teksty z BOL-15 i PROF-15), polem PIN-u i przyciskami „Wyślij”/„Anuluj”.
+- **Formularz profilu** – tryb zakładki Polecenia z polem procentu dla profilu wybranego z wyniku `PROFILE LIST` (PROF-15).
 - **Polecenie w toku** – `SessionCoordinator.activeSession.value != null`.
-- **Uruchamianie** – czas od dotknięcia `BG`/`PUMP`/„Wyślij” do wyniku `CommandLauncher.launch` (sprawdzenia, odczyt sekretu, start).
+- **Uruchamianie** – czas od dotknięcia `BG`/`PUMP`/`PROFILE STATUS`/`PROFILE LIST`/„Wyślij” do wyniku `CommandLauncher.launch` (sprawdzenia, odczyt sekretu, start).
 - **Przebieg** – widok sesji w fazie innej niż `FINISHED`; **wynik** – widok zakończonej sesji, aż użytkownik go zamknie.
 - **Fazy przed kodem / po kodzie** – jak w Spec 004 (`NOT_STARTED` … `PREPARING_CODE` / `SENDING_CODE`, `AWAITING_CONFIRMATION`).
 - **Komunikat** – jednorazowa informacja (Snackbar) jako wartość wyliczeniowa w stanie ViewModelu, kasowana po pokazaniu (jak w Spec 008).
@@ -61,17 +63,17 @@ Wspólne dane kryteriów (o ile kryterium nie mówi inaczej): numer AAPS w stani
 
 ### CMDUI-01: Ekran Polecenia zamiast zaślepki
 
-Zakładka Polecenia pokazuje (od góry): banery gotowości (CMDUI-02 – CMDUI-04), duże przyciski „BG” i „PUMP” (pełna szerokość), sekcję „CARBS” z polem ilości, trzema przyciskami szybkich wartości i przyciskiem „Dalej”. Gdy jest przebieg albo wynik (CMDUI-16), zakładka pokazuje go zamiast panelu; gdy otwarte jest podsumowanie – podsumowanie. Stan zakładki należy do `CommandsViewModel` i `CommandRunViewModel` tworzonych w zakresie `Activity` (nie wpisu nawigacji), więc przełączenie zakładek i obrót ekranu nie gubią stanu poza wyjątkami z CMDUI-11. `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` są usuwane.
+Zakładka Polecenia pokazuje (od góry): banery gotowości (CMDUI-02 – CMDUI-04), duże przyciski „BG” i „PUMP” (pełna szerokość), sekcję „CARBS” z polem ilości, przyciskami szybkich wartości (LIM-08) i przyciskiem „Dalej”, sekcję „Bolus” z polem „Insulina (j.)” i przyciskiem „Dalej” (BOL-13) oraz sekcję „Profil” z przyciskami „Aktualny profil” i „Zmień profil…” (PROF-13). Banery gotowości to kolejno: numer, uprawnienia SMS, sekret TOTP, limity poleceń (LIM-05). Gdy jest przebieg albo wynik (CMDUI-16), zakładka pokazuje go zamiast panelu; gdy otwarty jest formularz profilu (PROF-15) – formularz; gdy otwarte jest podsumowanie – podsumowanie. Stan zakładki należy do `CommandsViewModel` i `CommandRunViewModel` tworzonych w zakresie `Activity` (nie wpisu nawigacji), więc przełączenie zakładek i obrót ekranu nie gubią stanu poza wyjątkami z CMDUI-11. `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` są usuwane.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** źródła `ui/`, **gdy** test JVM je przeczytał, **wtedy** nie ma pliku `CommandsPlaceholderScreen.kt`, a `strings.xml` nie zawiera klucza `placeholder_commands_text`.
-- **Zakładając** `CommandsViewModel` z panelem w stanie spoczynku, **gdy** odczytano stan, **wtedy** podsumowanie jest zamknięte, okno „Na pewno” zamknięte, tekst pola ilości = `""`, a uruchamianie = `false`.
-- **Zakładając** telefon (W1), **gdy** uruchomiono aplikację, **wtedy** zakładka Polecenia pokazuje przyciski „BG”, „PUMP” i sekcję „CARBS”; po przejściu na Ustawienia i powrót tekst pola ilości jest zachowany.
+- **Zakładając** `CommandsViewModel` z panelem w stanie spoczynku, **gdy** odczytano stan, **wtedy** podsumowanie jest zamknięte, formularz profilu zamknięty, okno „Na pewno” zamknięte, tekst pola ilości `CARBS` i `BOLUS` = `""`, a uruchamianie = `false`.
+- **Zakładając** telefon (W1), **gdy** uruchomiono aplikację, **wtedy** zakładka Polecenia pokazuje przyciski „BG”, „PUMP” i sekcje „CARBS”, „Bolus” i „Profil”; po przejściu na Ustawienia i powrót tekst pola ilości jest zachowany.
 
 ### CMDUI-02: Gotowość – numer AAPS
 
-Panel pokazuje stan numeru z `AapsNumberSettingsStore.state` i od niego zależy dostępność wszystkich przycisków poleceń (`BG`, `PUMP`, szybkie wartości, „Dalej”):
+Panel pokazuje stan numeru z `AapsNumberSettingsStore.state` i od niego zależy dostępność wszystkich przycisków poleceń (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`, szybkie wartości, „Dalej” `CARBS` i `BOLUS`):
 
 | Stan numeru | Baner | Przycisk banera | Przyciski poleceń |
 | --- | --- | --- | --- |
@@ -100,30 +102,31 @@ Gdy brakuje `SEND_SMS` albo `RECEIVE_SMS`, panel pokazuje sekcję uprawnień SMS
 - **Zakładając** utworzony ViewModel, **gdy** wywołano 2 razy `refreshPermissions()`, **wtedy** `canSend()` i `canReceive()` wywołano po 3 razy.
 - **Zakładając** telefon (W3), **gdy** odebrano uprawnienia SMS w ustawieniach systemu i wrócono do aplikacji, **wtedy** zakładka Polecenia pokazuje sekcję uprawnień, a przyciski są nieaktywne; „Zezwól” prosi o uprawnienia.
 
-### CMDUI-04: Gotowość – sekret TOTP dla CARBS
+### CMDUI-04: Gotowość – sekret TOTP dla poleceń z kodem
 
-Przy utworzeniu `CommandsViewModel` wywołuje `TotpSecretStore.refreshState()` dokładnie raz i dalej obserwuje `TotpSecretStore.state`. Stan sekretu wpływa tylko na `CARBS` (szybkie wartości i „Dalej”); `BG` i `PUMP` nie zależą od sekretu.
+Przy utworzeniu `CommandsViewModel` wywołuje `TotpSecretStore.refreshState()` dokładnie raz i dalej obserwuje `TotpSecretStore.state`. Stan sekretu wpływa na każde polecenie z kodem: `CARBS` (szybkie wartości i „Dalej”), `BOLUS` („Dalej”) i zmianę profilu („Dalej” formularza oraz wybór pozycji z wyniku `PROFILE LIST`, PROF-14, gdzie `CommandRunViewModel` obserwuje `TotpSecretStore.state`, ale go nie odczytuje). `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` nie zależą od sekretu.
 
-| `SecretState` | Baner | Przycisk banera | `CARBS` |
+| `SecretState` | Baner | Przycisk banera | Polecenia z kodem |
 | --- | --- | --- | --- |
 | `UNKNOWN`, `PRESENT` | brak | – | dostępne (o ile CMDUI-02, CMDUI-03, CMDUI-05 pozwalają); ostateczne sprawdzenie przy starcie (CMDUI-12) |
-| `ABSENT` | „CARBS wymaga sekretu TOTP. Zeskanuj kod QR z AAPS w Ustawieniach.” | „Przejdź do Ustawień” | niedostępne |
+| `ABSENT` | „CARBS wymaga sekretu TOTP. Zeskanuj kod QR z AAPS w Ustawieniach.” (tekst bez zmian, choć dotyczy też `BOLUS` i zmiany profilu) | „Przejdź do Ustawień” | niedostępne |
 | `INVALIDATED` | „Sekret TOTP przestał działać (np. po zmianie blokady ekranu). Zeskanuj ponownie kod QR z AAPS w Ustawieniach.” | „Przejdź do Ustawień” | niedostępne |
 
-`UNKNOWN` nie blokuje `CARBS`, bo `refreshState()` przy błędzie odczytu zostawia `UNKNOWN` (SECRET-12). `CommandsViewModel` nie wywołuje `load()` poza uruchamianiem `CARBS` (CMDUI-12).
+`UNKNOWN` nie blokuje poleceń z kodem, bo `refreshState()` przy błędzie odczytu zostawia `UNKNOWN` (SECRET-12). `CommandsViewModel` nie wywołuje `load()` poza uruchamianiem polecenia z kodem (CMDUI-12).
 
 **Kryteria akceptacji:**
 
 - **Zakładając** atrapę magazynu w stanie `UNKNOWN`, **gdy** utworzono ViewModel i wykonano zadania dyspozytora, **wtedy** `refreshState()` wywołano dokładnie raz, a `load()` – ani razu.
-- **Zakładając** magazyn, którego stan zmienia się kolejno na `ABSENT`, `INVALIDATED`, `PRESENT`, `UNKNOWN` (Turbine), **gdy** ViewModel zbiera stan, **wtedy** `CARBS` jest kolejno: niedostępne, niedostępne, dostępne, dostępne, a `BG` i `PUMP` są dostępne we wszystkich czterech stanach.
+- **Zakładając** magazyn, którego stan zmienia się kolejno na `ABSENT`, `INVALIDATED`, `PRESENT`, `UNKNOWN` (Turbine), **gdy** ViewModel zbiera stan, **wtedy** `CARBS`, `BOLUS` i „Dalej” formularza profilu są kolejno: niedostępne, niedostępne, dostępne, dostępne, a `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` są dostępne we wszystkich czterech stanach.
+- **Zakładając** stan sekretu `ABSENT` (osobno `INVALIDATED`) i wynik `PROFILE LIST` z pozycjami, **gdy** wywołano wybór pozycji, **wtedy** formularz nie jest otwierany (PROF-14).
 
 ### CMDUI-05: Blokada w trakcie polecenia i uruchamiania
 
-Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń są niedostępne, a ich wywołanie jest ignorowane (podwójne dotknięcie nie uruchamia drugiego polecenia). Każda akcja startu (`BG`, `PUMP`, „Wyślij”) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” (klucz `msg_command_active` ze Spec 008), brak wywołania `CommandLauncher` i – przy „Wyślij” – PIN wyczyszczony (CMDUI-11). Gdy mimo to koordynator zwróci `Busy` (wyścig), wynik jest taki sam (CMDUI-13). Po zakończeniu polecenia dostępność wraca według CMDUI-02 – CMDUI-04.
+Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń (w tym „Dalej” `BOLUS`, przyciski sekcji „Profil”) są niedostępne, a ich wywołanie jest ignorowane (podwójne dotknięcie nie uruchamia drugiego polecenia). Każda akcja startu (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`, „Wyślij”) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” (klucz `msg_command_active` ze Spec 008), brak wywołania `CommandLauncher` i – przy „Wyślij” – PIN wyczyszczony (CMDUI-11). Gdy mimo to koordynator zwróci `Busy` (wyścig), wynik jest taki sam (CMDUI-13). Po zakończeniu polecenia dostępność wraca według CMDUI-02 – CMDUI-04.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** `activeSession` = sesja (MockK), **gdy** odczytano stan, **wtedy** `BG`, `PUMP` i `CARBS` są niedostępne, a znacznik „polecenie w toku” = `true`.
+- **Zakładając** `activeSession` = sesja (MockK), **gdy** odczytano stan, **wtedy** `BG`, `PUMP`, `CARBS`, `BOLUS` i przyciski profilu są niedostępne, a znacznik „polecenie w toku” = `true`.
 - **Zakładając** `activeSession` ustawione na sesję bez wykonania zadań dyspozytora (ViewModel nie zebrał zmiany), **gdy** wywołano `onBgClicked()`, **wtedy** `CommandLauncher` nie dostał wywołania, a komunikat = polecenie w toku.
 - **Zakładając** `FakeSmsSender`, którego wysłanie zawiesza się do zwolnienia przez test, **gdy** wywołano `onBgClicked()` dwa razy i `onPumpClicked()` raz przed zwolnieniem, **wtedy** atrapa dostała dokładnie jeden SMS (`BG`).
 - **Zakładając** `TotpSecretProvider.load`, który zawiesza się do zwolnienia przez test, **gdy** w podsumowaniu wywołano „Wyślij”, **wtedy** do zwolnienia znacznik uruchamiania = `true`, a `BG`, `PUMP` i `CARBS` są niedostępne.
@@ -131,53 +134,56 @@ Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń s
 
 ### Polecenia bez kodu
 
-### CMDUI-06: BG i PUMP jednym dotknięciem
+### CMDUI-06: BG, PUMP, PROFILE STATUS i PROFILE LIST jednym dotknięciem
 
-Dotknięcie „BG” albo „PUMP” (gdy dostępne) od razu uruchamia polecenie `Command.Bg` / `Command.Pump` przez `CommandLauncher.launch(command, pin = null)` – bez okna potwierdzenia i bez PIN-u (CMD-02). Po wyniku `Started` zakładka pokazuje przebieg (CMDUI-16); po odrzuceniu – komunikat z CMDUI-12/CMDUI-13, panel bez zmian.
+Dotknięcie „BG”, „PUMP”, „Aktualny profil” albo „Zmień profil…” (gdy dostępne) od razu uruchamia polecenie `Command.Bg` / `Command.Pump` / `Command.ProfileStatus` / `Command.ProfileList` (PROF-13) przez `CommandLauncher.launch(command, pin = null)` – bez okna potwierdzenia i bez PIN-u (CMD-02). Po wyniku `Started` zakładka pokazuje przebieg (CMDUI-16); po odrzuceniu – komunikat z CMDUI-12/CMDUI-13, panel bez zmian.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** wspólne dane, **gdy** wywołano `onBgClicked()` i wykonano zadania, **wtedy** `FakeSmsSender` dostał dokładnie jeden SMS `BG`, `activeSession.value` jest sesją polecenia `Command.Bg`, a `TotpSecretProvider.load()` nie był wywołany.
 - **Zakładając** wspólne dane, **gdy** wywołano `onPumpClicked()`, **wtedy** atrapa dostała dokładnie jeden SMS `PUMP`.
+- **Zakładając** wspólne dane, **gdy** wywołano `onProfileStatusClicked()` (osobno `onProfileListClicked()`), **wtedy** `FakeSmsSender` dostał dokładnie `PROFILE STATUS` (`PROFILE LIST`), a `load()` sekretu nie był wywołany (PROF-13).
 - **Zakładając** telefon z AAPS (W4), **gdy** dotknięto „BG”, **wtedy** bez dodatkowych dotknięć wychodzi SMS `BG` na numer AAPS, a po odpowiedzi widać jej treść.
 
 ### Polecenie CARBS
 
 ### CMDUI-07: Pole ilości i walidacja
 
-Sekcja „CARBS” ma pole tekstowe „Węglowodany (g)” z klawiaturą numeryczną (`KeyboardType.Number`). Tekst pola jest w stanie `CommandsViewModel` dokładnie tak, jak wpisany. „Dalej” wywołuje `Command.Carbs.parse(tekst)` (bez przycinania, CMD-04): `Valid` → CMDUI-09; `Invalid(error)` → błąd pod polem według tabeli, bez zmiany tekstu. Zmiana tekstu usuwa błąd. ViewModel nie stosuje innych reguł ilości niż `commands`.
+Sekcja „CARBS” ma pole tekstowe „Węglowodany (g)” z klawiaturą numeryczną (`KeyboardType.Number`). Tekst pola jest w stanie `CommandsViewModel` dokładnie tak, jak wpisany. „Dalej” wywołuje `Command.Carbs.parse(tekst, limity)` z bieżącymi limitami (LIM-06; bez przycinania, CMD-04). Pole i „Dalej” są dostępne tylko, gdy limity są wczytane (LIM-05): `Valid` → CMDUI-09; `Invalid(error)` → błąd pod polem według tabeli, bez zmiany tekstu. Zmiana tekstu usuwa błąd. ViewModel nie stosuje innych reguł ilości niż `commands`.
 
 | `CarbsAmountError` | Błąd pod polem |
 | --- | --- |
-| `EMPTY` | „Podaj ilość węglowodanów (1–50 g).” |
+| `EMPTY` | „Podaj ilość węglowodanów (1–X g).” |
 | `INVALID_CHARACTERS` | „Podaj liczbę całkowitą – tylko cyfry.” |
 | `BELOW_MIN` | „Najmniejsza ilość to 1 g.” |
-| `ABOVE_MAX` | „Największa ilość to 50 g.” |
+| `ABOVE_MAX` | „Największa ilość to X g.” |
 
-Liczby 1 i 50 w tekstach pochodzą z `CarbsLimits.MIN_GRAMS`/`MAX_GRAMS` (argumenty formatowania).
+Liczba 1 w tekstach pochodzi z `CarbsLimits.MIN_GRAMS`, a X to `carbsMaxGrams` z bieżących limitów (argumenty formatowania; LIM-06).
 
 **Kryteria akceptacji:**
 
-- **Zakładając** tekst pola kolejno `""`, `"2.5"`, `"0"`, `"51"`, **gdy** za każdym razem wywołano `onCarbsNextClicked()`, **wtedy** błąd = kolejno `EMPTY`, `INVALID_CHARACTERS`, `BELOW_MIN`, `ABOVE_MAX`, podsumowanie zamknięte, tekst pola bez zmian.
+- **Zakładając** limity domyślne i tekst pola kolejno `""`, `"2.5"`, `"0"`, `"51"`, **gdy** za każdym razem wywołano `onCarbsNextClicked()`, **wtedy** błąd = kolejno `EMPTY`, `INVALID_CHARACTERS`, `BELOW_MIN`, `ABOVE_MAX`, podsumowanie zamknięte, tekst pola bez zmian.
 - **Zakładając** błąd `ABOVE_MAX` przy tekście `"51"`, **gdy** zmieniono tekst na `"5"`, **wtedy** błąd = brak.
 - **Zakładając** tekst `" 20"` (spacja na początku), **gdy** wywołano „Dalej”, **wtedy** błąd = `INVALID_CHARACTERS`.
 - **Zakładając** tekst `"020"`, **gdy** wywołano „Dalej”, **wtedy** podsumowanie jest otwarte dla 20 g.
+- **Zakładając** `carbsMaxGrams` = 30 i tekst `"35"`, **gdy** wywołano „Dalej”, **wtedy** błąd = `ABOVE_MAX` z argumentem 30, a podsumowanie zamknięte (LIM-06).
 
 ### CMDUI-08: Szybkie wartości
 
-Sekcja „CARBS” ma przyciski „10 g”, „20 g”, „30 g” z `CarbsLimits.QUICK_VALUES`, w tej kolejności. Dotknięcie szybkiej wartości wpisuje ją w pole ilości (np. `"20"`), usuwa błąd pola i od razu otwiera podsumowanie dla tej ilości (szybkie wartości nie przekraczają 40 g, CMD-06). (Decyzja użytkownika, P1.)
+Sekcja „CARBS” ma przyciski „10 g”, „20 g”, „30 g” z `CarbsLimits.QUICK_VALUES` w tej kolejności, ale tylko te, które są ≤ progowi „Na pewno” z bieżących limitów (`CommandLimits.carbsQuickValues`, LIM-08); gdy lista jest pusta, wiersz przycisków nie jest pokazywany. Dotknięcie szybkiej wartości wpisuje ją w pole ilości (np. `"20"`), usuwa błąd pola i od razu otwiera podsumowanie dla tej ilości (szybkie wartości nie przekraczają progu, więc nie wymagają okna „Na pewno”, CMD-06, LIM-08). (Decyzja użytkownika, P1.)
 
 **Kryteria akceptacji:**
 
-- **Zakładając** stan ekranu, **gdy** odczytano listę szybkich wartości, **wtedy** to dokładnie `[10, 20, 30]`.
+- **Zakładając** stan ekranu z limitami domyślnymi, **gdy** odczytano listę szybkich wartości, **wtedy** to dokładnie `[10, 20, 30]`; przy `carbsMaxGrams` = 30 – `[10, 20]`, przy 10 – lista pusta (LIM-08).
 - **Zakładając** tekst pola `"7"` z błędem brak, **gdy** wywołano `onQuickValueClicked(20)`, **wtedy** tekst pola = `"20"`, podsumowanie otwarte dla 20 g, okno „Na pewno” zamknięte, `FakeSmsSender` nie dostał SMS-a.
 
-### CMDUI-09: Dodatkowe potwierdzenie powyżej 40 g
+### CMDUI-09: Dodatkowe potwierdzenie powyżej progu
 
-Gdy poprawne polecenie ma `requiresExtraConfirmation` = `true` (41–50 g, CMD-05), „Dalej” najpierw otwiera okno „Na pewno X g?” z tekstem „To więcej niż 40 g. Sprawdź ilość, zanim wpiszesz PIN.” i przyciskami „Tak, X g” i „Nie”. „Tak” zamyka okno i otwiera podsumowanie dla X g; „Nie” zamyka okno bez podsumowania, tekst pola bez zmian. Dla 1–40 g podsumowanie otwiera się od razu. Okno pokazuje ilość `CARBS`, więc przez cały czas otwarcia jest chronione (decyzja użytkownika, P11): dialog jest osobnym oknem systemowym, którego `FLAG_SECURE` okna `Activity` nie obejmuje, dlatego sam dialog ma `DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)` (jak okno wklejania w Spec 008, UI-23), a okno `Activity` pod nim (panel z polem ilości) ma `FLAG_SECURE` (CMDUI-23).
+Gdy poprawne polecenie `CARBS` ma `requiresExtraConfirmation(limity)` = `true` (ilość > ⌊80% limitu⌋, domyślnie 41–50 g, CMD-05, LIM-07), „Dalej” najpierw otwiera okno „Na pewno X g?” z tekstem „To więcej niż P g. Sprawdź ilość, zanim wpiszesz PIN.” (P = próg z bieżących limitów) i przyciskami „Tak, X g” i „Nie”. Dla `BOLUS` okno „Na pewno X j.?” opisuje BOL-14 (próg: połowa limitu bolusa). „Tak” zamyka okno i otwiera podsumowanie dla X g; „Nie” zamyka okno bez podsumowania, tekst pola bez zmian. Dla ilości do progu (domyślnie 1–40 g) podsumowanie otwiera się od razu. „Tak” przekazuje do `CommandLauncher` znacznik `extraConfirmed` (LIM-09). Okno pokazuje ilość `CARBS`, więc przez cały czas otwarcia jest chronione (decyzja użytkownika, P11): dialog jest osobnym oknem systemowym, którego `FLAG_SECURE` okna `Activity` nie obejmuje, dlatego sam dialog ma `DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)` (jak okno wklejania w Spec 008, UI-23), a okno `Activity` pod nim (panel z polem ilości) ma `FLAG_SECURE` (CMDUI-23).
 
 **Kryteria akceptacji:**
 
+- **Zakładając** `carbsMaxGrams` = 30 (próg 24) i tekst pola `"25"`, **gdy** wywołano „Dalej”, **wtedy** okno „Na pewno” jest otwarte dla 25 g z progiem 24 (LIM-07); utrata wczytanych limitów zamyka okno.
 - **Zakładając** tekst pola `"41"`, **gdy** wywołano „Dalej”, **wtedy** okno „Na pewno” jest otwarte dla 41 g, a podsumowanie zamknięte; **gdy** wywołano „Tak”, **wtedy** okno zamknięte, podsumowanie otwarte dla 41 g.
 - **Zakładając** okno „Na pewno” dla 50 g, **gdy** wywołano „Nie”, **wtedy** okno i podsumowanie są zamknięte, tekst pola = `"50"`, `FakeSmsSender` nie dostał SMS-a.
 - **Zakładając** tekst pola `"40"`, **gdy** wywołano „Dalej”, **wtedy** okno „Na pewno” nie jest otwierane, a podsumowanie jest otwarte dla 40 g.
@@ -187,10 +193,11 @@ Gdy poprawne polecenie ma `requiresExtraConfirmation` = `true` (41–50 g, CMD-0
 
 ### CMDUI-10: Podsumowanie z PIN-em
 
-Podsumowanie zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.”, pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”. Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
+Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje dla `CARBS`: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.” (dla `BOLUS` teksty z BOL-15, dla zmiany profilu – z PROF-15), pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”. Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
 
 **Kryteria akceptacji:**
 
+- **Zakładając** otwarte podsumowanie dla `BOLUS` 0,10 j. (osobno zmiany profilu), **gdy** odczytano teksty, **wtedy** odpowiadają BOL-15 (PROF-15), a pole PIN-u zachowuje się jak dla `CARBS`.
 - **Zakładając** otwarte podsumowanie dla 20 g, **gdy** odczytano stan, **wtedy** ilość podsumowania = 20, tekst PIN-u = `""`, „Wyślij” niedostępne.
 - **Zakładając** otwarte podsumowanie, **gdy** wywołano `onPinChanged("43")`, potem `onPinChanged("43a")`, potem `onPinChanged("4321")`, **wtedy** tekst PIN-u = kolejno `"43"`, `"43"`, `"4321"`, a „Wyślij” jest dostępne.
 - **Zakładając** tekst PIN-u `"123456789012"`, **gdy** wywołano `onPinChanged("1234567890123")`, **wtedy** tekst PIN-u = `"123456789012"`.
@@ -199,7 +206,7 @@ Podsumowanie zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawig
 
 ### CMDUI-11: PIN AAPS tylko w pamięci
 
-Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w `SavedStateHandle`, nie w `rememberSaveable`, nie w argumentach nawigacji). Jest czyszczony (`""`): przy „Wyślij” – przed wywołaniem `CommandLauncher` (znaki są kopiowane do tablicy, z niej powstaje `AapsPin.fromChars`, który zeruje tablicę), przy „Anuluj”/Wstecz, gdy zakładka Polecenia jest zatrzymywana (`ON_STOP`: przejście w tło, obrót ekranu) albo opuszcza kompozycję (zmiana zakładki, w tym akcja „Ustawienia” w Snackbarze) – w obu przypadkach `CommandsScreen` woła `onStop()`, a podsumowanie i okno „Na pewno” są zamykane – oraz gdy polecenie jest w toku w chwili „Wyślij” (CMDUI-05). `AapsPin` przekazany do `CommandLauncher` jest czyszczony na każdej ścieżce bez startu sesji (CMDUI-12, CMDUI-13); po starcie czyści go sesja (SESSION-19). Ograniczenie: obiekty `String` tekstu pola (Compose, ViewModel) nie dają się wyzerować w JVM i zostają w pamięci do odśmiecenia (jak UI-14).
+Dotyczy każdego polecenia z kodem (BOL-15, PROF-15). Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w `SavedStateHandle`, nie w `rememberSaveable`, nie w argumentach nawigacji). Jest czyszczony (`""`): przy „Wyślij” – przed wywołaniem `CommandLauncher` (znaki są kopiowane do tablicy, z niej powstaje `AapsPin.fromChars`, który zeruje tablicę), przy „Anuluj”/Wstecz, gdy zakładka Polecenia jest zatrzymywana (`ON_STOP`: przejście w tło, obrót ekranu) albo opuszcza kompozycję (zmiana zakładki, w tym akcja „Ustawienia” w Snackbarze) – w obu przypadkach `CommandsScreen` woła `onStop()`, a podsumowanie, okno „Na pewno” i formularz profilu są zamykane, a niezużyty wybór profilu (`ProfileSelection`) porzucany (PROF-15) – oraz gdy polecenie jest w toku w chwili „Wyślij” (CMDUI-05). `AapsPin` przekazany do `CommandLauncher` jest czyszczony na każdej ścieżce bez startu sesji (CMDUI-12, CMDUI-13); po starcie czyści go sesja (SESSION-19). Ograniczenie: obiekty `String` tekstu pola (Compose, ViewModel) nie dają się wyzerować w JVM i zostają w pamięci do odśmiecenia (jak UI-14).
 
 **Kryteria akceptacji:**
 
@@ -217,12 +224,16 @@ Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w 
 
 ### CMDUI-12: Sprawdzenia i odczyt sekretu przed startem
 
-`CommandLauncher.launch(command, pin)` wykonuje kolejno i przerywa na pierwszym niespełnionym warunku (zwraca `Rejected` z powodem, bez startu sesji, a przekazany `pin` jest czyszczony):
+`CommandLauncher.launch(command, pin, extraConfirmed = false)` wykonuje kolejno i przerywa na pierwszym niespełnionym warunku (zwraca `Rejected` z powodem, bez startu sesji, a przekazany `pin` jest czyszczony):
+
+`extraConfirmed` (domyślnie `false`) = okno „Na pewno” zatwierdzone przyciskiem „Tak” (LIM-09). Po `LaunchResult.Started` ViewModel czyści pole ilości `CARBS` (dla `CARBS`) albo `BOLUS` (dla `BOLUS`) wraz z jego błędem.
 
 0. Niepoprawny zestaw: `pin != null` różne od `command.definition.requiresCode` → `START_FAILED` (błąd programistyczny; bez wyjątku).
 1. `activeSession.value != null` → `COMMAND_ACTIVE`.
 2. Stan numeru: `Loading` → `NUMBER_LOADING`; `NotConfigured` albo `LoadFailed` → `NUMBER_MISSING`.
 3. `SmsPermissions.canSend()` albo `canReceive()` = `false` (odczyt w tej chwili) → `SMS_PERMISSIONS_MISSING`.
+3a. Tylko dla `CARBS` i `BOLUS` (jedna migawka stanu limitów na całe sprawdzenie, LIM-09): stan limitów inny niż `Loaded` → `LIMITS_UNAVAILABLE`; ilość > aktualnego limitu → `AMOUNT_ABOVE_LIMIT`; polecenie wymaga dodatkowego potwierdzenia według aktualnych limitów, a `extraConfirmed` = `false` → `EXTRA_CONFIRMATION_REQUIRED`.
+3b. Tylko dla `BOLUS` ([BOL-12](../012-bolus/spec.md)): odstęp od ostatniego bolusa z aplikacji (przy odstępie 0 bez sprawdzenia) → `BOLUS_INTERVAL` albo `BOLUS_HISTORY_UNAVAILABLE`.
 4. Tylko dla polecenia z kodem (`definition.requiresCode`): `TotpSecretProvider.load()` dokładnie raz; `Absent` → `SECRET_ABSENT`, `Invalidated` → `SECRET_INVALIDATED`, `Locked` → `SECRET_LOCKED`, `Unavailable` → `SECRET_UNAVAILABLE`, `Loaded(secret)` → `CodeCredentials(pin, secret)`.
 5. Start (CMDUI-13).
 
@@ -239,13 +250,19 @@ Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w 
 | `SECRET_LOCKED` | „Odblokuj telefon i spróbuj ponownie.” | – |
 | `SECRET_UNAVAILABLE` | „Nie udało się odczytać sekretu TOTP. Spróbuj ponownie.” | – |
 | `START_FAILED` | „Nie udało się uruchomić polecenia. Spróbuj ponownie.” | – |
+| `LIMITS_UNAVAILABLE` | „Nie udało się wczytać limitów poleceń. Zapisz je ponownie w Ustawieniach.” | Ustawienia |
+| `AMOUNT_ABOVE_LIMIT` | „Ilość przekracza limit z Ustawień. Popraw ilość i spróbuj ponownie.” | – |
+| `EXTRA_CONFIRMATION_REQUIRED` | „Limit w Ustawieniach się zmienił i ta ilość wymaga potwierdzenia. Sprawdź ilość i spróbuj ponownie.” | – |
+| `BOLUS_INTERVAL` | „Od ostatniego bolusa z aplikacji minęło mniej niż N min (limit w Ustawieniach). Spróbuj za M min.” (N = odstęp z limitów, M = minuty do końca odstępu) | – |
+| `BOLUS_HISTORY_UNAVAILABLE` | „Nie udało się odczytać historii, więc aplikacja nie sprawdzi odstępu między bolusami. Spróbuj ponownie.” | – |
 
 **Kryteria akceptacji:**
 
 - **Zakładając** `load()` zwracający kolejno `Absent`, `Invalidated`, `Locked`, `Unavailable`, **gdy** czterokrotnie wywołano `launch(CARBS 20, AapsPin 4321)` (za każdym razem nowy PIN), **wtedy** wyniki = kolejno `SECRET_ABSENT`, `SECRET_INVALIDATED`, `SECRET_LOCKED`, `SECRET_UNAVAILABLE`, każdy PIN jest wyczyszczony, brak startu.
 - **Zakładając** stan numeru `Loading` (osobno `NotConfigured`, `LoadFailed`), **gdy** wywołano `launch(CARBS 20, PIN)`, **wtedy** wynik = `NUMBER_LOADING` (`NUMBER_MISSING`, `NUMBER_MISSING`), PIN wyczyszczony, `load()` nie był wywołany.
 - **Zakładając** `canReceive` = `false`, **gdy** wywołano `launch(BG, null)`, **wtedy** wynik = `SMS_PERMISSIONS_MISSING`, brak startu.
-- **Zakładając** `launch(BG, null)` i `launch(PUMP, null)`, **gdy** się zakończyły, **wtedy** `load()` nie był wywołany.
+- **Zakładając** `launch(BG, null)`, `launch(PUMP, null)`, `launch(PROFILE STATUS, null)` i `launch(PROFILE LIST, null)`, **gdy** się zakończyły, **wtedy** `load()` nie był wywołany; przy limitach `LoadFailed` wszystkie cztery dają `Started`.
+- **Zakładając** scenariusze LIM-09 (limit zmniejszony po utworzeniu polecenia, stan `LoadFailed`, próg zmieniony po „Dalej”) i BOL-12 (odstęp, historia niedostępna), **gdy** wywołano `launch`, **wtedy** wyniki i komunikaty są takie jak w LIM-09 i BOL-12, PIN wyczyszczony, `load()` nie był wywołany, brak startu.
 - **Zakładając** `load()`, który zawiesza się do zwolnienia, **gdy** korutynę wywołującą `launch(CARBS 20, PIN)` anulowano przed zwolnieniem, **wtedy** PIN jest wyczyszczony i brak startu (także po zwolnieniu `load()`).
 - **Zakładając** podsumowanie dla 20 g z PIN-em `4321` i `load()` zwracający `Absent`, **gdy** wywołano „Wyślij”, **wtedy** komunikat = brak sekretu z akcją „Ustawienia”, podsumowanie zamknięte, tekst pola ilości = `"20"`.
 - **Zakładając** każdą wartość `LaunchRejection`, **gdy** odwzorowano ją na komunikat, **wtedy** komunikat i jego akcja odpowiadają wierszowi tabeli.
@@ -274,7 +291,7 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-15: Sekret i PIN nie zostają w warstwie ui
 
-`CommandLauncher` ma wyłącznie pola niezmienne z zależnościami (koordynator, magazyny, uprawnienia, rejestrator, `CurrentRun`, zakres) – żadne pole nie jest typu `TotpSecret`, `LoadResult`, `CodeCredentials`, `AapsPin`, `CharArray`, `ByteArray` ani `CommandSession`. Sekret istnieje tylko jako zmienna lokalna wywołania `launch` do zbudowania `CodeCredentials` przekazanego koordynatorowi (SECRET-14). ViewModele nie dostają `TotpSecret` ani `CodeCredentials`.
+`CommandLauncher` ma wyłącznie pola niezmienne z zależnościami (koordynator, magazyny numeru i limitów, uprawnienia, dostawca sekretu, rejestrator, historia, zegar, `CurrentRun`, zakres) – żadne pole nie jest typu `TotpSecret`, `LoadResult`, `CodeCredentials`, `AapsPin`, `CharArray`, `ByteArray` ani `CommandSession`. Sekret istnieje tylko jako zmienna lokalna wywołania `launch` do zbudowania `CodeCredentials` przekazanego koordynatorowi (SECRET-14). ViewModele nie dostają `TotpSecret` ani `CodeCredentials`.
 
 **Kryteria akceptacji:**
 
@@ -285,7 +302,7 @@ Zaraz po `StartResult.Started(session)`, w tym samym wywołaniu `launch` i przed
 
 ### CMDUI-16: Pokazanie przebiegu aktywnej sesji
 
-`CommandRunViewModel` obserwuje `CurrentRun` (polecenie i stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku albo już się zakończyła, zanim ViewModel powstał (np. po „Wyjdź” i ponownym otwarciu aplikacji, gdy proces żyje – P7, CMDUI-21). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”.
+`CommandRunViewModel` obserwuje `CurrentRun` (polecenie i stan ostatnio uruchomionej sesji, publikowany przez `CommandLauncher` po `Started`, przed powrotem z `launch`), a nie `activeSession` (ten mógłby przejść `sesja` → `null`, zanim kolektor ją odbierze); dla niepustego uruchomienia zbiera jego `state` i pokazuje przebieg (polecenie, kroki, liczba wiadomości nieoczekiwanych, tryb anulowania), a po fazie `FINISHED` – wynik z `SessionResult` (CMDUI-19). Działa to także dla sesji, która była w toku albo już się zakończyła, zanim ViewModel powstał (np. po „Wyjdź” i ponownym otwarciu aplikacji, gdy proces żyje – P7, CMDUI-21). Przełączenie zakładek i obrót ekranu nie zmieniają widoku (ViewModel w zakresie `Activity`). Nagłówek przebiegu i wyniku: „Polecenie BG”, „Polecenie PUMP”, „Polecenie CARBS X g”, „Polecenie BOLUS X j.” (BOL-16), „Polecenie PROFILE STATUS”, „Polecenie PROFILE LIST” i „Zmiana profilu: nazwa P%” (PROF-16). `CommandRunViewModel` obserwuje też `TotpSecretStore.state` (tylko stan, dla wyboru profilu, CMDUI-04) i przekazuje wybór pozycji do `ProfileSelection` (PROF-14).
 
 **Kryteria akceptacji:**
 
@@ -301,8 +318,8 @@ Przebieg pokazuje listę kroków zależną od polecenia; każdy krok ma status: 
 
 | Polecenie | Kroki (w kolejności) |
 | --- | --- |
-| `BG`, `PUMP` | 1 „Wysyłanie SMS z poleceniem”, 2 „Czekanie na odpowiedź AAPS (do 3 min)” |
-| `CARBS` | 1 „Wysyłanie SMS z poleceniem”, 2 „Czekanie na prośbę AAPS o kod (do 3 min)”, 3 „Przygotowanie kodu”, 4 „Wysyłanie kodu”, 5 „Czekanie na potwierdzenie AAPS (do 6 min)” |
+| `BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST` | 1 „Wysyłanie SMS z poleceniem”, 2 „Czekanie na odpowiedź AAPS (do 3 min)” |
+| `CARBS`, `BOLUS`, zmiana profilu | 1 „Wysyłanie SMS z poleceniem”, 2 „Czekanie na prośbę AAPS o kod (do 3 min)”, 3 „Przygotowanie kodu”, 4 „Wysyłanie kodu”, 5 „Czekanie na potwierdzenie AAPS (do 6 min)” |
 
 | Faza | Krok bieżący |
 | --- | --- |
@@ -327,6 +344,7 @@ Krok nie ma statusu „błąd”: błąd, brak odpowiedzi i anulowanie pokazuje 
 **Kryteria akceptacji:**
 
 - **Zakładając** `CARBS` i każdą z faz `NOT_STARTED` … `AWAITING_CONFIRMATION`, **gdy** wyliczono kroki, **wtedy** jest 5 kroków, a statusy odpowiadają tabeli (np. dla `SENDING_CODE`: wykonany, wykonany, wykonany, bieżący, oczekujący).
+- **Zakładając** `BOLUS` albo zmianę profilu i każdą fazę, **gdy** wyliczono kroki, **wtedy** są takie jak dla `CARBS`; dla `PROFILE STATUS` i `PROFILE LIST` – jak dla `BG` (BOL-16, PROF-16).
 - **Zakładając** `BG` (osobno `PUMP`) i fazy `SENDING_COMMAND`, `AWAITING_REPLY`, **gdy** wyliczono kroki, **wtedy** są 2 kroki ze statusami kolejno (bieżący, oczekujący) i (wykonany, bieżący).
 - **Zakładając** `BG` w fazie `AWAITING_CONFIRMATION` (osobno `PREPARING_CODE`), **gdy** wyliczono kroki, **wtedy** oba są oczekujące.
 - **Zakładając** `BG` w fazie `AWAITING_CODE_REQUEST` i (osobno) `CARBS` w fazie `AWAITING_REPLY`, **gdy** wyliczono kroki, **wtedy** krok 2 jest bieżący: odpowiednio (wykonany, bieżący) i (wykonany, bieżący, oczekujący, oczekujący, oczekujący).
@@ -359,11 +377,14 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | --- | --- | --- |
 | `Completed` (`BG`) | sukces → „Gotowe” | „Odpowiedź AAPS na BG” |
 | `Completed` (`PUMP`) | sukces → „Gotowe” | „Odpowiedź AAPS na PUMP” |
-| `Completed` (`CARBS`; nie występuje – Spec 004 kończy `CARBS` wynikiem `CarbsConfirmed`) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
+| `Completed` (`PROFILE STATUS`) | sukces → „Gotowe” | „Odpowiedź AAPS na PROFILE STATUS” |
+| `Completed` (`PROFILE LIST`) | sukces → „Gotowe” | „Lista profili z AAPS. Wybierz profil, aby go zmienić.” (+ pozycje do wyboru, PROF-14) |
+| `Completed` (`CARBS`, `BOLUS`, zmiana profilu; nie występuje – Spec 004 kończy je innym wynikiem) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
 | `CarbsConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził wprowadzenie X g” |
+| `BolusConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził podanie X j.” (X z wyniku, BOL-16) |
 | `Failed(SEND_FAILED)` | błąd → „Błąd” | „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” |
 | `Failed(UNRECOGNIZED_REPLY)` | błąd | „Nierozpoznana odpowiedź AAPS.” |
-| `Failed(AMOUNT_MISMATCH)` | błąd | „AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS).” |
+| `Failed(AMOUNT_MISMATCH)` | błąd | „AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS).” (dla `BOLUS` i zmiany profilu teksty z BOL-16 i PROF-16) |
 | `Failed(UNEXPECTED_REPLY)` | błąd | „Odpowiedź AAPS nie pasuje do etapu polecenia.” |
 | `Failed(WRONG_CODE)` | błąd | „AAPS odrzucił kod. Sprawdź PIN i to, czy zegar telefonu ustawia się automatycznie.” |
 | `Failed(CODE_REQUEST_EXPIRED)` | błąd | „Prośba AAPS o kod jest zbyt stara.” |
@@ -376,22 +397,22 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Unknown(CANCELLED_AFTER_CODE)` | nieznany | „Przestano czekać po przekazaniu kodu do wysłania.” |
 | `Unknown(CODE_SEND_FAILED)` | nieznany | „Wysyłanie kodu zgłosiło błąd, ale SMS mógł dotrzeć do AAPS.” |
 | `Unknown(UNRECOGNIZED_REPLY)` | nieznany | „Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS (np. o kolejce pompy).” |
-| `Unknown(AMOUNT_MISMATCH)` | nieznany | „Po wysłaniu kodu AAPS podał inną ilość niż wysłana.” |
+| `Unknown(AMOUNT_MISMATCH)` | nieznany | „Po wysłaniu kodu AAPS podał inną ilość niż wysłana.” (zmiana profilu: PROF-16) |
 | `Unknown(UNEXPECTED_REPLY)` | nieznany | „Po wysłaniu kodu AAPS ponownie poprosił o kod. Kod nie został wysłany drugi raz.” |
 | `Unknown(INTERNAL_ERROR)` | nieznany | „Błąd wewnętrzny aplikacji po wysłaniu kodu.” |
 | `Cancelled` | anulowane → „Anulowano” | „Polecenie anulowane.” |
 
 Dodatki:
 
-- **„Kod nie został wysłany.”** – dla polecenia z kodem, gdy wynik to `Failed` z powodem innym niż `WRONG_CODE`, `TimedOut` albo `Cancelled`.
-- **Ostrzeżenie** „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – dla każdego `Unknown`.
+- **„Kod nie został wysłany.”** – dla polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu), gdy wynik to `Failed` z powodem innym niż `WRONG_CODE`, `TimedOut` albo `Cancelled`.
+- **Ostrzeżenie** „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – dla każdego `Unknown` (dla `BOLUS`: „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.”, BOL-16).
 - Wynik sukcesu nie mówi, że wykonano polecenie z aplikacji, tylko co potwierdził AAPS (SESSION-12).
 
-Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams` (nie z polecenia). Argument liczbowy mają tylko komunikaty z X albo z minutami. Wiersz `Completed` dla `CARBS` nie twierdzi, że AAPS potwierdził ilość, i ma ten sam rodzaj (sukces) i ten sam rodzaj komunikatu („brak szczegółów”, bez argumentu) co wpis historii z tym wynikiem (Spec 010, HISTUI-04); historia dodaje do tekstu wyjaśnienie o wpisie z innej wersji aplikacji.
+Nowe teksty dla `BOLUS` i zmiany profilu: BOL-16 i PROF-16 (komunikaty pozostałych wyników – jak w tabeli). Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams` albo `BolusConfirmed.centiUnits` (nie z polecenia). Argument liczbowy mają tylko komunikaty z X albo z minutami. Wiersz `Completed` dla `CARBS` nie twierdzi, że AAPS potwierdził ilość, i ma ten sam rodzaj (sukces) i ten sam rodzaj komunikatu („brak szczegółów”, bez argumentu) co wpis historii z tym wynikiem (Spec 010, HISTUI-04); historia dodaje do tekstu wyjaśnienie o wpisie z innej wersji aplikacji.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 8 `FailureReason`, wszystkie 7 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG`, `PUMP` i `CARBS 20`, `CarbsConfirmed(1)`, `Cancelled`), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1; dla `Completed` z `CARBS 20` – sukces, „brak szczegółów”, argument pusty, bez wyjątku.
+- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 8 `FailureReason`, wszystkie 7 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST` i `CARBS 20`, `CarbsConfirmed(1)`, `BolusConfirmed(120)`, `Cancelled`; dla `BOLUS` i zmiany profilu także wiersze z BOL-16 i PROF-16), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1; dla `BolusConfirmed(120)` – argument ilości = 120; dla `Completed` z `CARBS 20` – sukces, „brak szczegółów”, argument pusty, bez wyjątku.
 - **Zakładając** polecenie `CARBS 1` i syntetyczny wynik `CarbsConfirmed(37)`, **gdy** odwzorowano, **wtedy** argument ilości = 37 (z wyniku, nie z polecenia).
 - **Zakładając** każdy wynik z pierwszego kryterium, **gdy** odwzorowano, **wtedy** argument komunikatu jest niepusty dokładnie wtedy, gdy klucz komunikatu w tabeli tekstów design jest oznaczony jako tekst z argumentem (`d`).
 - **Zakładając** polecenie `CARBS 20` i każdy z 8 `FailureReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST` oraz `Cancelled`, **gdy** odwzorowano, **wtedy** dodatek „Kod nie został wysłany” = `true` dla wszystkich poza `Failed(WRONG_CODE)` (= `false`); dla każdego z 7 `UnknownReason`, dla `CarbsConfirmed` i dla `Completed` = `false`; dla `BG` z każdym wynikiem z pierwszego kryterium = `false`.
@@ -410,7 +431,7 @@ Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy w
 
 ### CMDUI-21: Zamknięcie wyniku i brak referencji do sesji
 
-Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Stan ekranu `CommandRunViewModel` (`RunUiState`) po fazie `FINISHED` zawiera tylko dane wyniku (polecenie, rodzaj, komunikat, treść, liczby) – bez `StateFlow`, bez `CommandSession` i bez `CodeCredentials` (sesja trzyma `CodeCredentials` z sekretem). `CommandRunViewModel` nie ma pola typu `CommandSession`. `CurrentRun` (singleton) trzyma polecenie i `StateFlow<SessionState>` sesji aż do zamknięcia wyniku; jest to dozwolone, bo ten `StateFlow` nie wskazuje na `CommandSession` ani na `CodeCredentials` (w Spec 004 `CommandSession.state` to samodzielny `MutableStateFlow` ze stanem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął – także po „Wyjdź” (CMDUI-24) i ponownym otwarciu aplikacji; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Gdy wynik jest pokazany, panel poleceń jest niewidoczny, więc nowe polecenie można uruchomić dopiero po zamknięciu wyniku.
+Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Stan ekranu `CommandRunViewModel` (`RunUiState`) po fazie `FINISHED` zawiera tylko dane wyniku (polecenie, ilość bolusa, nazwa i procent profilu, rodzaj, komunikat, treść, liczby oraz pary (numer, nazwa) z wyniku `PROFILE LIST`, PROF-14) – bez `StateFlow`, bez `CommandSession` i bez `CodeCredentials` (sesja trzyma `CodeCredentials` z sekretem). `CommandRunViewModel` nie ma pola typu `CommandSession`. `CurrentRun` (singleton) trzyma polecenie i `StateFlow<SessionState>` sesji aż do zamknięcia wyniku; jest to dozwolone, bo ten `StateFlow` nie wskazuje na `CommandSession` ani na `CodeCredentials` (w Spec 004 `CommandSession.state` to samodzielny `MutableStateFlow` ze stanem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął – także po „Wyjdź” (CMDUI-24) i ponownym otwarciu aplikacji; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Gdy wynik jest pokazany, panel poleceń jest niewidoczny, więc nowe polecenie można uruchomić dopiero po zamknięciu wyniku.
 
 **Kryteria akceptacji:**
 
@@ -428,20 +449,20 @@ Gdy polecenie jest w toku (`activeSession.value != null`), okno `Activity` ma w�
 - **Zakładając** `CommandRunViewModel` bez uruchomienia, **gdy** uruchomiono `BG` przez launcher (`activeSession`: `null` → sesja `BG`), a potem przyszedł `bg.txt` (`activeSession` → `null`), **wtedy** znacznik „ekran włączony” (z `activeSession`) ma kolejno wartości `false`, `true`, `false`, a po zakończeniu stan = wynik (z `CurrentRun`).
 - **Zakładając** telefon z czasem wygaszania ekranu 15 s (W9), **gdy** uruchomiono `CARBS 1` i czekano na prośbę o kod dłużej niż 15 s, **wtedy** ekran się nie wygasza, także po przełączeniu na zakładkę Ustawienia; po wyniku ekran wygasa po 15 s.
 
-### CMDUI-23: Ochrona ekranu (okno „Na pewno”, podsumowanie, przebieg, wynik)
+### CMDUI-23: Ochrona ekranu (okno „Na pewno”, formularz profilu, podsumowanie, przebieg, wynik)
 
 Okno `Activity` ma `FLAG_SECURE` (brak zrzutów ekranu i podglądu w ostatnich aplikacjach), zgodnie z planem („FLAG_SECURE na ekranach z danymi”), gdy:
 
-- na zakładce Polecenia otwarte jest okno „Na pewno X g?” (CMDUI-09; decyzja użytkownika, P11; dialog ma dodatkowo własne `securePolicy = SecureOn`) albo podsumowanie z polem PIN-u, lub
+- na zakładce Polecenia otwarte jest okno „Na pewno X g?” albo „Na pewno X j.?” (CMDUI-09, BOL-14; decyzja użytkownika, P11; dialog ma dodatkowo własne `securePolicy = SecureOn`), formularz zmiany profilu (PROF-15) albo podsumowanie z polem PIN-u, lub
 - trwa uruchamianie (od „Wyślij”, `BG` albo `PUMP` do wyniku `CommandLauncher.launch`, w tym odczyt sekretu) – także wtedy, gdy w tym czasie `onStop()` zamknął podsumowanie, lub
 - istnieje przebieg albo niezamknięty wynik polecenia – od `LaunchResult.Started` do zamknięcia wyniku (CMDUI-21) – **niezależnie od wybranej zakładki** (Polecenia, Ustawienia, Historia; decyzja użytkownika, P11). Ochrona wynika ze stanu uruchomienia (`CurrentRun` w `CommandRunViewModel` i `runHandoff` w `CommandsViewModel`, oba w zakresie `Activity`), a nie z tego, że ekran zakładki Polecenia jest w kompozycji.
 
-Po zamknięciu okna „Na pewno” („Nie”), podsumowania albo wyniku flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania; HISTUI-13 – zakładka Historia). Flaga jest zdejmowana dopiero, gdy żaden ekran ani przebieg jej nie wymaga (licznik żądań). Panel Polecenia bez okna „Na pewno”, bez podsumowania i bez przebiegu albo wyniku nie ma `FLAG_SECURE` (decyzja użytkownika, P3, zmieniona po recenzji). Skutek: w trakcie polecenia także zakładka Ustawienia nie pozwala na zrzut ekranu.
+Po zamknięciu okna „Na pewno” („Nie”), formularza profilu, podsumowania albo wyniku flaga jest zdejmowana, chyba że chroni ją też inny ekran (UI-23 – skaner albo okno wklejania; HISTUI-13 – zakładka Historia). Flaga jest zdejmowana dopiero, gdy żaden ekran ani przebieg jej nie wymaga (licznik żądań). Panel Polecenia bez okna „Na pewno”, bez formularza profilu, bez podsumowania i bez przebiegu albo wyniku nie ma `FLAG_SECURE` (decyzja użytkownika, P3, zmieniona po recenzji). Skutek: w trakcie polecenia także zakładka Ustawienia nie pozwala na zrzut ekranu.
 
 Okno ma flagę, gdy znacznik „ekran chroniony” jest włączony w `CommandsViewModel` albo w `CommandRunViewModel`, a żądanie ochrony z tych znaczników zgłasza kompozycja wspólna dla wszystkich zakładek (poza zawartością zakładki Polecenia):
 
 - `CommandRunViewModel`: znacznik = przebieg albo wynik jest w stanie ekranu (`view != null`). Ekran przebiegu i wyniku jest pokazywany z tego samego pola, więc nigdy bez flagi.
-- `CommandsViewModel`: znacznik = okno „Na pewno” otwarte, podsumowanie otwarte, trwa uruchamianie (`launching`) albo trwa przekazanie do przebiegu. `launching` gaśnie w tej samej zmianie stanu, w której przy `Started` włącza się `runHandoff`, więc między „Wyślij” a przebiegiem nie ma chwili bez znacznika, nawet gdy `onStop()` zamknie podsumowanie w trakcie `load()`.
+- `CommandsViewModel`: znacznik = okno „Na pewno” otwarte, formularz profilu otwarty, podsumowanie otwarte, trwa uruchamianie (`launching`) albo trwa przekazanie do przebiegu. `launching` gaśnie w tej samej zmianie stanu, w której przy `Started` włącza się `runHandoff`, więc między „Wyślij” a przebiegiem nie ma chwili bez znacznika, nawet gdy `onStop()` zamknie podsumowanie w trakcie `load()`.
 
 Zmiana zakładki woła `onStop()` przy opuszczeniu kompozycji przez `CommandsScreen` (CMDUI-11), ale nie ma gwarancji, że `ON_STOP` cyklu życia wtedy dotrze (jak w Spec 008, UI-14), a `onStop()` nie zmienia `launching` ani `runHandoff`. Ochrona przebiegu i wyniku nie zależy od `onStop()` ani od obecności `CommandsScreen` w kompozycji. Po `LaunchResult.Started` ViewModel w jednej zmianie stanu zamyka podsumowanie i włącza znacznik przekazania (`runHandoff`) – dla każdego polecenia. Znacznik przekazania wyłącza dopiero kolektor `CurrentRun` w `CommandsViewModel`, gdy zobaczy pusty `CurrentRun` (po zamknięciu wyniku, CMDUI-21). `CurrentRun` jest publikowany przed powrotem z `launch` (CMDUI-16), więc w chwili włączenia znacznika nie jest pusty. Przy `Rejected` znacznik przekazania nie jest włączany.
 
@@ -470,6 +491,7 @@ Na zakładce Polecenia przycisk Wstecz:
 | Sytuacja | Działanie |
 | --- | --- |
 | okno „Na pewno” otwarte | zamyka okno („Nie”) |
+| formularz profilu otwarty | zamyka formularz („Anuluj”, wybór profilu porzucony) |
 | podsumowanie otwarte | „Anuluj” podsumowania (CMDUI-10) |
 | wynik na ekranie | „Zamknij” (CMDUI-21) |
 | polecenie w toku | okno „Trwa polecenie” z tekstem „Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.” i przyciskami „Zostań” i „Wyjdź”; „Wyjdź” zamyka `Activity` (sesja trwa dalej w zakresie aplikacji, CMDUI-13; `CurrentRun` nie jest czyszczony), „Zostań” zamyka okno |
@@ -500,7 +522,7 @@ Wszystkie teksty widoczne w UI z tej specyfikacji (panel, banery, błędy pola i
 
 ### CMDUI-26: Brak ujawniania danych
 
-Pakiet `ui` nie wywołuje API logowania (reguła UI-21 obejmuje też `ui.commands`). `toString()` stanów `CommandsViewModel` i `CommandRunViewModel` oraz typów wyniku nie zawiera tekstu PIN-u, tekstu pola ilości, ilości gramów ani treści SMS (stały tekst `***` w miejscu wartości). PIN, kod TOTP, sekret i treść SMS nie trafiają do komunikatów ani wyjątków.
+Pakiet `ui` nie wywołuje API logowania (reguła UI-21 obejmuje też `ui.commands`). `toString()` stanów `CommandsViewModel` i `CommandRunViewModel` oraz typów wyniku nie zawiera tekstu PIN-u, tekstów pól ilości i procentu, ilości gramów i bolusa, nazwy, numeru ani procentu profilu, ani treści SMS (stały tekst `***` w miejscu wartości; BOL-18, PROF-18). PIN, kod TOTP, sekret i treść SMS nie trafiają do komunikatów ani wyjątków.
 
 **Kryteria akceptacji:**
 
@@ -618,14 +640,14 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
-  - CMDUI-01: panel ma też sekcje „Bolus” (BOL-13) i „Profil” (PROF-13).
-  - CMDUI-04: sekret wymagany dla każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu); CMDUI-05 obejmuje nowe przyciski.
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
+  - CMDUI-01: panel ma też sekcje „Bolus” (BOL-13) i „Profil” (PROF-13) oraz baner limitów (LIM-05); formularz profilu jako tryb zakładki (PROF-15).
+  - CMDUI-04: sekret wymagany dla każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu); `CommandRunViewModel` obserwuje stan sekretu (wybór profilu, PROF-14). CMDUI-05 obejmuje nowe przyciski. Tekst banera sekretu bez zmian („CARBS wymaga…”).
   - CMDUI-07 – CMDUI-09: granica i próg `CARBS` z limitów (LIM-06 – LIM-08); dostępność zależna od stanu limitów (LIM-05).
-  - CMDUI-10, CMDUI-11: podsumowanie z PIN-em uogólnione na `BOLUS` i zmianę profilu (BOL-15, PROF-15).
-  - CMDUI-12: nowe powody odrzucenia `LIMITS_UNAVAILABLE`, `AMOUNT_ABOVE_LIMIT`, `EXTRA_CONFIRMATION_REQUIRED` (LIM-09; `launch` dostaje znacznik `extraConfirmed`), `BOLUS_INTERVAL`, `BOLUS_HISTORY_UNAVAILABLE` (BOL-12).
-  - CMDUI-16, CMDUI-17, CMDUI-19: nagłówki, kroki (5 kroków dla każdego polecenia z kodem) i komunikaty nowych poleceń (BOL-16, PROF-16); wynik listy profili z wyborem pozycji (PROF-14).
-  - CMDUI-23: `FLAG_SECURE` także dla okna „Na pewno X j.?” i formularza profilu (BOL-14, PROF-15).
+  - CMDUI-10, CMDUI-11: podsumowanie z PIN-em uogólnione na `BOLUS` i zmianę profilu (BOL-15, PROF-15); `onStop()` zamyka też formularz profilu i porzuca wybór.
+  - CMDUI-12: kolejność sprawdzeń z limitami (3a) i odstępem między bolusami (3b); nowe powody odrzucenia `LIMITS_UNAVAILABLE`, `AMOUNT_ABOVE_LIMIT`, `EXTRA_CONFIRMATION_REQUIRED` (LIM-09; `launch` dostaje znacznik `extraConfirmed`), `BOLUS_INTERVAL`, `BOLUS_HISTORY_UNAVAILABLE` (BOL-12).
+  - CMDUI-15, CMDUI-16, CMDUI-17, CMDUI-19, CMDUI-21: zależności launchera, nagłówki, kroki (5 kroków dla każdego polecenia z kodem), komunikaty i wynik nowych poleceń (BOL-16, PROF-16); wynik listy profili z wyborem pozycji (PROF-14).
+  - CMDUI-23, CMDUI-24, CMDUI-26: `FLAG_SECURE` także dla okna „Na pewno X j.?” i formularza profilu (BOL-14, PROF-15); Wstecz zamyka formularz profilu; `toString()` bez danych bolusa i profilu.
 - **2026-10-28 – czyszczenie PIN-u przy zmianie zakładki (P13).**
   - CMDUI-11: opuszczenie zakładki Polecenia (zmiana zakładki) czyści PIN i zamyka podsumowanie oraz okno „Na pewno” tak jak `ON_STOP`; nowe kryteria: dwukrotne `onStop()` (obrót), `onStop()` w trakcie `CARBS 1` nie rusza przebiegu ani ochrony, źródło `CommandsScreen.kt` (`DisposableEffect`); kryterium W6 dla zmiany zakładki.
   - CMDUI-23: opis zmiany zakładki – `onStop()` jest wołane, ale nie zmienia `launching` ani `runHandoff`; kryteria bez zmian.

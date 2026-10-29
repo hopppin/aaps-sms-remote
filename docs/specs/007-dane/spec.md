@@ -15,15 +15,16 @@ Pakiet `sms` wysyła i odbiera SMS-y tylko wtedy, gdy zna numer telefonu z AAPS,
 - Implementacja `sms.AapsNumberProvider` (bez blokującego I/O) i jej wiązanie Hilt.
 - Historia poleceń: wpis z `session.SessionResult`, zapis tekstowy wartości wyliczeniowych, odczyt wartości nieznanych, retencja 200 wpisów, odczyt jako `Flow` od najnowszego, czyszczenie całej historii.
 - Rejestrator wyników sesji: zapis jednego wpisu na każdą śledzoną sesję po jej zakończeniu.
-- Baza Room: schemat w wersji 1, eksport schematu, brak migracji destrukcyjnych.
+- Baza Room: schemat w wersji 3 (wersja 1 + migracje 1 → 2 i 2 → 3), eksport schematu, brak migracji destrukcyjnych.
+- Limity poleceń w osobnym pliku `SharedPreferences` `command_limits` – opisuje [Spec 011](../011-limity-polecen/spec.md) (LIM-04); plik `settings` (DATA-01) bez zmian.
 - Potwierdzenie, że plik ustawień i baza nie trafiają do kopii zapasowej ani transferu urządzenia (stan obecny manifestu i `data_extraction_rules.xml`).
-- Brak ujawniania numeru, ilości węglowodanów i treści odpowiedzi AAPS.
+- Brak ujawniania numeru, ilości węglowodanów, ilości bolusa, danych profilu i treści odpowiedzi AAPS.
 - Wiązania Hilt pakietu `data`.
 
 **Poza zakresem:**
 
 - Ekrany i komunikaty (wpisywanie numeru, lista historii, potwierdzenie „wyczyścić historię?”) – spec `ui`.
-- Wybór karty SIM (decyzja ze Spec 005) i inne ustawienia, m.in. „limit oczekiwania” z [planu](../../plan.md#ekrany-aplikacji) – limity sesji są stałe (Spec 004); ewentualne ustawienie to osobna specyfikacja.
+- Wybór karty SIM (decyzja ze Spec 005) i inne ustawienia, m.in. „limit oczekiwania” z [planu](../../plan.md#ekrany-aplikacji) – limity sesji są stałe (Spec 004); ewentualne ustawienie to osobna specyfikacja. Limity poleceń (`CARBS`, `BOLUS`) to [Spec 011](../011-limity-polecen/spec.md).
 - Usuwanie pojedynczych wpisów historii, eksport historii, synchronizacja, kopia zapasowa historii.
 - Szyfrowanie bazy i pliku ustawień (np. SQLCipher) – uzasadnienie w sekcji Bezpieczeństwo i w [design.md](design.md#decyzje).
 - Zapis wyniku sesji przerwanej zabiciem procesu (sesja przepada razem z procesem – Spec 005, Poza zakresem).
@@ -133,16 +134,18 @@ Wczytanie, zapis i usunięcie są wzajemnie wykluczające się: najwyżej jedna 
 
 ### DATA-07: Zawartość wpisu historii
 
-Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian, także `null` (SESSION-19). Ilość węglowodanów pochodzi z `Command.Carbs.grams` (wynik `CarbsConfirmed` ma zawsze tę samą ilość – Spec 004). Treść odpowiedzi jest zapisywana w całości, bez skracania.
+Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian, także `null` (SESSION-19). Ilość węglowodanów pochodzi z `Command.Carbs.grams` (wynik `CarbsConfirmed` ma zawsze tę samą ilość – Spec 004), ilość bolusa z `Command.Bolus.centiUnits` (BOL-17), numer i procent profilu z `Command.ProfileSwitch` (PROF-17; nazwa profilu nie jest osobnym polem). Treść odpowiedzi jest zapisywana w całości, bez skracania.
 
 | Pole wpisu | Źródło |
 | --- | --- |
 | identyfikator | nadawany przy zapisie (kolejność zapisu) |
-| polecenie | `command.id`: `BG`, `PUMP`, `CARBS` |
+| polecenie | `command.id`: `BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` |
 | ilość (g) | `Command.Carbs.grams` dla `CARBS`, inaczej brak |
-| rodzaj wyniku | `Completed`, `CarbsConfirmed`, `Failed`, `TimedOut`, `Unknown`, `Cancelled` |
+| ilość bolusa (setne części jednostki) | `Command.Bolus.centiUnits` dla `BOLUS`, inaczej brak |
+| numer i procent profilu | `Command.ProfileSwitch.number` i `.percent` dla `PROFILE_SWITCH`, inaczej brak (dwa osobne pola) |
+| rodzaj wyniku | `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `Failed`, `TimedOut`, `Unknown`, `Cancelled` |
 | powód | `Failed.reason` (`FailureReason`), `Unknown.reason` (`UnknownReason`), `TimedOut.phase` (`SessionPhase`); dla pozostałych brak |
-| treść odpowiedzi AAPS | `text` z `Completed`, `CarbsConfirmed`, `Failed`, `Unknown` (dla `Failed`/`Unknown` może być brak); dla `TimedOut` i `Cancelled` brak |
+| treść odpowiedzi AAPS | `text` z `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `Failed`, `Unknown` (dla `Failed`/`Unknown` może być brak); dla `TimedOut` i `Cancelled` brak |
 | rozpoczęcie, wysłanie polecenia, wysłanie kodu, zakończenie | `startedAtEpochMillis`, `commandSentAtEpochMillis`, `codeSentAtEpochMillis`, `finishedAtEpochMillis` |
 | liczba wiadomości nieoczekiwanych | `unexpectedMessages.size` |
 
@@ -150,6 +153,7 @@ Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian,
 
 - **Zakładając** wynik `BG`: `Completed` z treścią `bg.txt`, rozpoczęcie `T0`, wysłanie polecenia `T0 + 1000`, wysłanie kodu `null`, zakończenie `T0 + 5000`, 0 wiadomości nieoczekiwanych, **gdy** utworzono wpis, **wtedy** polecenie = `BG`, ilość = brak, rodzaj = `Completed`, powód = brak, treść = `bg.txt`, czasy = `T0`, `T0 + 1000`, `null`, `T0 + 5000`, liczba = 0.
 - **Zakładając** wynik `CARBS 20`: `CarbsConfirmed(20, carbs-sukces.txt)` z czasami `T0`, `T0 + 1000`, `T0 + 61000`, `T0 + 120000` i 2 wiadomościami nieoczekiwanymi, **gdy** utworzono wpis, **wtedy** polecenie = `CARBS`, ilość = 20, rodzaj = `CarbsConfirmed`, treść = `carbs-sukces.txt`, czasy jak w wyniku, liczba = 2.
+- **Zakładając** wynik `BOLUS 1,20 j.` `BolusConfirmed(120, bolus-sukces-1-20.txt)` i wynik zmiany profilu (2, `LocalProfile2`, 115) `Unknown(UNRECOGNIZED_REPLY)`, **gdy** utworzono wpisy, **wtedy** pierwszy ma polecenie `BOLUS`, ilość bolusa 120, brak ilości węglowodanów i rodzaj `BolusConfirmed`, a drugi – polecenie `PROFILE_SWITCH`, numer 2, procent 115, przy czym żadne pole poza treścią nie zawiera nazwy profilu (BOL-17, PROF-17).
 - **Zakładając** wyniki `Failed(WRONG_CODE, zly-kod.txt)`, `Failed(SEND_FAILED, null)`, `Unknown(CONFIRMATION_TIMEOUT, null)`, `Unknown(AMOUNT_MISMATCH, carbs-prosba-o-kod.txt)`, `TimedOut(AWAITING_REPLY)`, `Cancelled`, **gdy** utworzono wpisy, **wtedy** rodzaje i powody to kolejno `Failed`/`WRONG_CODE`, `Failed`/`SEND_FAILED`, `Unknown`/`CONFIRMATION_TIMEOUT`, `Unknown`/`AMOUNT_MISMATCH`, `TimedOut`/`AWAITING_REPLY`, `Cancelled`/brak, a treść jest tylko w pierwszym i czwartym wpisie.
 - **Zakładając** wynik `Cancelled` z wszystkimi czasami `null` (SESSION-19), **gdy** utworzono wpis, **wtedy** wszystkie cztery czasy = `null`.
 - **Zakładając** wynik `Failed(UNRECOGNIZED_REPLY, <2000 znaków "a">)`, **gdy** zamieniono go na wiersz i odczytano wpis, **wtedy** treść ma 2000 znaków i jest identyczna.
@@ -165,15 +169,17 @@ Wpis i wiersz mają wyłącznie pola z tabeli DATA-07. Nie zawierają PIN-u, kod
 
 ### DATA-09: Stabilne wartości tekstowe i wartości nieznane
 
-Polecenie, rodzaj wyniku i powód są zapisywane jako stałe teksty z tabeli w design (dla poleceń, powodów i faz równe obecnym nazwom wartości wyliczeniowych; dla rodzajów wyniku: `COMPLETED`, `CARBS_CONFIRMED`, `FAILED`, `TIMED_OUT`, `UNKNOWN`, `CANCELLED`). Zmiana nazwy wartości wyliczeniowej w kodzie nie zmienia zapisywanego tekstu. Odczyt wiersza nigdy nie rzuca:
+Polecenie, rodzaj wyniku i powód są zapisywane jako stałe teksty z tabeli w design (dla poleceń, powodów i faz równe obecnym nazwom wartości wyliczeniowych; dla rodzajów wyniku: `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `FAILED`, `TIMED_OUT`, `UNKNOWN`, `CANCELLED`). Zmiana nazwy wartości wyliczeniowej w kodzie nie zmienia zapisywanego tekstu. Odczyt wiersza nigdy nie rzuca:
 
 | Wiersz | Odczytany wpis |
 | --- | --- |
 | nieznany tekst polecenia | polecenie `UNRECOGNIZED`, ilość = brak |
 | polecenie inne niż `CARBS` z ilością | ilość = brak |
+| polecenie inne niż `BOLUS` z ilością bolusa | ilość bolusa = brak |
+| polecenie inne niż `PROFILE_SWITCH` z numerem lub procentem profilu | numer i procent = brak |
 | nieznany tekst rodzaju wyniku | rodzaj `Unrecognized`, powód = brak |
 | `FAILED`, `UNKNOWN`, `TIMED_OUT` z nieznanym albo brakującym powodem | ten rodzaj z powodem = brak |
-| `COMPLETED`, `CARBS_CONFIRMED`, `CANCELLED` z powodem | powód pominięty |
+| `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `CANCELLED` z powodem | powód pominięty |
 
 Pozostałe pola (identyfikator, czasy, treść, liczba) są odczytywane bez zmian.
 
@@ -184,6 +190,8 @@ Pozostałe pola (identyfikator, czasy, treść, liczba) są odczytywane bez zmia
 - **Zakładając** wiersz z rodzajem `PARTIAL` i powodem `SEND_FAILED`, **gdy** go odczytano, **wtedy** rodzaj = `Unrecognized`, powód = brak.
 - **Zakładając** wiersz `FAILED` z powodem `NO_SIGNAL`, **gdy** go odczytano, **wtedy** rodzaj = `Failed`, powód = brak, pozostałe pola bez zmian.
 - **Zakładając** wiersz `BG` z ilością 20, **gdy** go odczytano, **wtedy** ilość = brak.
+- **Zakładając** wiersz `CARBS` z ilością bolusa 50 oraz wiersz `PROFILE_LIST` z numerem 3 i procentem 100, **gdy** je odczytano, **wtedy** ilość bolusa, numer i procent profilu = brak (BOL-17, PROF-17).
+- **Zakładając** wiersz `PROFILE_LIST` z samym numerem profilu 3 (procent `NULL`) oraz wiersz `PROFILE_STATUS` z samym procentem 100 (numer `NULL`), **gdy** je odczytano, **wtedy** w obu numer i procent profilu = brak (PROF-17).
 
 ### DATA-10: Zapis z retencją 200 wpisów
 
@@ -241,12 +249,15 @@ Rejestrator nie wpływa na sesję: nie anuluje jej, nie zmienia jej stanu i nie 
 
 ### DATA-14: Schemat bazy i migracje
 
-Baza Room o nazwie pliku `aaps_remote.db` w domyślnym katalogu baz aplikacji (`databases/`) ma wersję schematu 1 i jedną tabelę `command_history` z kolumnami z design. Identyfikator jest kluczem głównym z `AUTOINCREMENT` (identyfikatory nie są używane ponownie, także po czyszczeniu). Schemat jest eksportowany (`exportSchema = true`) do katalogu `app/schemas/`, a plik schematu wersji 1 jest w repo (`app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`). Baza nie używa `fallbackToDestructiveMigration` w żadnym wariancie; każda przyszła zmiana schematu wymaga zmiany tej specyfikacji z migracją i jej testem.
+Baza Room o nazwie pliku `aaps_remote.db` w domyślnym katalogu baz aplikacji (`databases/`) ma wersję schematu 3 i jedną tabelę `command_history` z kolumnami z design. Wersja 2 (migracja 1 → 2) dodaje kolumnę `bolus_centi_units INTEGER` ([Spec 012](../012-bolus/spec.md), BOL-17), wersja 3 (migracja 2 → 3) – kolumny `profile_number INTEGER` i `profile_percent INTEGER` ([Spec 013](../013-profil/spec.md), PROF-17); wszystkie nowe kolumny dopuszczają `NULL`, istniejące wiersze zostają bez zmian. Obie migracje są rejestrowane jednym wywołaniem `addMigrations(MIGRATION_1_2, MIGRATION_2_3)`, więc baza w wersji 1 przechodzi do 3 kolejno przez 2. Identyfikator jest kluczem głównym z `AUTOINCREMENT` (identyfikatory nie są używane ponownie, także po czyszczeniu). Schemat jest eksportowany (`exportSchema = true`) do katalogu `app/schemas/`, a pliki schematów wersji 1, 2 i 3 są w repo (`app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`, `2.json`, `3.json`). Baza nie używa `fallbackToDestructiveMigration` w żadnym wariancie; każda przyszła zmiana schematu wymaga zmiany tej specyfikacji z migracją i jej testem (bez testu migracji na `androidTest` – patrz kryteria: sprawdzenie plików schematu w JVM i ręczne W3 na urządzeniu).
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wyeksportowany plik schematu `app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`, **gdy** test JVM go przeczytał, **wtedy** wersja = 1, jest dokładnie jedna tabela `command_history`, nazwy kolumn, ich typy i `NOT NULL` są zgodne z design, a zapytanie tworzące tabelę zawiera `AUTOINCREMENT`.
+- **Zakładając** wyeksportowany plik schematu `app/schemas/pl.twojanazwa.aapsremote.data.platform.AapsRemoteDatabase/1.json`, **gdy** test JVM go przeczytał, **wtedy** wersja = 1 (schemat wyjściowy), jest dokładnie jedna tabela `command_history`, nazwy kolumn, ich typy i `NOT NULL` są zgodne z design, a zapytanie tworzące tabelę zawiera `AUTOINCREMENT`.
+- **Zakładając** pliki `2.json` i `3.json`, **gdy** test JVM je przeczytał, **wtedy** wersje = 2 i 3, tabela ma kolumny wersji poprzedniej i nowe kolumny (`bolus_centi_units`; `profile_number`, `profile_percent`) typu `INTEGER` bez `NOT NULL`; migracja 1 → 2 zawiera dokładnie jedno `ALTER TABLE command_history ADD COLUMN bolus_centi_units INTEGER`, a migracja 2 → 3 dokładnie dwa `ALTER TABLE command_history ADD COLUMN …` (BOL-17, PROF-17).
+- **Zakładając** źródło `AapsRemoteDatabase.kt`/`DataModule.kt`, **gdy** test JVM je przeczytał, **wtedy** jest dokładnie jedno wywołanie `addMigrations(` z `MIGRATION_1_2` i `MIGRATION_2_3`.
 - **Zakładając** źródła `data.platform`, **gdy** test JVM przeszukał je jako tekst, **wtedy** nie zawierają `fallbackToDestructiveMigration`.
+- **Zakładając** telefon z historią w wersji 1 albo 2 (sprawdzenie na urządzeniu, W3 w Spec 012 i 013), **gdy** zainstalowano nową wersję, **wtedy** dotychczasowe wpisy są zachowane, a nowe wpisy bolusa i profilu mają swoje pola.
 - **Zakładając** telefon po pierwszym poleceniu (sprawdzenie na urządzeniu, W3), **gdy** wyświetlono `databases/` przez `adb shell run-as`, **wtedy** jest plik `aaps_remote.db`, a po zabiciu procesu i ponownym starcie historia zawiera wpis.
 
 ### DATA-15: Błędy bez wyjątków
@@ -260,7 +271,7 @@ Operacje publiczne `data` (zapis i usunięcie numeru, `currentNumber()`, zapis w
 
 ### DATA-16: Brak kopii zapasowej ustawień i historii
 
-Plik ustawień (domena `sharedpref`) i baza historii (domena `database`) nie trafiają do kopii zapasowej ani transferu urządzenia. Stan obecny zostaje bez zmian: w `AndroidManifest.xml` `android:allowBackup="false"`, `android:fullBackupContent="false"`, `android:dataExtractionRules="@xml/data_extraction_rules"`, a `res/xml/data_extraction_rules.xml` w sekcjach `cloud-backup` i `device-transfer` wyklucza domeny `database` i `sharedpref`. Ta specyfikacja nie zmienia tych plików.
+Pliki ustawień (`settings` i `command_limits` – Spec 011; domena `sharedpref`) i baza historii (domena `database`) nie trafiają do kopii zapasowej ani transferu urządzenia. Stan obecny zostaje bez zmian: w `AndroidManifest.xml` `android:allowBackup="false"`, `android:fullBackupContent="false"`, `android:dataExtractionRules="@xml/data_extraction_rules"`, a `res/xml/data_extraction_rules.xml` w sekcjach `cloud-backup` i `device-transfer` wyklucza domeny `database` i `sharedpref`. Ta specyfikacja nie zmienia tych plików.
 
 **Kryteria akceptacji:**
 
@@ -269,7 +280,7 @@ Plik ustawień (domena `sharedpref`) i baza historii (domena `database`) nie tra
 
 ### DATA-17: Brak ujawniania danych
 
-Numer telefonu, ilość węglowodanów i treść odpowiedzi AAPS nie trafiają do `toString()` typów z `data` i `data.platform` (stały tekst `NazwaTypu(***)` albo tekst bez tych danych), do komunikatów wyjątków ani do logów. Pakiety `data` i `data.platform` nie wywołują API logowania (`android.util.Log`, `println`, `System.out`/`err`, loggerów). Komunikaty wyjątków rzucanych przez `data` są stałymi tekstami.
+Numer telefonu, ilość węglowodanów, ilość bolusa, numer i procent profilu oraz treść odpowiedzi AAPS (a także limity poleceń – LIM-12) nie trafiają do `toString()` typów z `data` i `data.platform` (stały tekst `NazwaTypu(***)` albo tekst bez tych danych), do komunikatów wyjątków ani do logów. Pakiety `data` i `data.platform` nie wywołują API logowania (`android.util.Log`, `println`, `System.out`/`err`, loggerów). Komunikaty wyjątków rzucanych przez `data` są stałymi tekstami.
 
 **Kryteria akceptacji:**
 
@@ -305,10 +316,10 @@ Numer telefonu, ilość węglowodanów i treść odpowiedzi AAPS nie trafiają d
 
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej funkcji:
 
-- **PIN, kod TOTP i sekret nigdy nie trafiają do historii.** Wynik sesji ich nie zawiera (SESSION-21), a wpis ma zamkniętą listę pól (DATA-08). Treść odpowiedzi to wyłącznie tekst SMS-a od numeru AAPS (po filtrze `sms`): odpowiedź BG/PUMP, potwierdzenie CARBS, „zły kod”, prośba o kod (w `Failed` z `AMOUNT_MISMATCH`, `UNEXPECTED_REPLY`, `CODE_REQUEST_EXPIRED` i w `Unknown` z `UNEXPECTED_REPLY`, `AMOUNT_MISMATCH`) albo tekst nierozpoznany. Prośba o kod z AAPS 3.4.2.6 nie zawiera kodu ani PIN-u – zawiera godzinę, ilość i imię ustawione w AAPS (`dla: Jan` w danych testowych). Odpowiedź z kodem wysyłana przez aplikację nigdy nie jest w wyniku sesji. Ryzyko szczątkowe: nierozpoznany SMS z numeru AAPS (np. prywatna wiadomość, gdy telefon z AAPS służy też do innych celów) trafi do historii w całości – zapis treści to decyzja użytkownika; historię można wyczyścić (DATA-12).
+- **PIN, kod TOTP i sekret nigdy nie trafiają do historii.** Wynik sesji ich nie zawiera (SESSION-21), a wpis ma zamkniętą listę pól (DATA-08). Treść odpowiedzi to wyłącznie tekst SMS-a od numeru AAPS (po filtrze `sms`): odpowiedź BG/PUMP, stan i lista profili, potwierdzenie CARBS lub bolusa, „zły kod”, prośba o kod (w `Failed` z `AMOUNT_MISMATCH`, `UNEXPECTED_REPLY`, `CODE_REQUEST_EXPIRED` i w `Unknown` z `UNEXPECTED_REPLY`, `AMOUNT_MISMATCH`) albo tekst nierozpoznany. Prośba o kod z AAPS 3.4.2.6 nie zawiera kodu ani PIN-u – zawiera godzinę, ilość i imię ustawione w AAPS (`dla: Jan` w danych testowych). Odpowiedź z kodem wysyłana przez aplikację nigdy nie jest w wyniku sesji. Ryzyko szczątkowe: nierozpoznany SMS z numeru AAPS (np. prywatna wiadomość, gdy telefon z AAPS służy też do innych celów) trafi do historii w całości – zapis treści to decyzja użytkownika; historię można wyczyścić (DATA-12).
 - **Z wiadomości nieoczekiwanych tylko liczba** (DATA-08). Wiadomość nieoczekiwana to m.in. potwierdzenie CARBS wysłane przez AAPS do wszystkich dozwolonych numerów (polecenie z innego telefonu); jej treść nie dotyczy polecenia z aplikacji, a liczba wystarcza do ostrzeżenia w `ui`.
 - **Numer telefonu nigdy nie jest logowany ani pokazywany w `toString()`** (DATA-17); wpis historii nie zawiera numeru (DATA-08). W testach i dokumentacji tylko numery fikcyjne.
-- **Ilość CARBS i treść odpowiedzi to dane zdrowotne:** redagowane `toString()`, bez logowania (DATA-17), bez kopii zapasowej i transferu urządzenia (DATA-16).
+- **Ilość CARBS, ilość bolusa, profil i treść odpowiedzi to dane zdrowotne:** redagowane `toString()`, bez logowania (DATA-17), bez kopii zapasowej i transferu urządzenia (DATA-16).
 - **Brak szyfrowania pliku ustawień i bazy** (dla numeru – decyzja użytkownika; dla historii – decyzja tej specyfikacji): dane leżą w prywatnym katalogu aplikacji, niedostępnym dla innych aplikacji bez roota, i nie opuszczają telefonu przez kopię (DATA-16). Szyfrowanie kluczem z Keystore wymagającym odblokowanego telefonu blokowałoby zapis historii przy zablokowanym ekranie, a SQLCipher dodałby zależność natywną; korzyść jest mała wobec danych, które i tak pokazuje AAPS. Root i modyfikacje systemu są poza zakresem (jak w Spec 006).
 - **Nieznany numer = nic nie jest wysyłane ani przyjmowane.** Przed wczytaniem i przy błędzie odczytu `currentNumber()` = `null`, a `sms` wtedy odpowiada `Failed` bez wysyłania i nie dostarcza wiadomości (SMS-04, SMS-12) – bezpieczny stop (DATA-05).
 - **Zmiana numeru w trakcie polecenia.** `sms` czyta numer przy każdym broadcaście i każdym wysłaniu (SMS-04, SMS-09), więc zmiana numeru po przyjęciu prośby o kod, a przed wysłaniem odpowiedzi skierowałaby `<kod><PIN>` na nowy numer. Dlatego zmiana i usunięcie numeru są niedostępne w `ui`, gdy jest aktywne polecenie (wymaganie dla `ui`, sekcja „Założenia i zależności”). Rozwiązanie po stronie sesji (numer ustalany raz na polecenie) – „Przyszłe zmiany”.
@@ -356,7 +367,7 @@ Brak. Decyzje przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
-  - Nowy plik ustawień `command_limits` (LIM-04); DATA-01 i plik `settings` bez zmian.
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
+  - Nowy plik ustawień `command_limits` (LIM-04); DATA-01 i plik `settings` bez zmian; DATA-16 obejmuje oba pliki (domena `sharedpref`).
   - DATA-07, DATA-09: nowe polecenia i rodzaj wyniku `BOLUS_CONFIRMED`, pola ilości bolusa, numeru i procentu profilu (BOL-17, PROF-17).
   - DATA-14: baza w wersji 2 (migracja 1 → 2, kolumna `bolus_centi_units`) i 3 (migracja 2 → 3, `profile_number`, `profile_percent`), bez migracji destrukcyjnych.

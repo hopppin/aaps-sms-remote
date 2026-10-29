@@ -7,12 +7,12 @@
 
 ## Cel
 
-Aplikacja prowadzi jedno polecenie od wysłania SMS-a do wyniku: czeka na odpowiedź AAPS, dla `CARBS` sama odsyła kod `<TOTP><PIN>` dokładnie wtedy, gdy AAPS poprosił o kod dla wysłanej ilości, i kończy się jednym, jednoznacznie nazwanym wynikiem. Ta specyfikacja opisuje czystą logikę w Kotlinie (bez `android.*`): maszynę stanów jednego polecenia, limity czasu, regułę „jedno aktywne polecenie” i porty, których `session` wymaga od `sms`.
+Aplikacja prowadzi jedno polecenie od wysłania SMS-a do wyniku: czeka na odpowiedź AAPS, dla poleceń z kodem (`CARBS`, `BOLUS`, zmiana profilu) sama odsyła kod `<TOTP><PIN>` dokładnie wtedy, gdy AAPS poprosił o kod dla wysłanej ilości (profilu i procentu), i kończy się jednym, jednoznacznie nazwanym wynikiem. Ta specyfikacja opisuje czystą logikę w Kotlinie (bez `android.*`): maszynę stanów jednego polecenia, limity czasu, regułę „jedno aktywne polecenie” i porty, których `session` wymaga od `sms`.
 
 ## Zakres
 
-- Maszyna stanów jednego polecenia: wysyłanie polecenia → czekanie na odpowiedź (`BG`, `PUMP`) albo na prośbę o kod (`CARBS`) → przygotowanie i wysłanie kodu → czekanie na potwierdzenie → wynik końcowy.
-- Wyniki końcowe: zakończone (odpowiedź `BG`/`PUMP`), potwierdzenie `CARBS` przez AAPS, błąd, brak odpowiedzi (timeout), wynik nieznany („sprawdź w AAPS”), anulowane.
+- Maszyna stanów jednego polecenia: wysyłanie polecenia → czekanie na odpowiedź (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`) albo na prośbę o kod (`CARBS`, `BOLUS`, zmiana profilu) → przygotowanie i wysłanie kodu → czekanie na potwierdzenie → wynik końcowy.
+- Wyniki końcowe: zakończone (odpowiedź `BG`/`PUMP`/stan lub lista profili), potwierdzenie `CARBS` albo `BOLUS` przez AAPS, błąd, brak odpowiedzi (timeout), wynik nieznany („sprawdź w AAPS”), anulowane.
 - Limity czasu jako parametry sesji z wartościami domyślnymi (3 min, 6 min).
 - Warunki odesłania kodu: rodzaj wiadomości, stan sesji, ilość, wiek prośby o kod.
 - Składanie odpowiedzi `<6 cyfr TOTP><PIN>` z `UsableTotpProvider` (Spec 001) i PIN-u AAPS trzymanego tylko w pamięci.
@@ -32,7 +32,7 @@ Aplikacja prowadzi jedno polecenie od wysłania SMS-a do wyniku: czeka na odpowi
 - Zapis historii w Room, ustawienia limitów czasu w aplikacji – `data`/`ui` (później).
 - Wstrzykiwanie przez Hilt – przy integracji z `ui`.
 - Obsługa wiadomości, które przychodzą, gdy żadna sesja nie jest aktywna.
-- Polecenia spoza MVP.
+- Polecenia spoza katalogu ([Spec 003](../003-katalog-polecen/spec.md)). Reguły sesji dla `BOLUS` i profilu: [Spec 012](../012-bolus/spec.md) (BOL-10, BOL-11, BOL-19) i [Spec 013](../013-profil/spec.md) (PROF-11, PROF-12); ta specyfikacja opisuje wspólne fazy, limity i wyniki.
 
 ## Fakty o AAPS (źródło)
 
@@ -51,7 +51,7 @@ Aplikacja prowadzi jedno polecenie od wysłania SMS-a do wyniku: czeka na odpowi
 ## Pojęcia
 
 - **Sesja** – przebieg jednego polecenia (`Command` ze Spec 003) od wysłania do wyniku końcowego.
-- **Polecenie z kodem** – polecenie, którego wpis katalogu ma `requiresCode = true` (w MVP: `CARBS`). Pozostałe to **polecenia bez kodu** (`BG`, `PUMP`).
+- **Polecenie z kodem** – polecenie, którego wpis katalogu ma `requiresCode = true` (`CARBS`, `BOLUS`, zmiana profilu). Pozostałe to **polecenia bez kodu** (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`).
 - **Wiadomość** – przychodzący SMS od numeru AAPS przekazany sesji przez port odbioru: treść i chwila odbioru (`receivedAtEpochMillis`).
 - **Zegar** – `EpochClock` ze Spec 001; wszystkie chwile w tej specyfikacji to milisekundy epoki z tego zegara.
 - **Chwila wysłania polecenia** (`commandSentAt`) – odczyt zegara w chwili, gdy port wysyłania zwrócił „wysłano” dla SMS-a z poleceniem.
@@ -82,8 +82,9 @@ Fazy przed kodem: `NOT_STARTED`, `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_
 
 | Wynik | Znaczenie (dla `ui`) | Pola |
 | --- | --- | --- |
-| `Completed` | odpowiedź na `BG`/`PUMP` | wynik parsera (`BgReport`/`PumpStatus`), treść |
+| `Completed` | odpowiedź na polecenie bez kodu | wynik parsera (`BgReport`, `PumpStatus`, stan profilu albo lista profili), treść |
 | `CarbsConfirmed` | „AAPS potwierdził wprowadzenie X g” | ilość, treść |
+| `BolusConfirmed` | „AAPS potwierdził podanie X j.” (BOL-11) | ilość w setnych jednostki, treść |
 | `Failed` | błąd; kod na pewno nie został wysłany albo AAPS go odrzucił | powód, treść (jeśli dotyczy) |
 | `TimedOut` | „AAPS nie odpowiada” | faza, w której upłynął limit |
 | `Unknown` | „nieznany – sprawdź w AAPS”; nie błąd i nie sukces | powód, treść (jeśli dotyczy) |
@@ -155,9 +156,9 @@ Sesja przetwarza tylko wiadomości z portu odbioru (już przefiltrowane po numer
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `carbs-prosba-o-kod.txt` z `receivedAtEpochMillis = T0 − 1`, **wtedy** jest ignorowana i żaden kod nie jest wysyłany.
 - **Zakładając** sesję `BG`, **gdy** strumień odbioru kończy się wyjątkiem w chwili 1000, **wtedy** faza pozostaje `AWAITING_REPLY` do chwili 180 000, a potem wynik to `TimedOut(AWAITING_REPLY)`.
 
-### SESSION-06: Odpowiedź na BG i PUMP
+### SESSION-06: Odpowiedź na BG, PUMP, PROFILE STATUS i PROFILE LIST
 
-W fazie `AWAITING_REPLY`: wynik parsera `BgReport` (dla `BG`) albo `PumpStatus` (dla `PUMP`) kończy sesję wynikiem `Completed` z tym wynikiem parsera i treścią wiadomości. Każdy inny wynik parsera (`Unrecognized`) kończy sesję wynikiem `Failed(UNRECOGNIZED_REPLY)` z treścią wiadomości.
+W fazie `AWAITING_REPLY`: wynik parsera `BgReport` (dla `BG`), `PumpStatus` (dla `PUMP`), stan profilu (dla `PROFILE STATUS`) albo lista profili (dla `PROFILE LIST`; PROF-06, PROF-07, PROF-11) kończy sesję wynikiem `Completed` z tym wynikiem parsera i treścią wiadomości. Każdy inny wynik parsera (`Unrecognized`, a także raport innego polecenia, np. lista profili w sesji `PROFILE STATUS`) kończy sesję wynikiem `Failed(UNRECOGNIZED_REPLY)` z treścią wiadomości.
 
 **Kryteria akceptacji:**
 
@@ -166,6 +167,7 @@ W fazie `AWAITING_REPLY`: wynik parsera `BgReport` (dla `BG`) albo `PumpStatus` 
 - **Zakładając** sesję `BG` w `AWAITING_REPLY`, **gdy** przychodzi `Czesc, kupisz chleb?`, **wtedy** wynik to `Failed(UNRECOGNIZED_REPLY)` z treścią `Czesc, kupisz chleb?`.
 - **Zakładając** sesję `BG` w `AWAITING_REPLY`, **gdy** przychodzi `carbs-sukces.txt` (potwierdzenie `CARBS` z innego numeru), **wtedy** wynik to `Failed(UNRECOGNIZED_REPLY)` z tą treścią.
 - **Zakładając** sesję `PUMP` w `AWAITING_REPLY`, **gdy** przychodzi `bg.txt`, **wtedy** wynik to `Failed(UNRECOGNIZED_REPLY)`.
+- **Zakładając** sesję `PROFILE LIST` (osobno `PROFILE STATUS`) w `AWAITING_REPLY`, **gdy** przychodzi `profile-list.txt` (`profile-status.txt`), **wtedy** wynik to `Completed` z listą profili (stanem profilu) i treścią pliku; **gdy** przychodzi plik drugiego polecenia, **wtedy** `Failed(UNRECOGNIZED_REPLY)` (PROF-11).
 
 ### SESSION-07: Limit oczekiwania na pierwszą odpowiedź
 
@@ -186,7 +188,7 @@ Limit odpowiedzi (SESSION-01) liczony jest w czasie korutyn od rozpoczęcia wysy
 
 ### SESSION-08: Przyjęcie prośby o kod
 
-Jedynym zdarzeniem, które prowadzi do wysłania kodu, jest wynik parsera `CodeRequest` dla wiadomości przetwarzanej w fazie `AWAITING_CODE_REQUEST` (więc z `receivedAtEpochMillis` ≥ chwili wysłania polecenia, SESSION-05). Parser zwraca `CodeRequest` tylko przy ilości równej wysłanej (PARSER-06). Po przyjęciu sesja zapamiętuje chwilę odbioru prośby i przechodzi do `PREPARING_CODE`. W żadnej innej fazie `CodeRequest` nie prowadzi do wysłania kodu (SESSION-11, SESSION-13). Sesja wysyła kod najwyżej raz.
+Jedynym zdarzeniem, które prowadzi do wysłania kodu, jest wynik parsera będący prośbą o kod zgodną z poleceniem sesji (`CodeRequest` dla `CARBS`, prośba o kod bolusa dla `BOLUS`, prośba o kod profilu dla zmiany profilu; wspólny nadtyp, BOL-19) dla wiadomości przetwarzanej w fazie `AWAITING_CODE_REQUEST` (więc z `receivedAtEpochMillis` ≥ chwili wysłania polecenia, SESSION-05). Parser zwraca prośbę o kod tylko przy ilości (profilu i procencie) równej wysłanej (PARSER-06, BOL-08, PROF-09). Po przyjęciu sesja zapamiętuje chwilę odbioru prośby i przechodzi do `PREPARING_CODE`. W żadnej innej fazie prośba o kod nie prowadzi do wysłania kodu (SESSION-11, SESSION-13). Sesja wysyła kod najwyżej raz.
 
 **Ograniczenie (brak identyfikatora prośby):** AAPS nie nadaje prośbie o kod identyfikatora, a jej treść niesie tylko ilość i godzinę (godziny parser nie porównuje z zegarem – PARSER-05). Sesja nie odróżni więc prośby dla bieżącego polecenia od starej prośby z tą samą ilością, która zostanie dostarczona ponownie albo z opóźnieniem i ma chwilę odbioru ≥ chwili wysłania polecenia (np. prośba z wcześniejszej, anulowanej sesji). Taka wiadomość w `AWAITING_CODE_REQUEST` zostanie przyjęta i sesja odeśle kod. Skutek jest ograniczony: AAPS trzyma tylko jedną oczekującą prośbę – dla najnowszego polecenia (A6) – i kod odnosi się do niej, a nie do prośby, której treść przyszła. Polecenie tej sesji zostało wysłane później niż stara prośba i ma tę samą ilość (inaczej parser zwróciłby „niezgodna ilość”), więc kod potwierdza bieżące, identyczne polecenie i nie powoduje ponownego wykonania starego. Ryzyko ponownego dostarczenia już przekazanej wiadomości ogranicza kontrakt portu odbioru (K2, sekcja „Kontrakt portów”); wiadomości odebrane przed wysłaniem polecenia odrzuca SESSION-05.
 
@@ -224,19 +226,19 @@ Kryteria równości limitu (`T0 = 1111111051000`, prośba `carbs-prosba-o-kod.tx
 - **Zakładając** dostawcę zwracającego kod po 9 999 ms, **gdy** kod jest gotowy w chwili 69 999, **wtedy** w chwili 69 999 wysyłany jest SMS `0504714321`.
 - **Zakładając** dostawcę zwracającego kod po 10 000 ms, **gdy** kod jest gotowy w chwili 70 000, **wtedy** wynik to `Failed(CODE_PREPARATION_TIMEOUT)` i żaden SMS z kodem nie jest wysyłany.
 
-### SESSION-11: Wiadomości przed wysłaniem kodu (CARBS)
+### SESSION-11: Wiadomości przed wysłaniem kodu (polecenia z kodem)
 
-W fazach `AWAITING_CODE_REQUEST` i `PREPARING_CODE` wynik parsera decyduje tak:
+Reguły dotyczą każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu): prośbę o kod i niezgodność sesja rozpoznaje po wspólnych typach parsera (prośba o kod zgodna z poleceniem, niezgodność z poleceniem, potwierdzenie zgodne z poleceniem – PARSER-01), a rodzaj odpowiedzi musi odpowiadać poleceniu sesji (BOL-19); odpowiedź innego rodzaju jest traktowana jak `Unrecognized`. Dodatkowo sesja sama porównuje ilość (a dla zmiany profilu – nazwę i procent z treści prośby) z wysłaną, niezależnie od parsera. W fazach `AWAITING_CODE_REQUEST` i `PREPARING_CODE` wynik parsera decyduje tak (nazwy typów jak dla `CARBS`; dla `BOLUS` i profilu – odpowiedniki z BOL-10 i PROF-12):
 
 | Wynik parsera | `AWAITING_CODE_REQUEST` | `PREPARING_CODE` |
 | --- | --- | --- |
-| `CodeRequest` | SESSION-08 | `Failed(UNEXPECTED_REPLY)` – druga prośba, kod nie jest wysyłany |
-| `CarbsAmountMismatch` (dowolny etap) | `Failed(AMOUNT_MISMATCH)` | `Failed(AMOUNT_MISMATCH)`, kod nie jest wysyłany |
-| `CarbsDone` | wiadomość nieoczekiwana (SESSION-18), faza bez zmian | wiadomość nieoczekiwana, przygotowanie kodu trwa dalej |
+| prośba o kod (`CodeRequest`) | SESSION-08 | `Failed(UNEXPECTED_REPLY)` – druga prośba, kod nie jest wysyłany |
+| niezgodność (`CarbsAmountMismatch`, niezgodna ilość bolusa, niezgodny profil; dowolny etap) | `Failed(AMOUNT_MISMATCH)` | `Failed(AMOUNT_MISMATCH)`, kod nie jest wysyłany |
+| potwierdzenie (`CarbsDone`, wykonano bolus) | wiadomość nieoczekiwana (SESSION-18), faza bez zmian | wiadomość nieoczekiwana, przygotowanie kodu trwa dalej |
 | `WrongCode` | `Failed(UNEXPECTED_REPLY)` | `Failed(UNEXPECTED_REPLY)`, kod nie jest wysyłany |
 | `Unrecognized` | `Failed(UNRECOGNIZED_REPLY)` | `Failed(UNRECOGNIZED_REPLY)`, kod nie jest wysyłany |
 
-Każdy wynik `Failed` niesie treść wiadomości. Wynik parsera niemożliwy w kontekście `CARBS` (`BgReport`, `PumpStatus`) jest traktowany jak `Unrecognized`.
+Każdy wynik `Failed` niesie treść wiadomości. Wynik parsera niemożliwy w kontekście polecenia sesji (np. `BgReport`, `PumpStatus`, stan lub lista profili, prośba o kod innego rodzaju) jest traktowany jak `Unrecognized`. Zmiana profilu nie ma rozpoznawanego potwierdzenia (PROF-12): jedynie prośbę o kod, niezgodność, zły kod i `Unrecognized`.
 
 **Kryteria akceptacji:**
 
@@ -245,13 +247,14 @@ Każdy wynik `Failed` niesie treść wiadomości. Wynik parsera niemożliwy w ko
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `carbs-sukces.txt`, **wtedy** faza pozostaje `AWAITING_CODE_REQUEST`, wiadomość jest na liście nieoczekiwanych, a gdy potem przychodzi `carbs-prosba-o-kod.txt`, sesja wysyła kod.
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `zly-kod.txt`, **wtedy** wynik to `Failed(UNEXPECTED_REPLY)` z treścią pliku.
 - **Zakładając** sesję `CARBS 1` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `Czesc, kupisz chleb?`, **wtedy** wynik to `Failed(UNRECOGNIZED_REPLY)` z tą treścią.
+- **Zakładając** sesje `BOLUS` i zmiany profilu, **gdy** przychodzą wiadomości z tabeli, **wtedy** wyniki są takie jak w BOL-10 i PROF-12, a prośba o kod innego rodzaju niż polecenie sesji kończy sesję `Failed(UNRECOGNIZED_REPLY)` bez kodu (BOL-19).
 - **Zakładając** sesję `CARBS 1`, która w chwili 58 000 przyjęła prośbę i czeka 1000 ms na kod TOTP, **gdy** w chwili 58 500 przychodzi `Czesc, kupisz chleb?`, **wtedy** wynik to `Failed(UNRECOGNIZED_REPLY)` i żaden SMS z kodem nie jest wysyłany (także po chwili 59 000).
 - **Zakładając** tę sesję, **gdy** w chwili 58 500 przychodzi `carbs-sukces.txt`, **wtedy** wiadomość trafia do nieoczekiwanych, a w chwili 59 000 wysyłany jest `0504714321`.
 - **Zakładając** tę sesję, **gdy** w chwili 58 500 przychodzi ponownie `carbs-prosba-o-kod.txt`, **wtedy** wynik to `Failed(UNEXPECTED_REPLY)` i żaden SMS z kodem nie jest wysyłany.
 
-### SESSION-12: Potwierdzenie CARBS przez AAPS
+### SESSION-12: Potwierdzenie CARBS i BOLUS przez AAPS
 
-W fazie `AWAITING_CONFIRMATION` wynik parsera `CarbsDone` (ilość równa wysłanej) dla wiadomości z `receivedAtEpochMillis` ≥ chwili wysłania kodu kończy sesję wynikiem `CarbsConfirmed` z ilością i treścią. Ponieważ ten sam tekst przychodzi po `CARBS` z innego dozwolonego numeru (A5), wynik oznacza „AAPS potwierdził wprowadzenie X g”, a nie „wykonano Twoje polecenie”; `ui` i `data` nie mogą go prezentować jako dowodu wykonania polecenia z tej aplikacji. `CarbsDone` z `receivedAtEpochMillis` < chwili wysłania kodu jest wiadomością nieoczekiwaną (SESSION-18).
+W fazie `AWAITING_CONFIRMATION` wynik parsera `CarbsDone` (ilość równa wysłanej; dla `BOLUS` – wykonano bolus z ilością równą wysłanej) dla wiadomości z `receivedAtEpochMillis` ≥ chwili wysłania kodu kończy sesję wynikiem `CarbsConfirmed` (dla `BOLUS` – `BolusConfirmed`, BOL-11) z ilością i treścią. Ponieważ ten sam tekst przychodzi po `CARBS` (i analogicznie po `BOLUS`) z innego dozwolonego numeru (A5), wynik oznacza „AAPS potwierdził wprowadzenie X g” („AAPS potwierdził podanie X j.”), a nie „wykonano Twoje polecenie”; `ui` i `data` nie mogą go prezentować jako dowodu wykonania polecenia z tej aplikacji. Potwierdzenie z `receivedAtEpochMillis` < chwili wysłania kodu jest wiadomością nieoczekiwaną (SESSION-18).
 
 **Kryteria akceptacji:**
 
@@ -261,17 +264,17 @@ W fazie `AWAITING_CONFIRMATION` wynik parsera `CarbsDone` (ilość równa wysła
 
 ### SESSION-13: Wiadomości po wysłaniu kodu
 
-W fazie `AWAITING_CONFIRMATION` (oraz dla wiadomości odebranych w `SENDING_CODE`, przetwarzanych po wyniku „wysłano”):
+W fazie `AWAITING_CONFIRMATION` (oraz dla wiadomości odebranych w `SENDING_CODE`, przetwarzanych po wyniku „wysłano”) – dla każdego polecenia z kodem; zasady zgodności rodzaju odpowiedzi jak w SESSION-11, tabele dla `BOLUS` i zmiany profilu: BOL-11 i PROF-12:
 
 | Wynik parsera | Wynik sesji |
 | --- | --- |
-| `CarbsDone` | SESSION-12 |
+| potwierdzenie (`CarbsDone`, wykonano bolus) | SESSION-12 |
 | `WrongCode` | `Failed(WRONG_CODE)` z treścią (AAPS odrzucił kod; `ui` sugeruje sprawdzenie zegara telefonu) |
 | `Unrecognized` (np. komunikat o przekroczeniu czasu kolejki pompy, A4) | `Unknown(UNRECOGNIZED_REPLY)` z treścią |
-| `CarbsAmountMismatch` (dowolny etap) | `Unknown(AMOUNT_MISMATCH)` z treścią |
-| `CodeRequest` | `Unknown(UNEXPECTED_REPLY)` z treścią; kod nie jest wysyłany ponownie |
+| niezgodność (`CarbsAmountMismatch`, niezgodna ilość bolusa, niezgodny profil; dowolny etap) | `Unknown(AMOUNT_MISMATCH)` z treścią |
+| prośba o kod (`CodeRequest`, prośba o kod bolusa lub profilu) | `Unknown(UNEXPECTED_REPLY)` z treścią; kod nie jest wysyłany ponownie |
 
-Wynik parsera niemożliwy w kontekście `CARBS` jest traktowany jak `Unrecognized`.
+Wynik parsera niemożliwy w kontekście polecenia sesji jest traktowany jak `Unrecognized`. Dla zmiany profilu każda odpowiedź inna niż zły kod, niezgodność i prośba o kod jest `Unrecognized`, czyli `Unknown(UNRECOGNIZED_REPLY)` z treścią (PROF-12).
 
 **Kryteria akceptacji:**
 
@@ -431,7 +434,7 @@ Sesja zakłada, że implementacje portów spełniają poniższe warunki. Nie są
 | Wiadomość odebrana przed chwilą wysłania polecenia | ignorowana | SESSION-05 |
 | Strumień odbioru kończy się lub rzuca wyjątek | sesja czeka do limitu czasu | SESSION-05 |
 | Brak odpowiedzi AAPS („AAPS nie odpowiada”) | `TimedOut` z fazą, bez ponawiania | SESSION-07 |
-| Nierozpoznana odpowiedź przed kodem (w tym potwierdzenie `CARBS` w sesji `BG`) | `Failed(UNRECOGNIZED_REPLY)` z treścią, kod nie jest wysyłany | SESSION-06, SESSION-11 |
+| Nierozpoznana odpowiedź przed kodem (w tym potwierdzenie `CARBS` w sesji `BG`, prośba o kod innego polecenia) | `Failed(UNRECOGNIZED_REPLY)` z treścią, kod nie jest wysyłany | SESSION-06, SESSION-11 |
 | Prośba o kod z inną ilością (np. obcięta przez limit AAPS) | `Failed(AMOUNT_MISMATCH)` z treścią, kod nie jest wysyłany | SESSION-11 |
 | Potwierdzenie `CARBS` z tą samą ilością przed wysłaniem kodu | wiadomość nieoczekiwana, faza bez zmian | SESSION-11, SESSION-18 |
 | „Zly kod” przed wysłaniem kodu | `Failed(UNEXPECTED_REPLY)` | SESSION-11 |
@@ -459,8 +462,8 @@ Sesja zakłada, że implementacje portów spełniają poniższe warunki. Nie są
 
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo), które dotyczą tej funkcji:
 
-- **Nigdy nie odsyłamy kodu, gdy odpowiedź AAPS nie zgadza się z poleceniem.** Kod powstaje wyłącznie po wyniku `CodeRequest` (dokładne dopasowanie całej treści i ilości równej wysłanej – Spec 002) przetworzonym w fazie `AWAITING_CODE_REQUEST` (SESSION-08). Inny numer nadawcy odcina `sms` (kontrakt portu odbioru, SESSION-05); odpowiedź sprzed wysłania – SESSION-05; inna ilość – SESSION-11; nierozpoznana treść – SESSION-11; wiadomość niepasująca do fazy – SESSION-11, SESSION-13; stara prośba – SESSION-10; ponownie dostarczona prośba – kontrakt K2 i ograniczenie opisane w SESSION-08 (AAPS nie ma identyfikatora prośby, więc kod może potwierdzić tylko bieżące, identyczne polecenie). Każda wątpliwa wiadomość w czasie przygotowania kodu przerywa je bez wysłania (SESSION-11).
-- **Potwierdzenie `CARBS` nie dowodzi wykonania naszego polecenia** (A5). Przyjmowane tylko po wysłaniu kodu (SESSION-12), prezentowane jako „AAPS potwierdził wprowadzenie X g”. Ryzyko szczątkowe: `CARBS` z tą samą ilością wysłane z innego dozwolonego numeru, którego potwierdzenie przyjdzie w czasie `AWAITING_CONFIRMATION`, zostanie przyjęte jako potwierdzenie dla tej sesji. Sesja nie potrafi tego odróżnić; dlatego treść wyniku mówi o potwierdzeniu AAPS, a nie o wykonaniu polecenia z aplikacji.
+- **Nigdy nie odsyłamy kodu, gdy odpowiedź AAPS nie zgadza się z poleceniem.** Kod powstaje wyłącznie po wyniku będącym prośbą o kod zgodną z poleceniem sesji (`CodeRequest`, prośba o kod bolusa albo profilu – dokładne dopasowanie całej treści i ilości (profilu i procentu) równej wysłanej – Spec 002, 012, 013) przetworzonym w fazie `AWAITING_CODE_REQUEST` (SESSION-08). Inny numer nadawcy odcina `sms` (kontrakt portu odbioru, SESSION-05); odpowiedź sprzed wysłania – SESSION-05; inna ilość – SESSION-11; nierozpoznana treść – SESSION-11; wiadomość niepasująca do fazy – SESSION-11, SESSION-13; stara prośba – SESSION-10; ponownie dostarczona prośba – kontrakt K2 i ograniczenie opisane w SESSION-08 (AAPS nie ma identyfikatora prośby, więc kod może potwierdzić tylko bieżące, identyczne polecenie). Każda wątpliwa wiadomość w czasie przygotowania kodu przerywa je bez wysłania (SESSION-11).
+- **Potwierdzenie `CARBS` i `BOLUS` nie dowodzi wykonania naszego polecenia** (A5). Przyjmowane tylko po wysłaniu kodu (SESSION-12), prezentowane jako „AAPS potwierdził wprowadzenie X g” („podanie X j.”). Ryzyko szczątkowe: `CARBS` z tą samą ilością wysłane z innego dozwolonego numeru, którego potwierdzenie przyjdzie w czasie `AWAITING_CONFIRMATION`, zostanie przyjęte jako potwierdzenie dla tej sesji. Sesja nie potrafi tego odróżnić; dlatego treść wyniku mówi o potwierdzeniu AAPS, a nie o wykonaniu polecenia z aplikacji.
 - **Brak automatycznego ponawiania i omijania limitów AAPS.** Najwyżej 1 SMS z poleceniem i 1 z kodem na sesję (SESSION-20); po niezgodnej ilości (A3) sesja kończy się błędem, bez korekty ilości i bez nowej próby. Wyniki „nieznany” istnieją po to, żeby użytkownik sprawdził AAPS przed ponowieniem ręcznym – zamiast fałszywego „błąd”, które zachęcałoby do powtórzenia `CARBS` (ryzyko podwójnego wprowadzenia).
 - **PIN nigdy nie jest zapisywany.** `AapsPin` żyje tylko w pamięci, nie jest serializowany ani przekazywany poza sesję i port wysyłania (w odpowiedzi z kodem); jest czyszczony zaraz po złożeniu kodu i w każdym zakończeniu sesji (SESSION-02, SESSION-09, SESSION-19, SESSION-22). Odpowiedź z kodem jest tablicą znaków zerowaną po wysłaniu (SESSION-09). Ograniczenie: port `sms` musi utworzyć `String` dla `SmsManager`; tej kopii nie da się wyzerować – wymóg dla spec `sms`: nie przechowywać jej poza wywołaniem (K6).
 - **Nie logujemy PIN-u, kodów, sekretu.** SESSION-23; wynik i stan nie zawierają PIN-u ani kodu (SESSION-21), więc mogą trafić do historii.
@@ -488,6 +491,6 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - SESSION-06: `AWAITING_REPLY` przyjmuje też odpowiedź na `PROFILE STATUS` i `PROFILE LIST` (PROF-11).
-  - SESSION-08, SESSION-11 – SESSION-13: reguły dla `CARBS` obejmują każde polecenie z kodem – prośba o kod i niezgodność rozpoznawane po wspólnych typach parsera; tabele dla `BOLUS` (BOL-10, BOL-11) i zmiany profilu (PROF-12). Nowy wynik `BolusConfirmed` (jak `CarbsConfirmed`). Fazy, limity czasu i A1 – A7 bez zmian.
+  - SESSION-08, SESSION-11 – SESSION-13: reguły dla `CARBS` obejmują każde polecenie z kodem – prośba o kod i niezgodność rozpoznawane po wspólnych typach parsera, zgodność rodzaju odpowiedzi z poleceniem sesji (BOL-19) oraz drugie, niezależne od parsera porównanie ilości (i nazwy z procentem dla profilu) w sesji; tabele dla `BOLUS` (BOL-10, BOL-11) i zmiany profilu (PROF-12). Nowy wynik `BolusConfirmed` (jak `CarbsConfirmed`). Fazy, limity czasu i A1 – A7 bez zmian.
