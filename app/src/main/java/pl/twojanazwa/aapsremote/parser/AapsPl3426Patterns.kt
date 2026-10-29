@@ -32,6 +32,7 @@ internal object AapsPl3426Patterns {
 
     val PROFILE_LIST_LINE = Regex("""([1-9][0-9]?)\. ([^\n]+)""")
 
+    // Współdzielony przez AapsReplyParser i CommandSession.profileRequestMatches: zmiana wzorca wymaga sprawdzenia obu.
     val PROFILE_CODE_REQUEST = Regex(
         """Aby przelaczyc profil na ([^\n]+) ([1-9][0-9]{0,3})% odpowiedz kodem z aplikacji Authenticator dla: [^\n]+, z doklejonym PIN-em""",
     )

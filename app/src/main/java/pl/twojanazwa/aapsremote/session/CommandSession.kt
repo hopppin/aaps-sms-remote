@@ -20,7 +20,9 @@ import pl.twojanazwa.aapsremote.commands.toExpectedCommand
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.TotpCode
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
+import pl.twojanazwa.aapsremote.parser.AapsPl3426Patterns
 import pl.twojanazwa.aapsremote.parser.AapsReply
+import pl.twojanazwa.aapsremote.parser.ReplyNormalizer
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import pl.twojanazwa.aapsremote.parser.ExpectedCommand
 import java.util.concurrent.atomic.AtomicReference
@@ -243,7 +245,10 @@ class CommandSession(
             SessionPhase.AWAITING_REPLY -> {
                 val reply = parseMatching(sms)
                 return when (reply) {
-                    is AapsReply.BgReport, is AapsReply.PumpStatus -> SessionOutcome.Completed(reply, sms.body)
+                    // Typ raportu zgodny z poleceniem gwarantuje amountMatches (PROF-11).
+                    is AapsReply.BgReport, is AapsReply.PumpStatus,
+                    is AapsReply.ProfileStatusReport, is AapsReply.ProfileListReport,
+                    -> SessionOutcome.Completed(reply, sms.body)
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
@@ -262,7 +267,7 @@ class CommandSession(
                     // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
                     is AapsReply.MatchingDone -> addUnexpected(sms)
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
-                    // Unrecognized oraz wyniki niemożliwe dla CARBS (BgReport, PumpStatus).
+                    // Unrecognized (także raporty BG/PUMP niezgodne z poleceniem, patrz amountMatches).
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
@@ -301,22 +306,29 @@ class CommandSession(
     /** Druga linia obrony (BOL-10, BOL-11): ilość w prośbie/potwierdzeniu musi być równa wysłanej, niezależnie od parsera. */
     private fun amountMatches(reply: AapsReply): Boolean {
         val sent = command
-        // Zad. 3 spec 013 doda sprawdzenie nazwy i procentu; do tego czasu polecenia profilu nie przepuszczają żadnej odpowiedzi.
-        if (sent is Command.ProfileStatus || sent is Command.ProfileList || sent is Command.ProfileSwitch) return false
         return when (reply) {
             is AapsReply.BolusCodeRequest -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
             is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
-            // Zad. 3 spec 013 (#234) doda sprawdzenie profilu; do tego czasu te wyniki nie przechodzą.
-            is AapsReply.ProfileCodeRequest, is AapsReply.ProfileSwitchMismatch,
-            is AapsReply.ProfileStatusReport, is AapsReply.ProfileListReport,
-            -> false
+            // PROF-11, PROF-12: raport tylko dla własnego polecenia; prośba o kod tylko z dokładnie tą nazwą i procentem.
+            is AapsReply.ProfileStatusReport -> sent is Command.ProfileStatus
+            is AapsReply.ProfileListReport -> sent is Command.ProfileList
+            is AapsReply.ProfileCodeRequest -> sent is Command.ProfileSwitch && profileRequestMatches(reply.text, sent)
+            is AapsReply.ProfileSwitchMismatch -> sent is Command.ProfileSwitch
+            is AapsReply.BgReport -> sent is Command.Bg
+            is AapsReply.PumpStatus -> sent is Command.Pump
             is AapsReply.BolusAmountMismatch, is AapsReply.CarbsAmountMismatch,
-            is AapsReply.BgReport, is AapsReply.PumpStatus,
             AapsReply.WrongCode, is AapsReply.Unrecognized,
             -> true
         }
+    }
+
+    /** PROF-12: niezależne od parsera porównanie nazwy i procentu (wielkość liter znacząca) z treścią prośby. */
+    private fun profileRequestMatches(text: String, sent: Command.ProfileSwitch): Boolean {
+        val n = ReplyNormalizer.normalize(text) ?: return false
+        val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues ?: return false
+        return g[1] == sent.profileName && g[2].toIntOrNull() == sent.percent
     }
 
     /** Tylko dla odpowiedzi zgodnej z poleceniem (po [parseMatching]). */

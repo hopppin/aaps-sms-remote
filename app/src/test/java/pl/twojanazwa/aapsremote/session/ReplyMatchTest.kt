@@ -10,6 +10,7 @@ class ReplyMatchTest {
     private val codeRequests = mapOf<AapsReply.MatchingCodeRequest, CommandId>(
         AapsReply.CodeRequest(1, "x") to CommandId.CARBS,
         AapsReply.BolusCodeRequest(10, "x") to CommandId.BOLUS,
+        AapsReply.ProfileCodeRequest("x") to CommandId.PROFILE_SWITCH,
     )
     private val dones = mapOf<AapsReply.MatchingDone, CommandId>(
         AapsReply.CarbsDone(1, "x") to CommandId.CARBS,
@@ -26,10 +27,10 @@ class ReplyMatchTest {
     }
 
     @Test
-    fun `PROF-05 polecenia profilu nie sa zgodne z zadna prosba o kod ani potwierdzeniem`() {
+    fun `PROF-12 polecenia profilu nie sa zgodne z prosba o kod bolusa ani CARBS i zadnym potwierdzeniem`() {
         val profile = listOf(CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH)
         for (id in profile) {
-            for (reply in codeRequests.keys) assertEquals(false, ReplyMatch.isCodeRequestFor(id, reply))
+            for (reply in codeRequests.keys.filter { it !is AapsReply.ProfileCodeRequest }) assertEquals(false, ReplyMatch.isCodeRequestFor(id, reply))
             for (reply in dones.keys) assertEquals(false, ReplyMatch.isDoneFor(id, reply))
         }
     }

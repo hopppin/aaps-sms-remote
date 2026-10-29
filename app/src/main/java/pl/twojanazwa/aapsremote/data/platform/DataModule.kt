@@ -70,7 +70,7 @@ abstract class DataModule {
         @Singleton
         fun database(@ApplicationContext context: Context): AapsRemoteDatabase =
             Room.databaseBuilder(context, AapsRemoteDatabase::class.java, AapsRemoteDatabase.FILE_NAME)
-                .addMigrations(AapsRemoteDatabase.MIGRATION_1_2)
+                .addMigrations(AapsRemoteDatabase.MIGRATION_1_2, AapsRemoteDatabase.MIGRATION_2_3)
                 .build()
 
         @Provides

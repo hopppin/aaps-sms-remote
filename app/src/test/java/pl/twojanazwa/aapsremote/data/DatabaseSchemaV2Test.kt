@@ -61,7 +61,7 @@ class DatabaseSchemaV2Test {
     fun `BOL-17 jedno wywolanie addMigrations z MIGRATION_1_2 i brak migracji destrukcyjnej`() {
         val module = File("src/main/java/pl/twojanazwa/aapsremote/data/platform/DataModule.kt").readText()
         assertEquals(1, Regex("addMigrations\\(").findAll(module).count())
-        assertTrue(module.contains("addMigrations(AapsRemoteDatabase.MIGRATION_1_2)"))
+        assertTrue(module.contains("addMigrations(AapsRemoteDatabase.MIGRATION_1_2, AapsRemoteDatabase.MIGRATION_2_3)"))
         val files = platformDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
         assertFalse(files.any { it.readText().contains("fallbackToDestructiveMigration") })
     }

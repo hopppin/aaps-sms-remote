@@ -47,7 +47,7 @@ class HistoryCodecBolusTest {
 
     @Test
     fun `BOL-17 wiersz CARBS z bolus_centi_units 50 daje po odczycie brak ilosci bolusa`() {
-        val row = HistoryRow(1, "CARBS", 20, "CARBS_CONFIRMED", null, T0, T0, T0, T0, null, 0, 50)
+        val row = HistoryRow(1, "CARBS", 20, "CARBS_CONFIRMED", null, T0, T0, T0, T0, null, 0, 50, null, null)
         val entry = HistoryCodec.toEntry(row)
         assertEquals(HistoryCommand.CARBS, entry.command)
         assertNull(entry.bolusCentiUnits)

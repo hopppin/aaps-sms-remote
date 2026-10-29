@@ -31,4 +31,6 @@ fun historyEntry(
     replyText = replyText,
     unexpectedMessageCount = unexpected,
     bolusCentiUnits = bolusCentiUnits,
+    profileNumber = null,
+    profilePercent = null,
 )

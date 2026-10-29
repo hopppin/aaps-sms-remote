@@ -8,9 +8,8 @@ internal object ReplyMatch {
     fun isCodeRequestFor(id: CommandId, reply: AapsReply.MatchingCodeRequest): Boolean = when (id) {
         CommandId.CARBS -> reply is AapsReply.CodeRequest
         CommandId.BOLUS -> reply is AapsReply.BolusCodeRequest
-        CommandId.BG, CommandId.PUMP -> false
-        // Spec 013, zad. 3 zmieni PROFILE_SWITCH; do tego czasu polecenia profilu nie odsyłają kodu.
-        CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH -> false
+        CommandId.PROFILE_SWITCH -> reply is AapsReply.ProfileCodeRequest
+        CommandId.BG, CommandId.PUMP, CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST -> false
     }
 
     fun isDoneFor(id: CommandId, reply: AapsReply.MatchingDone): Boolean = when (id) {
