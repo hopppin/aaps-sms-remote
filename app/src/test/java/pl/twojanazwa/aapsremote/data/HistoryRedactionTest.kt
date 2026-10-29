@@ -9,10 +9,10 @@ class HistoryRedactionTest {
     private val t0 = 1111111051000L
 
     private fun entry(id: Long, command: HistoryCommand, grams: Int?, outcome: HistoryOutcome, text: String) =
-        HistoryEntry(id, command, grams, outcome, t0, t0 + 1000, null, t0 + 5000, text, 0, null)
+        HistoryEntry(id, command, grams, outcome, t0, t0 + 1000, null, t0 + 5000, text, 0, null, null, null)
 
     private fun row(id: Long, command: String, grams: Int?, outcome: String, text: String) =
-        HistoryRow(id, command, grams, outcome, null, t0, t0 + 1000, null, t0 + 5000, text, 0, null)
+        HistoryRow(id, command, grams, outcome, null, t0, t0 + 1000, null, t0 + 5000, text, 0, null, null, null)
 
     private fun assertRedacted(text: String, body: String, vararg words: String) {
         for (w in words) assertFalse(text.contains(w), "zawiera zabroniony fragment")

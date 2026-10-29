@@ -16,7 +16,7 @@ class HistoryCodecEncodeTest {
     fun `DATA-07 wynik BG Completed trafia do wiersza`() {
         val row = HistoryCodec.toRow(HistoryFixtures.bgCompleted())
         assertEquals(
-            HistoryRow(0, "BG", null, "COMPLETED", null, T0, T0 + 1000, null, T0 + 5000, AapsSamples.bg, 0, null),
+            HistoryRow(0, "BG", null, "COMPLETED", null, T0, T0 + 1000, null, T0 + 5000, AapsSamples.bg, 0, null, null, null),
             row,
         )
     }
@@ -27,7 +27,7 @@ class HistoryCodecEncodeTest {
         assertEquals(
             HistoryRow(
                 0, "CARBS", 20, "CARBS_CONFIRMED", null, T0, T0 + 1000, T0 + 61000, T0 + 120000,
-                AapsSamples.carbsDone, 2, null,
+                AapsSamples.carbsDone, 2, null, null, null,
             ),
             row,
         )

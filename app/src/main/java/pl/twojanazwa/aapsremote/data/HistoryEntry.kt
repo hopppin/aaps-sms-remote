@@ -13,6 +13,8 @@ data class HistoryEntry(
     val replyText: String?,
     val unexpectedMessageCount: Int,
     val bolusCentiUnits: Int?,
+    val profileNumber: Int?,
+    val profilePercent: Int?,
 ) {
     override fun toString(): String = "HistoryEntry(***)"
 }

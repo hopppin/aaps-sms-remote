@@ -60,7 +60,7 @@ class HistoryCodecDecodeTest {
         outcome: String = "COMPLETED",
         reason: String? = null,
         text: String? = "tekst",
-    ) = HistoryRow(7, command, carbs, outcome, reason, T0, T0 + 1000, T0 + 2000, T0 + 3000, text, 3, null)
+    ) = HistoryRow(7, command, carbs, outcome, reason, T0, T0 + 1000, T0 + 2000, T0 + 3000, text, 3, null, null, null)
 
     // ---- Kompletnosc tabeli kodow wzgledem wartosci wyliczeniowych ----
 
@@ -243,7 +243,7 @@ class HistoryCodecDecodeTest {
         assertEquals(
             HistoryEntry(
                 0, HistoryCommand.BG, null, HistoryOutcome.Completed, T0, T0 + 1000, null, T0 + 5000,
-                AapsSamples.bg, 0, null,
+                AapsSamples.bg, 0, null, null, null,
             ),
             e,
         )
@@ -255,7 +255,7 @@ class HistoryCodecDecodeTest {
         assertEquals(
             HistoryEntry(
                 0, HistoryCommand.CARBS, 20, HistoryOutcome.CarbsConfirmed, T0, T0 + 1000, T0 + 61000,
-                T0 + 120000, AapsSamples.carbsDone, 2, null,
+                T0 + 120000, AapsSamples.carbsDone, 2, null, null, null,
             ),
             e,
         )

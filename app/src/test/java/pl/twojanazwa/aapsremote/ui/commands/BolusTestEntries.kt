@@ -29,4 +29,6 @@ fun bolusEntry(
     replyText = null,
     unexpectedMessageCount = 0,
     bolusCentiUnits = null,
+    profileNumber = null,
+    profilePercent = null,
 )

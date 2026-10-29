@@ -52,7 +52,10 @@ object HistoryEntryMapper {
             if (entry.carbsGrams != null) HistoryCommandLabel.CARBS else HistoryCommandLabel.CARBS_NO_AMOUNT
         HistoryCommand.BOLUS ->
             if (entry.bolusCentiUnits != null) HistoryCommandLabel.BOLUS else HistoryCommandLabel.BOLUS_NO_AMOUNT
-        HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
+        // Zad. 5 spec 013 doda etykiety profilu; do tego czasu wpisy profilu mają etykietę neutralną.
+        HistoryCommand.PROFILE_STATUS, HistoryCommand.PROFILE_LIST, HistoryCommand.PROFILE_SWITCH,
+        HistoryCommand.UNRECOGNIZED,
+        -> HistoryCommandLabel.UNRECOGNIZED
     }
 
     private fun carbsGrams(entry: HistoryEntry): Int? =
@@ -72,7 +75,9 @@ object HistoryEntryMapper {
                 message = when (entry.command) {
                     HistoryCommand.BG -> ResultMessage.BG_REPLY
                     HistoryCommand.PUMP -> ResultMessage.PUMP_REPLY
-                    HistoryCommand.CARBS, HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED -> null
+                    HistoryCommand.CARBS, HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED,
+                    HistoryCommand.PROFILE_STATUS, HistoryCommand.PROFILE_LIST, HistoryCommand.PROFILE_SWITCH,
+                    -> null
                 }
             }
             HistoryOutcome.CarbsConfirmed -> {

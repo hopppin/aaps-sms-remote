@@ -21,6 +21,8 @@ data class HistoryEntity(
     @ColumnInfo(name = "reply_text") val replyText: String?,
     @ColumnInfo(name = "unexpected_count") val unexpectedMessageCount: Int,
     @ColumnInfo(name = "bolus_centi_units") val bolusCentiUnits: Int?,
+    @ColumnInfo(name = "profile_number") val profileNumber: Int?,
+    @ColumnInfo(name = "profile_percent") val profilePercent: Int?,
 ) {
     fun toRow(): HistoryRow = HistoryRow(
         id = id,
@@ -35,6 +37,8 @@ data class HistoryEntity(
         replyText = replyText,
         unexpectedMessageCount = unexpectedMessageCount,
         bolusCentiUnits = bolusCentiUnits,
+        profileNumber = profileNumber,
+        profilePercent = profilePercent,
     )
 
     override fun toString(): String = "HistoryEntity(***)"
@@ -53,6 +57,8 @@ data class HistoryEntity(
             replyText = row.replyText,
             unexpectedMessageCount = row.unexpectedMessageCount,
             bolusCentiUnits = row.bolusCentiUnits,
+            profileNumber = row.profileNumber,
+            profilePercent = row.profilePercent,
         )
     }
 }

@@ -35,6 +35,8 @@ object HistoryCodec {
             command = encode(result.command.id),
             carbsGrams = (result.command as? Command.Carbs)?.grams,
             bolusCentiUnits = (result.command as? Command.Bolus)?.centiUnits,
+            profileNumber = (result.command as? Command.ProfileSwitch)?.number,
+            profilePercent = (result.command as? Command.ProfileSwitch)?.percent,
             outcome = kind,
             reason = reason,
             startedAtEpochMillis = result.startedAtEpochMillis,
@@ -65,6 +67,8 @@ object HistoryCodec {
             command = command,
             carbsGrams = if (command == HistoryCommand.CARBS) row.carbsGrams else null,
             bolusCentiUnits = if (command == HistoryCommand.BOLUS) row.bolusCentiUnits else null,
+            profileNumber = if (command == HistoryCommand.PROFILE_SWITCH) row.profileNumber else null,
+            profilePercent = if (command == HistoryCommand.PROFILE_SWITCH) row.profilePercent else null,
             outcome = outcome,
             startedAtEpochMillis = row.startedAtEpochMillis,
             commandSentAtEpochMillis = row.commandSentAtEpochMillis,
@@ -81,6 +85,9 @@ object HistoryCodec {
         "PUMP" to HistoryCommand.PUMP,
         "CARBS" to HistoryCommand.CARBS,
         "BOLUS" to HistoryCommand.BOLUS,
+        "PROFILE_STATUS" to HistoryCommand.PROFILE_STATUS,
+        "PROFILE_LIST" to HistoryCommand.PROFILE_LIST,
+        "PROFILE_SWITCH" to HistoryCommand.PROFILE_SWITCH,
     )
 
     private val FAILURE_REASONS: Map<String, FailureReason> = mapOf(
