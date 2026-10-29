@@ -7,7 +7,7 @@
 
 ## Cel
 
-Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, zapisać sekret TOTP z kodu QR pokazanego przez AAPS i przyznać uprawnienia SMS. Ta specyfikacja opisuje szkielet nawigacji aplikacji (dolny pasek z trzema zakładkami) oraz ekran Ustawienia z tymi trzema sekcjami, a także moduł Hilt dający jeden `SessionCoordinator`, potrzebny do blokowania zmian ustawień w trakcie polecenia.
+Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, zapisać sekret TOTP z kodu QR pokazanego przez AAPS i przyznać uprawnienia SMS. Ta specyfikacja opisuje szkielet nawigacji aplikacji (dolny pasek z trzema zakładkami) oraz ekran Ustawienia z tymi trzema sekcjami (czwartą sekcję „Limity poleceń” dodaje [Spec 011](../011-limity-polecen/spec.md), LIM-10), a także moduł Hilt dający jeden `SessionCoordinator`, potrzebny do blokowania zmian ustawień w trakcie polecenia.
 
 ## Zakres
 
@@ -15,6 +15,7 @@ Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, z
 - Zakładki Polecenia i Historia jako zaślepki z krótkim tekstem (zastąpią je spec 009 i 010).
 - Ekran Ustawienia, sekcja „Numer telefonu AAPS”: stan numeru, ustawienie/zmiana z walidacją, usunięcie z potwierdzeniem, komunikaty wyników.
 - Ekran Ustawienia, sekcja „Sekret TOTP”: stan sekretu, skan kodu QR aparatem (CameraX + ML Kit, tylko format QR, offline), ręczne wklejenie URI `otpauth://`, pytanie o zastąpienie istniejącego sekretu, usunięcie z potwierdzeniem, komunikaty wyników, uprawnienie `CAMERA`.
+- Ekran Ustawienia, sekcja „Limity poleceń” (pod sekcjami numeru, sekretu i uprawnień): pola, zapis, błędy i blokada w trakcie polecenia opisują LIM-10 i LIM-11 w [Spec 011](../011-limity-polecen/spec.md); wymagania UI-01 – UI-24 się nie zmieniają.
 - Ekran Ustawienia, sekcja „Uprawnienia SMS”: stan `SEND_SMS`/`RECEIVE_SMS`, prośba o uprawnienia, komunikat przy odmowie, przejście do ustawień aplikacji przy trwałej odmowie, odświeżenie po powrocie do aplikacji.
 - Czyszczenie schowka systemowego po wklejeniu URI, gdy zawiera dokładnie wklejony tekst.
 - Blokada zmiany i usunięcia numeru oraz sekretu, gdy `SessionCoordinator.activeSession.value != null`.
@@ -26,7 +27,7 @@ Użytkownik musi raz skonfigurować aplikację: wpisać numer telefonu z AAPS, z
 - Ekran Polecenia i przebieg polecenia: przyciski BG/PUMP/CARBS, PIN AAPS, CARBS z potwierdzeniem, start sesji, `SessionHistoryRecorder.track`, odczyt sekretu `TotpSecretProvider.load` przed poleceniem z kodem i komunikaty jego wyników (`Absent`, `Locked`, `Invalidated`, `Unavailable`), ekran włączony w trakcie polecenia, zakres korutyn uruchamiania sesji, ręczna weryfikacja W1–W7 ze Spec 005 – spec 009.
 - Ekran Historia: lista wpisów, potwierdzenie przed wyczyszczeniem historii, weryfikacja W3–W5 ze Spec 007 i część W6 dotycząca historii – spec 010.
 - Osobny kreator pierwszego uruchomienia i „test połączenia `BG`” z planu – aplikacja startuje na zakładce Polecenia; konfiguracja odbywa się w zakładce Ustawienia (decyzja użytkownika). Test `BG` to zwykłe polecenie z 009.
-- Ustawienie limitów czasu sesji (plan: „limit oczekiwania”) – limity są stałe (Spec 004).
+- Ustawienie limitów czasu sesji (plan: „limit oczekiwania”) – limity są stałe (Spec 004). Limity poleceń (`CARBS`, `BOLUS`) to osobna sekcja ze Spec 011.
 - Wybór karty SIM (Spec 005: tylko domyślna karta SMS).
 - Testy Robolectric i testy Compose UI; kompozycje i warstwa kamery są sprawdzane ręcznie (sekcja „Weryfikacja na urządzeniu”).
 
@@ -253,7 +254,7 @@ Stan sekretu po zapisie pochodzi wyłącznie z `TotpSecretStore.state` (np. `INV
 
 ### UI-15: Blokada zmian w trakcie polecenia
 
-Gdy polecenie jest w toku, w sekcjach numeru i sekretu są niedostępne: „Ustaw numer”/„Zmień”, „Zapisz” edycji numeru, „Usuń” numeru, „Skanuj QR”, „Wklej URI”, „Usuń sekret”; nad sekcjami jest tekst „Trwa polecenie. Numer i sekret możesz zmienić po jego zakończeniu.” Gdy polecenie się zaczyna: okna potwierdzeń (usunięcie numeru, zastąpienie i usunięcie sekretu) są zamykane, skaner i okno wklejania zamykane, a tekst pola wklejania czyszczony; edycja numeru zostaje otwarta z tekstem, ale bez „Zapisz”. Każda akcja zmieniająca (zapis i usunięcie numeru, przyjęcie wejścia sekretu, usunięcie sekretu) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” i brak wywołania magazynu oraz parsera. Operacja już przekazana do magazynu przed startem polecenia kończy się normalnie (nie jest anulowana). Po zakończeniu polecenia akcje wracają według UI-04 i UI-07. Uprawnienia SMS i `CAMERA` nie są blokowane.
+Gdy polecenie jest w toku, w sekcjach numeru i sekretu są niedostępne: „Ustaw numer”/„Zmień”, „Zapisz” edycji numeru, „Usuń” numeru, „Skanuj QR”, „Wklej URI”, „Usuń sekret”; nad sekcjami jest tekst „Trwa polecenie. Numer i sekret możesz zmienić po jego zakończeniu.” Gdy polecenie się zaczyna: okna potwierdzeń (usunięcie numeru, zastąpienie i usunięcie sekretu) są zamykane, skaner i okno wklejania zamykane, a tekst pola wklejania czyszczony; edycja numeru zostaje otwarta z tekstem, ale bez „Zapisz”. Każda akcja zmieniająca (zapis i usunięcie numeru, przyjęcie wejścia sekretu, usunięcie sekretu) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” i brak wywołania magazynu oraz parsera. Operacja już przekazana do magazynu przed startem polecenia kończy się normalnie (nie jest anulowana). Po zakończeniu polecenia akcje wracają według UI-04 i UI-07. Uprawnienia SMS i `CAMERA` nie są blokowane. Sekcja „Limity poleceń” ma własną blokadę w trakcie polecenia (LIM-11, [Spec 011](../011-limity-polecen/spec.md)), niezależną od tej i działającą w ten sam sposób.
 
 **Kryteria akceptacji:**
 
@@ -266,7 +267,7 @@ Gdy polecenie jest w toku, w sekcjach numeru i sekretu są niedostępne: „Usta
 
 ### UI-16: Jedna operacja ustawień naraz w sekcji
 
-W każdej z sekcji (numer, sekret) w danej chwili trwa najwyżej jedna operacja ustawień. Od jej wywołania do wyniku akcje zmieniające sekcji są niedostępne, a ich wywołanie (np. podwójne dotknięcie) jest ignorowane bez wywołania magazynu.
+W każdej z sekcji (numer, sekret) w danej chwili trwa najwyżej jedna operacja ustawień (sekcja „Limity poleceń” – tak samo, LIM-11). Od jej wywołania do wyniku akcje zmieniające sekcji są niedostępne, a ich wywołanie (np. podwójne dotknięcie) jest ignorowane bez wywołania magazynu.
 
 **Kryteria akceptacji:**
 
@@ -452,8 +453,7 @@ Blokady w trakcie polecenia (UI-15) nie da się sprawdzić na telefonie bez ekra
 
 ## Historia zmian
 
-- **2026-10-28 – Planowane zmiany (Spec 011 – 013, zatwierdzone; obowiązują dla kodu tych spec, treść poniższych wymagań zostanie scalona zadaniem 6 z [design 013](../013-profil/design.md#podział-na-zadania)).**
-  - Ekran Ustawienia dostaje sekcję „Limity poleceń” pod sekcjami numeru, sekretu i uprawnień (LIM-10); blokada w trakcie polecenia i jedna operacja naraz jak UI-15 i UI-16 (LIM-11). Wymagania UI-01 – UI-24 bez zmian.
+- **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).** Ekran Ustawienia ma czwartą sekcję „Limity poleceń” pod sekcjami numeru, sekretu i uprawnień (LIM-10); blokada w trakcie polecenia i jedna operacja naraz jak UI-15 i UI-16 (LIM-11). Wymagania UI-01 – UI-24 bez zmian treści (dopisane tylko odesłania w Zakresie, UI-15 i UI-16).
 - **2026-10-21 – doprecyzowania po implementacji (bez zmian wymagań).** Design uzupełniony o zachowanie, które realizuje kod zadań 1–10 i poprawek z przeglądu:
   - Tabele przejść `AapsNumberViewModel`: warunek `onEditClicked` liczony ze źródeł w chwili akcji (`!busy`, brak polecenia, stan ≠ `Loading`); `onInputChanged` i `onEditCancelled` ignorowane przy `busy`.
   - Tabele przejść `TotpSecretViewModel`: `onCameraPermissionResult` otwiera skaner tylko przy `canScan` i nie wymaga oczekującej prośby; `onReplaceConfirmed` przy `!canPaste`/`!canScan` tylko zamyka okno; `onPasteSubmitted` celowo bez `canSubmitPaste` (wyścig → `COMMAND_ACTIVE`); `onCameraFailed`/`onScannerClosed` ignorowane poza skanerem.
