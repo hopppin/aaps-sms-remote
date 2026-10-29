@@ -176,7 +176,7 @@ Treść SMS jest budowana wyłącznie z poprawnego polecenia: słowo kluczowe z 
 - **Zakładając** polecenie utworzone z tekstu `007`, **gdy** zbudowano treść SMS, **wtedy** jest to `CARBS 7`.
 - **Zakładając** polecenia `BOLUS` 10, 125 i 200 (setne), `PROFILE STATUS`, `PROFILE LIST` oraz zmianę profilu (1, 100) i (2, 115), **gdy** zbudowano treści SMS, **wtedy** są to kolejno `BOLUS 0.1`, `BOLUS 1.25`, `BOLUS 2`, `PROFILE STATUS`, `PROFILE LIST`, `PROFILE 1`, `PROFILE 2 115` (BOL-05, PROF-04).
 - **Zakładając** każde poprawne polecenie `CARBS` z ilością 1–50, **gdy** zbudowano treść SMS, **wtedy** pasuje ona w całości do wzorca `CARBS [1-9][0-9]?` i liczba w niej równa się ilości polecenia.
-- **Zakładając** polecenie `CARBS` z ilością 100 (górna granica limitu `carbsMaxGrams`, LIM-01), **gdy** zbudowano treść SMS, **wtedy** jest to dokładnie `CARBS 100` (9 znaków); ogólnie dla ilości 1…`carbsMaxGrams` treść pasuje do wzorca `CARBS [1-9][0-9]{0,2}` i liczba w niej równa się ilości.
+- **Zakładając** `carbsMaxGrams` = 100 (LIM-02, LIM-06) i polecenie `CARBS` z ilością 100 (górna granica tego limitu), **gdy** zbudowano treść SMS, **wtedy** jest to dokładnie `CARBS 100` (9 znaków; przy domyślnym 50 g `CARBS 100` nie jest poprawnym poleceniem); ogólnie dla ilości 1…`carbsMaxGrams` treść pasuje do wzorca `CARBS [1-9][0-9]{0,2}` i liczba w niej równa się ilości.
 
 ### CMD-08: Kontekst dla parsera
 
