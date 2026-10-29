@@ -65,7 +65,7 @@ class CommandTestEnv(testScope: TestScope) {
         coordinator: SessionCoordinator = this.coordinator,
         recorder: SessionHistoryRecorder = this.recorder,
     ) =
-        CommandLauncher(coordinator, numbers, limits, permissions, secrets, recorder, currentRun, appScope)
+        CommandLauncher(coordinator, numbers, limits, permissions, secrets, recorder, history, clock, currentRun, appScope)
 
     fun setNumber(state: AapsNumberState) = numbers.setState(state)
 

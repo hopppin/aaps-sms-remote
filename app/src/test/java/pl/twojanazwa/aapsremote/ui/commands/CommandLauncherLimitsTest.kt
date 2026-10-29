@@ -126,7 +126,8 @@ class CommandLauncherLimitsTest {
                 pl.twojanazwa.aapsremote.data.SaveLimitsResult.Saved
         }
         val launcher = CommandLauncher(
-            env.coordinator, env.numbers, store, env.permissions, env.secrets, env.recorder, env.currentRun, env.appScope,
+            env.coordinator, env.numbers, store, env.permissions, env.secrets, env.recorder, env.history, env.clock,
+            env.currentRun, env.appScope,
         )
 
         val result = launcher.launch(CommandTestFixtures.carbs(40), CommandTestFixtures.pin())

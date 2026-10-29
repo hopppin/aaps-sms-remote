@@ -102,6 +102,8 @@
     <string name="commands_banner_limits_load_failed">Nie udało się wczytać limitów poleceń. Zapisz je ponownie w Ustawieniach.</string>
     <string name="commands_msg_amount_above_limit">Ilość przekracza limit z Ustawień. Popraw ilość i spróbuj ponownie.</string>
     <string name="commands_msg_extra_confirmation_required">Limit w Ustawieniach się zmienił i ta ilość wymaga potwierdzenia. Sprawdź ilość i spróbuj ponownie.</string>
+    <string name="commands_msg_bolus_interval">Od ostatniego bolusa z aplikacji minęło mniej niż %1$d min (limit w Ustawieniach). Spróbuj za %2$d min.</string>
+    <string name="commands_msg_bolus_history_unavailable">Nie udało się odczytać historii, więc aplikacja nie sprawdzi odstępu między bolusami. Spróbuj ponownie.</string>
     <string name="commands_msg_action_settings">Ustawienia</string>
     <string name="limits_section_title">Limity poleceń</string>
     <string name="limits_note">Limity aplikacji działają obok limitów AAPS i ich nie zastępują.</string>

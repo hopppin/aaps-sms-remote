@@ -37,7 +37,7 @@ class CommandLauncherRetentionTest {
 
     @Test
     fun `CMDUI-15 wszystkie pola launchera sa final i zadne nie ma typu wrazliwego`() {
-        assertEquals(8, fields.size, fields.joinToString { it.name })
+        assertEquals(10, fields.size, fields.joinToString { it.name })
         for (field in fields) {
             assertTrue(Modifier.isFinal(field.modifiers), field.name)
             assertFalse(Modifier.isStatic(field.modifiers), field.name)

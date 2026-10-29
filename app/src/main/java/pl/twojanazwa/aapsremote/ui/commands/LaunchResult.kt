@@ -4,6 +4,7 @@ enum class LaunchRejection {
     START_FAILED, COMMAND_ACTIVE, NUMBER_LOADING, NUMBER_MISSING, SMS_PERMISSIONS_MISSING,
     SECRET_ABSENT, SECRET_INVALIDATED, SECRET_LOCKED, SECRET_UNAVAILABLE,
     LIMITS_UNAVAILABLE, AMOUNT_ABOVE_LIMIT, EXTRA_CONFIRMATION_REQUIRED,
+    BOLUS_INTERVAL, BOLUS_HISTORY_UNAVAILABLE,
 }
 
 sealed interface LaunchResult {
@@ -13,5 +14,6 @@ sealed interface LaunchResult {
      */
     data object Started : LaunchResult
 
-    data class Rejected(val reason: LaunchRejection) : LaunchResult
+    /** [minutesLeft] tylko dla BOLUS_INTERVAL (BOL-12). */
+    data class Rejected(val reason: LaunchRejection, val minutesLeft: Int? = null) : LaunchResult
 }

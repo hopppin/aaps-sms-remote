@@ -14,6 +14,8 @@ enum class CommandMessage(val opensSettings: Boolean) {
     LIMITS_UNAVAILABLE(true),
     AMOUNT_ABOVE_LIMIT(false),
     EXTRA_CONFIRMATION_REQUIRED(false),
+    BOLUS_INTERVAL(false),
+    BOLUS_HISTORY_UNAVAILABLE(false),
 }
 
 /** Odwzorowanie 1:1 po nazwie (CMDUI-12). */
@@ -30,4 +32,6 @@ fun LaunchRejection.toMessage(): CommandMessage = when (this) {
     LaunchRejection.LIMITS_UNAVAILABLE -> CommandMessage.LIMITS_UNAVAILABLE
     LaunchRejection.AMOUNT_ABOVE_LIMIT -> CommandMessage.AMOUNT_ABOVE_LIMIT
     LaunchRejection.EXTRA_CONFIRMATION_REQUIRED -> CommandMessage.EXTRA_CONFIRMATION_REQUIRED
+    LaunchRejection.BOLUS_INTERVAL -> CommandMessage.BOLUS_INTERVAL
+    LaunchRejection.BOLUS_HISTORY_UNAVAILABLE -> CommandMessage.BOLUS_HISTORY_UNAVAILABLE
 }
