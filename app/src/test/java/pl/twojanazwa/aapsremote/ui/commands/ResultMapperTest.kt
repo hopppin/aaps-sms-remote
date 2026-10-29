@@ -147,6 +147,7 @@ class ResultMapperTest {
         assertEquals(ResultKind.SUCCESS, view.kind)
         assertEquals(ResultMessage.DETAILS_MISSING, view.message)
         assertNull(view.messageArg)
+        assertEquals("t", view.replyText)
     }
 
     @Test
