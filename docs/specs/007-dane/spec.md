@@ -191,6 +191,7 @@ Pozostałe pola (identyfikator, czasy, treść, liczba) są odczytywane bez zmia
 - **Zakładając** wiersz `FAILED` z powodem `NO_SIGNAL`, **gdy** go odczytano, **wtedy** rodzaj = `Failed`, powód = brak, pozostałe pola bez zmian.
 - **Zakładając** wiersz `BG` z ilością 20, **gdy** go odczytano, **wtedy** ilość = brak.
 - **Zakładając** wiersz `CARBS` z ilością bolusa 50 oraz wiersz `PROFILE_LIST` z numerem 3 i procentem 100, **gdy** je odczytano, **wtedy** ilość bolusa, numer i procent profilu = brak (BOL-17, PROF-17).
+- **Zakładając** wiersz `PROFILE_LIST` z samym numerem profilu 3 (procent `NULL`) oraz wiersz `PROFILE_STATUS` z samym procentem 100 (numer `NULL`), **gdy** je odczytano, **wtedy** w obu numer i procent profilu = brak (PROF-17).
 
 ### DATA-10: Zapis z retencją 200 wpisów
 

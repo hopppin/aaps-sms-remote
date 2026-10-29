@@ -267,7 +267,7 @@ Gdy polecenie jest w toku, w sekcjach numeru i sekretu są niedostępne: „Usta
 
 ### UI-16: Jedna operacja ustawień naraz w sekcji
 
-W każdej z sekcji (numer, sekret) w danej chwili trwa najwyżej jedna operacja ustawień (sekcja „Limity poleceń” – tak samo, LIM-11). Od jej wywołania do wyniku akcje zmieniające sekcji są niedostępne, a ich wywołanie (np. podwójne dotknięcie) jest ignorowane bez wywołania magazynu.
+W każdej z sekcji (numer, sekret) w danej chwili trwa najwyżej jedna operacja ustawień (sekcja „Limity poleceń” – tak samo, LIM-11). Od jej wywołania do wyniku akcje zmieniające sekcji są niedostępne, a ich wywołanie (np. podwójne dotknięcie) jest ignorowane bez wywołania magazynu. W sekcji „Limity poleceń” blokowany jest tylko przycisk „Zapisz limity” (kolejny zapis jest ignorowany); edycja pól limitów w trakcie zapisu nie jest blokowana (LIM-11).
 
 **Kryteria akceptacji:**
 

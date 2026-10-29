@@ -224,9 +224,9 @@ Dotyczy każdego polecenia z kodem (BOL-15, PROF-15). Tekst PIN-u istnieje wył�
 
 ### CMDUI-12: Sprawdzenia i odczyt sekretu przed startem
 
-`CommandLauncher.launch(command, pin)` wykonuje kolejno i przerywa na pierwszym niespełnionym warunku (zwraca `Rejected` z powodem, bez startu sesji, a przekazany `pin` jest czyszczony):
+`CommandLauncher.launch(command, pin, extraConfirmed = false)` wykonuje kolejno i przerywa na pierwszym niespełnionym warunku (zwraca `Rejected` z powodem, bez startu sesji, a przekazany `pin` jest czyszczony):
 
-`launch(command, pin, extraConfirmed)` – `extraConfirmed` = okno „Na pewno” zatwierdzone przyciskiem „Tak” (LIM-09).
+`extraConfirmed` (domyślnie `false`) = okno „Na pewno” zatwierdzone przyciskiem „Tak” (LIM-09). Po `LaunchResult.Started` ViewModel czyści pole ilości `CARBS` (dla `CARBS`) albo `BOLUS` (dla `BOLUS`) wraz z jego błędem.
 
 0. Niepoprawny zestaw: `pin != null` różne od `command.definition.requiresCode` → `START_FAILED` (błąd programistyczny; bez wyjątku).
 1. `activeSession.value != null` → `COMMAND_ACTIVE`.
