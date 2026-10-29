@@ -5,6 +5,7 @@ import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsLimits
 import pl.twojanazwa.aapsremote.commands.CommandLimits
+import pl.twojanazwa.aapsremote.data.CommandLimitsState
 
 /** CMDUI-25: jedna funkcja wartość → zasób na typ; teksty wspólne ze Spec 008 są używane ponownie. */
 @StringRes
@@ -18,6 +19,9 @@ fun CommandMessage.textRes(): Int = when (this) {
     CommandMessage.SECRET_LOCKED -> R.string.secret_msg_locked
     CommandMessage.SECRET_UNAVAILABLE -> R.string.commands_msg_secret_unavailable
     CommandMessage.START_FAILED -> R.string.commands_msg_start_failed
+    CommandMessage.LIMITS_UNAVAILABLE -> R.string.commands_banner_limits_load_failed
+    CommandMessage.AMOUNT_ABOVE_LIMIT -> R.string.commands_msg_amount_above_limit
+    CommandMessage.EXTRA_CONFIRMATION_REQUIRED -> R.string.commands_msg_extra_confirmation_required
 }
 
 @StringRes
@@ -29,9 +33,9 @@ fun CarbsAmountError.textRes(): Int = when (this) {
 }
 
 /** CMDUI-25: ABOVE_MAX podaje największą dozwoloną ilość; pozostałe błędy – najmniejszą i największą. */
-fun CarbsAmountError.textArgs(): List<Int> = when (this) {
-    CarbsAmountError.ABOVE_MAX -> listOf(CommandLimits.DEFAULT.carbsMaxGrams)
-    else -> listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams)
+fun CarbsAmountError.textArgs(limits: CommandLimits): List<Int> = when (this) {
+    CarbsAmountError.ABOVE_MAX -> listOf(limits.carbsMaxGrams)
+    else -> listOf(CarbsLimits.MIN_GRAMS, limits.carbsMaxGrams)
 }
 
 /** Gotowy numer nie ma banera (null). */
@@ -42,6 +46,11 @@ fun NumberReadiness.bannerRes(): Int? = when (this) {
     NumberReadiness.NOT_CONFIGURED -> R.string.commands_banner_number_not_configured
     NumberReadiness.LOAD_FAILED -> R.string.commands_banner_number_load_failed
 }
+
+/** LIM-05: baner tylko przy `LoadFailed`; `Loading` i `Loaded` bez banera. */
+@StringRes
+fun CommandLimitsState.bannerRes(): Int? =
+    if (this == CommandLimitsState.LoadFailed) R.string.commands_banner_limits_load_failed else null
 
 /** UNKNOWN (CARBS dostępne) i PRESENT nie mają banera (null). */
 @StringRes

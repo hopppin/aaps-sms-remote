@@ -50,6 +50,7 @@ class CommandTestEnv(testScope: TestScope) {
     )
     val numbers = FakeAapsNumberSettingsStore().also { it.setConfigured("+447700900123") }
     val permissions = FakeSmsPermissions()
+    val limits = FakeCommandLimitsStore()
     val secrets = FakeTotpSecretStore()
     val history = FakeCommandHistory()
     val currentRun = CurrentRun()
@@ -64,7 +65,7 @@ class CommandTestEnv(testScope: TestScope) {
         coordinator: SessionCoordinator = this.coordinator,
         recorder: SessionHistoryRecorder = this.recorder,
     ) =
-        CommandLauncher(coordinator, numbers, permissions, secrets, recorder, currentRun, appScope)
+        CommandLauncher(coordinator, numbers, limits, permissions, secrets, recorder, currentRun, appScope)
 
     fun setNumber(state: AapsNumberState) = numbers.setState(state)
 

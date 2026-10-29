@@ -37,7 +37,7 @@ class CommandLauncherRetentionTest {
 
     @Test
     fun `CMDUI-15 wszystkie pola launchera sa final i zadne nie ma typu wrazliwego`() {
-        assertEquals(7, fields.size, fields.joinToString { it.name })
+        assertEquals(8, fields.size, fields.joinToString { it.name })
         for (field in fields) {
             assertTrue(Modifier.isFinal(field.modifiers), field.name)
             assertFalse(Modifier.isStatic(field.modifiers), field.name)
@@ -70,7 +70,7 @@ class CommandLauncherRetentionTest {
             val secret = SessionTestFixtures.secret()
             env.secrets.loadResults.add(LoadResult.Loaded(secret))
             val launcher = env.launcher()
-            val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions)
+            val vm = CommandsViewModel(launcher, env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits)
             env.secrets.setState(pl.twojanazwa.aapsremote.security.SecretState.PRESENT)
             main.dispatcher.scheduler.advanceUntilIdle()
             vm.onCarbsInputChanged("20")

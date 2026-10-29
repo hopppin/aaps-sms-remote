@@ -11,6 +11,9 @@ enum class CommandMessage(val opensSettings: Boolean) {
     SECRET_LOCKED(false),
     SECRET_UNAVAILABLE(false),
     START_FAILED(false),
+    LIMITS_UNAVAILABLE(true),
+    AMOUNT_ABOVE_LIMIT(false),
+    EXTRA_CONFIRMATION_REQUIRED(false),
 }
 
 /** Odwzorowanie 1:1 po nazwie (CMDUI-12). */
@@ -24,4 +27,7 @@ fun LaunchRejection.toMessage(): CommandMessage = when (this) {
     LaunchRejection.SECRET_LOCKED -> CommandMessage.SECRET_LOCKED
     LaunchRejection.SECRET_UNAVAILABLE -> CommandMessage.SECRET_UNAVAILABLE
     LaunchRejection.START_FAILED -> CommandMessage.START_FAILED
+    LaunchRejection.LIMITS_UNAVAILABLE -> CommandMessage.LIMITS_UNAVAILABLE
+    LaunchRejection.AMOUNT_ABOVE_LIMIT -> CommandMessage.AMOUNT_ABOVE_LIMIT
+    LaunchRejection.EXTRA_CONFIRMATION_REQUIRED -> CommandMessage.EXTRA_CONFIRMATION_REQUIRED
 }

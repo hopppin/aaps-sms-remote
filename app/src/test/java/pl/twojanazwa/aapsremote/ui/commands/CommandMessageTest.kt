@@ -21,6 +21,7 @@ class CommandMessageTest {
             setOf(
                 LaunchRejection.NUMBER_MISSING,
                 LaunchRejection.SECRET_ABSENT,
+                LaunchRejection.LIMITS_UNAVAILABLE,
                 LaunchRejection.SECRET_INVALIDATED,
             ),
             opening.toSet(),

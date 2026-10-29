@@ -51,6 +51,7 @@ fun CommandsPanel(
             }
         }
         state.secret.bannerRes()?.let { Banner(it, onOpenSettings) }
+        state.limits.bannerRes()?.let { Banner(it, onOpenSettings) }
 
         if (state.launching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         FilledTonalButton(
@@ -87,19 +88,23 @@ fun CommandsPanel(
                     label = { Text(stringResource(R.string.commands_carbs_label)) },
                     isError = state.carbsError != null,
                     supportingText = state.carbsError?.let { error ->
-                        { Text(stringResource(error.textRes(), *error.textArgs().toTypedArray())) }
+                        state.loadedLimits?.let { limits ->
+                            { Text(stringResource(error.textRes(), *error.textArgs(limits).toTypedArray())) }
+                        }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.quickValues.forEach { grams ->
-                        OutlinedButton(
-                            onClick = { onQuickValueClicked(grams) },
-                            enabled = state.canStartCarbs,
-                            modifier = Modifier.weight(1f),
-                        ) { Text(stringResource(R.string.commands_carbs_quick, grams)) }
+                if (state.quickValues.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.quickValues.forEach { grams ->
+                            OutlinedButton(
+                                onClick = { onQuickValueClicked(grams) },
+                                enabled = state.canStartCarbs,
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(R.string.commands_carbs_quick, grams)) }
+                        }
                     }
                 }
                 Button(

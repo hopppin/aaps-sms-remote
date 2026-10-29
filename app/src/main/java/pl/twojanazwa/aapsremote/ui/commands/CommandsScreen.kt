@@ -109,9 +109,11 @@ fun CommandsScreen(
     if (run.confirmingExit) {
         ExitDuringCommandDialog(onConfirm = runViewModel::onExitConfirmed, onDismiss = runViewModel::onExitDismissed)
     }
-    commands.confirmingLargeGrams?.let { grams ->
+    val confirmThreshold = commands.carbsExtraConfirmationAboveGrams
+    commands.confirmingLargeGrams?.takeIf { confirmThreshold != null }?.let { grams ->
         LargeAmountDialog(
             grams = grams,
+            thresholdGrams = checkNotNull(confirmThreshold),
             onConfirm = commandsViewModel::onLargeAmountConfirmed,
             onDismiss = commandsViewModel::onLargeAmountDismissed,
         )

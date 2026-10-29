@@ -98,6 +98,10 @@
     <string name="commands_msg_secret_invalidated">Sekret TOTP przestał działać. Zeskanuj ponownie kod QR z AAPS w Ustawieniach.</string>
     <string name="commands_msg_secret_unavailable">Nie udało się odczytać sekretu TOTP. Spróbuj ponownie.</string>
     <string name="commands_msg_start_failed">Nie udało się uruchomić polecenia. Spróbuj ponownie.</string>
+    <!-- 011: limity -->
+    <string name="commands_banner_limits_load_failed">Nie udało się wczytać limitów poleceń. Zapisz je ponownie w Ustawieniach.</string>
+    <string name="commands_msg_amount_above_limit">Ilość przekracza limit z Ustawień. Popraw ilość i spróbuj ponownie.</string>
+    <string name="commands_msg_extra_confirmation_required">Limit w Ustawieniach się zmienił i ta ilość wymaga potwierdzenia. Sprawdź ilość i spróbuj ponownie.</string>
     <string name="commands_msg_action_settings">Ustawienia</string>
 
     <!-- 009: przebieg -->

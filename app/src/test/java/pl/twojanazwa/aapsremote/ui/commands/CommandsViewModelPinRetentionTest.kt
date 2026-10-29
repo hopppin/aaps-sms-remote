@@ -40,7 +40,7 @@ class CommandsViewModelPinRetentionTest {
     private fun TestScope.env() = CommandTestEnv(this).also { it.secrets.setState(SecretState.PRESENT) }
 
     private fun CommandTestEnv.viewModel(launcher: CommandLauncher = launcher()) =
-        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions).also { settle() }
+        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions, FakeCommandLimitsStore()).also { settle() }
 
     private fun CommandsViewModel.openSummary(grams: String = "20") {
         onCarbsInputChanged(grams)
