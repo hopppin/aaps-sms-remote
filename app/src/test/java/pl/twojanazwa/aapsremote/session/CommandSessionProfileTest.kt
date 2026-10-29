@@ -18,6 +18,8 @@ class CommandSessionProfileTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
+    private val BODY = "dowolna tresc"
+
     private val switch: Command =
         (Command.ProfileSwitch.of(ProfileChoice(1, "LocalProfile1"), 100) as ProfileSwitchValidation.Valid).command
 
@@ -29,9 +31,10 @@ class CommandSessionProfileTest {
         )
         val run = async { session.run() }
         runCurrent()
-        deliverAt(source, 60_000, "dowolna tresc")
-        session.cancel()
-        run.await()
+        deliverAt(source, 60_000, BODY)
+        val outcome = run.await().outcome
+        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, BODY), outcome)
+        assertEquals(1, sender.sentCommands.size)
         assertEquals(emptyList<String>(), sender.sentCodeCopies)
     }
 
