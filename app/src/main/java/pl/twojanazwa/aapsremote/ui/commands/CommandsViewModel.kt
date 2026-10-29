@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
-import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
+import pl.twojanazwa.aapsremote.data.CommandLimitsStore
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
@@ -34,6 +34,7 @@ class CommandsViewModel @Inject constructor(
     private val numbers: AapsNumberSettingsStore,
     private val secrets: TotpSecretStore,
     private val permissions: SmsPermissions,
+    private val limitsStore: CommandLimitsStore,
 ) : ViewModel() {
     /** Część stanu własna ViewModelu (początkowy odczyt uprawnień, CMDUI-03); gotowość dokłada `combine`. */
     private val local = MutableStateFlow(CommandsUiState(smsGranted = readPermissions()))
@@ -42,12 +43,14 @@ class CommandsViewModel @Inject constructor(
         numbers.state,
         secrets.state,
         coordinator.activeSession,
+        limitsStore.state,
         local,
-    ) { number, secret, session, own ->
+    ) { number, secret, session, limits, own ->
         own.copy(
             number = number.toReadiness(),
             secret = secret.toReadiness(),
             commandActive = session != null,
+            limits = limits,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, compose())
 
@@ -80,16 +83,18 @@ class CommandsViewModel @Inject constructor(
     }
 
     fun onCarbsNextClicked() {
-        if (!compose().canStartCarbs) return
-        when (val result = Command.Carbs.parse(local.value.carbsInput, CommandLimits.DEFAULT)) {
+        val state = compose()
+        val limits = state.loadedLimits
+        if (!state.canStartCarbs || limits == null) return
+        when (val result = Command.Carbs.parse(local.value.carbsInput, limits)) {
             is CarbsValidation.Invalid ->
                 local.update { it.copy(carbsError = result.error) }
             is CarbsValidation.Valid -> {
                 val carbs = result.command
-                if (carbs.requiresExtraConfirmation(CommandLimits.DEFAULT)) {
+                if (carbs.requiresExtraConfirmation(limits)) {
                     local.update { it.copy(confirmingLargeGrams = carbs.grams) }
                 } else {
-                    local.update { it.copy(summaryGrams = carbs.grams, pinText = "") }
+                    local.update { it.copy(summaryGrams = carbs.grams, pinText = "", extraConfirmed = false) }
                 }
             }
         }
@@ -99,6 +104,7 @@ class CommandsViewModel @Inject constructor(
         if (!compose().canStartCarbs) return
         local.update {
             it.copy(
+                extraConfirmed = false,
                 carbsInput = grams.toString(),
                 carbsError = null,
                 summaryGrams = grams,
@@ -111,7 +117,7 @@ class CommandsViewModel @Inject constructor(
     fun onLargeAmountConfirmed() {
         val grams = local.value.confirmingLargeGrams ?: return
         local.update {
-            it.copy(confirmingLargeGrams = null, summaryGrams = grams, pinText = "")
+            it.copy(confirmingLargeGrams = null, summaryGrams = grams, pinText = "", extraConfirmed = true)
         }
     }
 
@@ -133,19 +139,26 @@ class CommandsViewModel @Inject constructor(
         val chars = state.pinText.toCharArray()
         local.update { it.copy(pinText = "") }
         val pin = AapsPin.fromChars(chars)
-        val carbs = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as? CarbsValidation.Valid)?.command
-        if (carbs == null) {
+        val limits = state.loadedLimits
+        if (limits == null) {
             pin.clear()
-            local.update { it.copy(summaryGrams = null) }
+            local.update { it.copy(summaryGrams = null, message = CommandMessage.LIMITS_UNAVAILABLE) }
             return
         }
-        startCommand(carbs, pin)
+        val carbs = (Command.Carbs.of(grams, limits) as? CarbsValidation.Valid)?.command
+        if (carbs == null) {
+            // LIM-09: limit zmniejszony po otwarciu podsumowania; ilość nie jest przycinana.
+            pin.clear()
+            local.update { it.copy(summaryGrams = null, message = CommandMessage.AMOUNT_ABOVE_LIMIT) }
+            return
+        }
+        startCommand(carbs, pin, state.extraConfirmed)
     }
 
     /** W trakcie uruchamiania „Anuluj” i Wstecz nie ukrywają podsumowania (CMDUI-10, CMDUI-11). */
     fun onSummaryDismissed() {
         if (local.value.launching) return
-        local.update { it.copy(summaryGrams = null, pinText = "") }
+        local.update { it.copy(summaryGrams = null, pinText = "", extraConfirmed = false) }
     }
 
     /** Okno „Na pewno” -> zamknij; podsumowanie -> jak „Anuluj” (CMDUI-24). */
@@ -156,7 +169,7 @@ class CommandsViewModel @Inject constructor(
 
     /** Aplikacja schodzi z ekranu albo zmiana zakładki: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
     fun onStop() {
-        local.update { it.copy(pinText = "", summaryGrams = null, confirmingLargeGrams = null) }
+        local.update { it.copy(pinText = "", summaryGrams = null, confirmingLargeGrams = null, extraConfirmed = false) }
     }
 
     private fun startNoCode(command: Command) {
@@ -170,7 +183,7 @@ class CommandsViewModel @Inject constructor(
      * więc podwójne dotknięcie nie woła launchera drugi raz. Sesję uruchamia launcher w zakresie aplikacji,
      * nie `viewModelScope` (CMDUI-13).
      */
-    private fun startCommand(command: Command, pin: AapsPin?) {
+    private fun startCommand(command: Command, pin: AapsPin?, extraConfirmed: Boolean = false) {
         if (local.value.launching) {
             pin?.clear()
             return
@@ -184,16 +197,16 @@ class CommandsViewModel @Inject constructor(
         // ATOMIC: korutyna rusza nawet po anulowaniu zakresu, więc launcher zawsze czyści PIN (CMDUI-11).
         viewModelScope.launch(start = CoroutineStart.ATOMIC) {
             val result = try {
-                launcher.launch(command, pin)
+                launcher.launch(command, pin, extraConfirmed)
             } finally {
                 local.update { it.copy(launching = false) }
             }
             local.update {
                 when (result) {
                     LaunchResult.Started -> it.copy(
-                        summaryGrams = null, carbsInput = "", carbsError = null, runHandoff = true,
+                        summaryGrams = null, extraConfirmed = false, carbsInput = "", carbsError = null, runHandoff = true,
                     )
-                    is LaunchResult.Rejected -> it.copy(summaryGrams = null, message = result.reason.toMessage())
+                    is LaunchResult.Rejected -> it.copy(summaryGrams = null, extraConfirmed = false, message = result.reason.toMessage())
                 }
             }
         }
@@ -212,6 +225,7 @@ class CommandsViewModel @Inject constructor(
             number = numbers.state.value.toReadiness(),
             secret = secrets.state.value.toReadiness(),
             commandActive = coordinator.activeSession.value != null,
+            limits = limitsStore.state.value,
         )
 }
 

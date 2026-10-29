@@ -36,9 +36,9 @@ class CommandTextsTest {
 
     @Test
     fun `CMDUI-25 ABOVE_MAX podaje MAX_GRAMS jako jedyny argument, BELOW_MIN i EMPTY podaja MIN i MAX`() {
-        assertEquals(listOf(CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.ABOVE_MAX.textArgs())
-        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.BELOW_MIN.textArgs())
-        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.EMPTY.textArgs())
+        assertEquals(listOf(CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.ABOVE_MAX.textArgs(CommandLimits.DEFAULT))
+        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.BELOW_MIN.textArgs(CommandLimits.DEFAULT))
+        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.EMPTY.textArgs(CommandLimits.DEFAULT))
     }
 
     @Test

@@ -8,6 +8,8 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.data.AapsNumberState
+import pl.twojanazwa.aapsremote.data.CommandLimitsState
+import pl.twojanazwa.aapsremote.data.CommandLimitsStore
 import pl.twojanazwa.aapsremote.data.SessionHistoryRecorder
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.LoadResult
@@ -27,6 +29,7 @@ import javax.inject.Inject
 class CommandLauncher @Inject constructor(
     private val coordinator: SessionCoordinator,
     private val numbers: AapsNumberSettingsStore,
+    private val limitsStore: CommandLimitsStore,
     private val permissions: SmsPermissions,
     private val secrets: TotpSecretProvider,
     private val recorder: SessionHistoryRecorder,
@@ -34,10 +37,10 @@ class CommandLauncher @Inject constructor(
     @CommandRunScope private val scope: CoroutineScope,
 ) {
     /**
-     * [pin] != null dokładnie dla CommandCatalog.definitionOf(command.id).requiresCode. Każdy Rejected i anulowanie
+     * [extraConfirmed] = okno „Na pewno” zatwierdzone (LIM-09). [pin] != null dokładnie dla CommandCatalog.definitionOf(command.id).requiresCode. Każdy Rejected i anulowanie
      * korutyny = pin wyczyszczony. Nie rzuca poza CancellationException (wyjątek ze startu sesji = START_FAILED).
      */
-    suspend fun launch(command: Command, pin: AapsPin?): LaunchResult {
+    suspend fun launch(command: Command, pin: AapsPin?, extraConfirmed: Boolean = false): LaunchResult {
         var started = false
         try {
             if ((pin != null) != CommandCatalog.definitionOf(command.id).requiresCode) {
@@ -54,6 +57,17 @@ class CommandLauncher @Inject constructor(
             }
             if (!permissions.canSend() || !permissions.canReceive()) {
                 return LaunchResult.Rejected(LaunchRejection.SMS_PERMISSIONS_MISSING)
+            }
+            if (command is Command.Carbs) {
+                // LIM-09: jedna migawka stanu limitów na całe sprawdzenie; ilość nie jest przycinana.
+                val limits = (limitsStore.state.value as? CommandLimitsState.Loaded)?.limits
+                    ?: return LaunchResult.Rejected(LaunchRejection.LIMITS_UNAVAILABLE)
+                if (command.grams > limits.carbsMaxGrams) {
+                    return LaunchResult.Rejected(LaunchRejection.AMOUNT_ABOVE_LIMIT)
+                }
+                if (!extraConfirmed && command.requiresExtraConfirmation(limits)) {
+                    return LaunchResult.Rejected(LaunchRejection.EXTRA_CONFIRMATION_REQUIRED)
+                }
             }
             val credentials = if (pin == null) {
                 null
