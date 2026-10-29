@@ -10,6 +10,13 @@ sealed interface CommandParameter {
         val stepCentiUnits: Int,
     ) : CommandParameter
 
+    /** Numer i nazwa z listy profili oraz procent (PROF-01). */
+    data class ProfileAndPercent(
+        val minPercent: Int,
+        val maxPercent: Int,
+        val defaultPercent: Int,
+    ) : CommandParameter
+
     data class Grams(
         val min: Int,
         val quickValues: List<Int>,

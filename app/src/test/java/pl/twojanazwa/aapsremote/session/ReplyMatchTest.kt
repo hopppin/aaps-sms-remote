@@ -26,6 +26,15 @@ class ReplyMatchTest {
     }
 
     @Test
+    fun `PROF-05 polecenia profilu nie sa zgodne z zadna prosba o kod ani potwierdzeniem`() {
+        val profile = listOf(CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH)
+        for (id in profile) {
+            for (reply in codeRequests.keys) assertEquals(false, ReplyMatch.isCodeRequestFor(id, reply))
+            for (reply in dones.keys) assertEquals(false, ReplyMatch.isDoneFor(id, reply))
+        }
+    }
+
+    @Test
     fun `BOL-19 potwierdzenie jest zgodne tylko z wlasnym poleceniem`() {
         for ((reply, owner) in dones) {
             for (id in CommandId.entries) {

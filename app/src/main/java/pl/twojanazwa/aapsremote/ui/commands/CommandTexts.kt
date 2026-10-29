@@ -93,12 +93,12 @@ fun formatHalfLimit(limitCentiUnits: Int): String {
 fun summaryTitle(command: Command): String = when (command) {
     is Command.Carbs -> stringResource(R.string.commands_summary_title, command.grams)
     is Command.Bolus -> stringResource(R.string.commands_bolus_summary_title, formatCentiUnits(command.centiUnits))
-    Command.Bg, Command.Pump -> ""
+    Command.Bg, Command.Pump, Command.ProfileStatus, Command.ProfileList, is Command.ProfileSwitch -> ""
 }
 
 @Composable
 fun summaryText(command: Command): String = when (command) {
     is Command.Carbs -> stringResource(R.string.commands_summary_text, command.grams)
     is Command.Bolus -> stringResource(R.string.commands_bolus_summary_text, formatCentiUnits(command.centiUnits))
-    Command.Bg, Command.Pump -> ""
+    Command.Bg, Command.Pump, Command.ProfileStatus, Command.ProfileList, is Command.ProfileSwitch -> ""
 }

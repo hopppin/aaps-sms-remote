@@ -9,11 +9,14 @@ internal object ReplyMatch {
         CommandId.CARBS -> reply is AapsReply.CodeRequest
         CommandId.BOLUS -> reply is AapsReply.BolusCodeRequest
         CommandId.BG, CommandId.PUMP -> false
+        // Spec 013, zad. 3 zmieni PROFILE_SWITCH; do tego czasu polecenia profilu nie odsyłają kodu.
+        CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH -> false
     }
 
     fun isDoneFor(id: CommandId, reply: AapsReply.MatchingDone): Boolean = when (id) {
         CommandId.CARBS -> reply is AapsReply.CarbsDone
         CommandId.BOLUS -> reply is AapsReply.BolusDone
         CommandId.BG, CommandId.PUMP -> false
+        CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH -> false
     }
 }

@@ -17,7 +17,10 @@ import pl.twojanazwa.aapsremote.session.UnknownReason
 class HistoryCodecDecodeTest {
 
     // Niezalezna tabela kodow (literaly z design.md); kompletnosc sprawdzana wzgledem entries.
-    private val commandCodes = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS")
+    private val commandCodes = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS",
+        CommandId.PROFILE_STATUS to "PROFILE_STATUS", CommandId.PROFILE_LIST to "PROFILE_LIST",
+        CommandId.PROFILE_SWITCH to "PROFILE_SWITCH",
+    )
 
     private val failureCodes = mapOf(
         FailureReason.SEND_FAILED to "SEND_FAILED",
@@ -67,20 +70,22 @@ class HistoryCodecDecodeTest {
         assertEquals(FailureReason.entries.toSet(), failureCodes.keys)
         assertEquals(UnknownReason.entries.toSet(), unknownCodes.keys)
         assertEquals(SessionPhase.entries.toSet(), phaseCodes.keys)
-        assertEquals(4, commandCodes.size)
+        assertEquals(7, commandCodes.size)
         assertEquals(8, failureCodes.size)
         assertEquals(7, unknownCodes.size)
         assertEquals(8, phaseCodes.size)
     }
 
+    // Dekodowanie polecen profilu (HistoryCommand) - spec 013, zad. 3.
     @ParameterizedTest
-    @EnumSource(CommandId::class)
+    @EnumSource(CommandId::class, names = ["BG", "PUMP", "CARBS", "BOLUS"])
     fun `DATA-09 polecenie round-trip i tekst z tabeli`(id: CommandId) {
         val command = when (id) {
             CommandId.BG -> Command.Bg
             CommandId.PUMP -> Command.Pump
             CommandId.CARBS -> HistoryFixtures.carbs20
             CommandId.BOLUS -> HistoryFixtures.bolus
+            else -> error("poza zakresem testu")
         }
         val row = HistoryCodec.toRow(HistoryFixtures.withOutcome(SessionOutcome.Cancelled).copy(command = command))
         assertEquals(commandCodes.getValue(id), row.command)
@@ -89,6 +94,7 @@ class HistoryCodecDecodeTest {
             CommandId.PUMP -> HistoryCommand.PUMP
             CommandId.CARBS -> HistoryCommand.CARBS
             CommandId.BOLUS -> HistoryCommand.BOLUS
+            else -> error("poza zakresem testu")
         }
         assertEquals(expected, HistoryCodec.toEntry(row).command)
     }
