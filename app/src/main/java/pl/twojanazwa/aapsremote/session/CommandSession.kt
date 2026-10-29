@@ -301,12 +301,17 @@ class CommandSession(
     /** Druga linia obrony (BOL-10, BOL-11): ilość w prośbie/potwierdzeniu musi być równa wysłanej, niezależnie od parsera. */
     private fun amountMatches(reply: AapsReply): Boolean {
         val sent = command
+        // Zad. 3 spec 013 doda sprawdzenie nazwy i procentu; do tego czasu polecenia profilu nie przepuszczają żadnej odpowiedzi.
+        if (sent is Command.ProfileStatus || sent is Command.ProfileList || sent is Command.ProfileSwitch) return false
         return when (reply) {
             is AapsReply.BolusCodeRequest -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
             is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
-            else -> true
+            is AapsReply.BolusAmountMismatch, is AapsReply.CarbsAmountMismatch,
+            is AapsReply.BgReport, is AapsReply.PumpStatus,
+            AapsReply.WrongCode, is AapsReply.Unrecognized,
+            -> true
         }
     }
 

@@ -19,7 +19,10 @@ class ProfileCommandTest {
 
     @Test
     fun `PROF-01 dane wpisow profilu`() {
-        val (status, list, sw) = CommandCatalog.entries.drop(4)
+        fun entry(id: CommandId) = CommandCatalog.entries.single { it.id == id }
+        val status = entry(CommandId.PROFILE_STATUS)
+        val list = entry(CommandId.PROFILE_LIST)
+        val sw = entry(CommandId.PROFILE_SWITCH)
         assertEquals("PROFILE STATUS", status.keyword)
         assertEquals("PROFILE LIST", list.keyword)
         assertEquals("PROFILE", sw.keyword)
@@ -48,6 +51,7 @@ class ProfileCommandTest {
         assertEquals(ProfileSwitchError.BELOW_MIN, err(Command.ProfileSwitch.of(choice, 0)))
         assertEquals(ProfileSwitchError.BELOW_MIN, err(Command.ProfileSwitch.of(choice, -10)))
         assertEquals(ProfileSwitchError.ABOVE_MAX, err(Command.ProfileSwitch.of(choice, Int.MAX_VALUE)))
+        assertEquals(ProfileSwitchError.BELOW_MIN, err(Command.ProfileSwitch.of(choice, Int.MIN_VALUE)))
     }
 
     @Test
@@ -79,6 +83,9 @@ class ProfileCommandTest {
         assertEquals(ProfileSwitchError.INVALID_CHARACTERS, err(parse("110%")))
         assertEquals(ProfileSwitchError.INVALID_CHARACTERS, err(parse("1,5")))
         assertEquals(ProfileSwitchError.INVALID_CHARACTERS, err(parse(" 100")))
+        assertEquals(100, (parse("0000000000000100") as ProfileSwitchValidation.Valid).command.percent)
+        assertEquals(ProfileSwitchError.BELOW_MIN, err(parse("0000000000000000")))
+        assertEquals(ProfileSwitchError.ABOVE_MAX, err(parse("2147483648")))
     }
 
     @Test
@@ -115,10 +122,31 @@ class ProfileCommandTest {
     }
 
     @Test
+    fun `PROF-05 equals i hashCode ProfileChoice i ProfileSwitch`() {
+        assertEquals(ProfileChoice(1, "A"), ProfileChoice(1, "A"))
+        assertEquals(ProfileChoice(1, "A").hashCode(), ProfileChoice(1, "A").hashCode())
+        assertFalse(ProfileChoice(1, "A") == ProfileChoice(2, "A"))
+        assertEquals(switch(1, 100), switch(1, 100))
+        assertEquals(switch(1, 100).hashCode(), switch(1, 100).hashCode())
+        assertFalse(switch(1, 100) == switch(1, 101))
+        assertFalse(switch(1, 100) == switch(2, 100))
+    }
+
+    @Test
     fun `PROF-05 parser do zad 2 zwraca Unrecognized dla polecen profilu`() {
-        val all = listOf(ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, ExpectedCommand.ProfileSwitch("A", 100))
+        val all = listOf(ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, ExpectedCommand.ProfileSwitch("LocalProfile1", 100))
+        val bodies = listOf(
+            "A (100%)",
+            "LocalProfile1 (115%)",
+            "Aby przelaczyc profil na LocalProfile1 100% odpowiedz kodem z Authenticatora",
+            "1. LocalProfile1\n2. LocalProfile2",
+            "Bledny format",
+            "",
+        )
         for (e in all) {
-            assertTrue(AapsReplyParser.parse("A (100%)", e) is AapsReply.Unrecognized)
+            for (b in bodies) {
+                assertTrue(AapsReplyParser.parse(b, e) is AapsReply.Unrecognized, b)
+            }
         }
     }
 }
