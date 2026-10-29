@@ -42,7 +42,9 @@ fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = historyCommandText(details.command, details.grams, details.bolusCentiUnits),
+            text = historyCommandText(
+                details.command, details.grams, details.bolusCentiUnits, details.profileNumber, details.profilePercent,
+            ),
             style = MaterialTheme.typography.titleMedium,
         )
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -97,8 +99,20 @@ internal fun rememberHistoryZone(): ZoneId {
 
 /** Nazwa polecenia z ilością dla CARBS (HISTUI-03). */
 @Composable
-internal fun historyCommandText(command: HistoryCommandLabel, grams: Int?, bolusCentiUnits: Int?): String = when (command) {
+internal fun historyCommandText(
+    command: HistoryCommandLabel,
+    grams: Int?,
+    bolusCentiUnits: Int?,
+    profileNumber: Int? = null,
+    profilePercent: Int? = null,
+): String = when (command) {
     HistoryCommandLabel.CARBS -> stringResource(command.textRes(), grams ?: 0)
+    HistoryCommandLabel.PROFILE_SWITCH ->
+        if (profileNumber == null || profilePercent == null) {
+            stringResource(HistoryCommandLabel.PROFILE_SWITCH_NO_DETAILS.textRes())
+        } else {
+            stringResource(command.textRes(), profileNumber, profilePercent)
+        }
     HistoryCommandLabel.BOLUS ->
         if (bolusCentiUnits == null) {
             stringResource(HistoryCommandLabel.BOLUS_NO_AMOUNT.textRes())

@@ -17,6 +17,10 @@ fun HistoryCommandLabel.textRes(): Int = when (this) {
     HistoryCommandLabel.CARBS_NO_AMOUNT -> R.string.history_command_carbs_no_amount
     HistoryCommandLabel.BOLUS -> R.string.history_command_bolus
     HistoryCommandLabel.BOLUS_NO_AMOUNT -> R.string.history_command_bolus_no_amount
+    HistoryCommandLabel.PROFILE_STATUS -> R.string.history_command_profile_status
+    HistoryCommandLabel.PROFILE_LIST -> R.string.history_command_profile_list
+    HistoryCommandLabel.PROFILE_SWITCH -> R.string.history_command_profile_switch
+    HistoryCommandLabel.PROFILE_SWITCH_NO_DETAILS -> R.string.history_command_profile_switch_no_details
     HistoryCommandLabel.UNRECOGNIZED -> R.string.history_command_unrecognized
 }
 
