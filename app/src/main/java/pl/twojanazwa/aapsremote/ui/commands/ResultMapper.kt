@@ -25,6 +25,7 @@ object ResultMapper {
                     is Command.Bg -> ResultMessage.BG_REPLY
                     is Command.Pump -> ResultMessage.PUMP_REPLY
                     is Command.Carbs -> ResultMessage.DETAILS_MISSING
+                    is Command.Bolus -> ResultMessage.DETAILS_MISSING
                 }
                 text = outcome.text
             }

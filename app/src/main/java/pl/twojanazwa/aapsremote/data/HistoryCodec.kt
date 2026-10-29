@@ -114,6 +114,7 @@ object HistoryCodec {
         CommandId.BG -> "BG"
         CommandId.PUMP -> "PUMP"
         CommandId.CARBS -> "CARBS"
+        CommandId.BOLUS -> "BOLUS"
     }
 
     private fun encode(reason: FailureReason): String = when (reason) {

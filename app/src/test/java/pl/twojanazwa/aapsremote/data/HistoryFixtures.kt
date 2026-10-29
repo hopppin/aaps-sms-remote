@@ -1,6 +1,7 @@
 package pl.twojanazwa.aapsremote.data
 
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
@@ -18,6 +19,8 @@ object HistoryFixtures {
     const val T0 = 1111111051000L
 
     val carbs20: Command.Carbs = (Command.Carbs.of(20, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
+
+    val bolus: Command.Bolus = (Command.Bolus.of(500, CommandLimits.DEFAULT) as BolusValidation.Valid).command
 
     fun sms(body: String) = IncomingSms(body, T0 + 2000)
 

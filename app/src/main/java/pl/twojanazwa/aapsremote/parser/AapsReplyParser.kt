@@ -20,6 +20,9 @@ object AapsReplyParser {
                 }
 
             is ExpectedCommand.Carbs -> parseCarbs(n, firstLine, body, expected.grams)
+
+            // Parser bolusa: spec 012, zad. 2. Do tego czasu nic nie jest rozpoznawane.
+            is ExpectedCommand.Bolus -> null
         }
         return result ?: AapsReply.Unrecognized(body)
     }

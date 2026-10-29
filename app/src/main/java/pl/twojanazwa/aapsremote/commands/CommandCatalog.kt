@@ -2,7 +2,7 @@ package pl.twojanazwa.aapsremote.commands
 
 /** Katalog poleceń MVP jako dane (CMD-01). */
 object CommandCatalog {
-    /** BG, PUMP, CARBS - w tej kolejności. */
+    /** BG, PUMP, CARBS, BOLUS - w tej kolejności. */
     val entries: List<CommandDefinition> = listOf(
         CommandDefinition(
             id = CommandId.BG,
@@ -24,6 +24,16 @@ object CommandCatalog {
             parameter = CommandParameter.Grams(
                 min = CarbsLimits.MIN_GRAMS,
                 quickValues = CarbsLimits.QUICK_VALUES,
+            ),
+            requiresCode = true,
+            approval = Approval.SUMMARY_WITH_PIN,
+        ),
+        CommandDefinition(
+            id = CommandId.BOLUS,
+            keyword = "BOLUS",
+            parameter = CommandParameter.InsulinUnits(
+                minCentiUnits = BolusLimits.MIN_CENTI_UNITS,
+                stepCentiUnits = BolusLimits.STEP_CENTI_UNITS,
             ),
             requiresCode = true,
             approval = Approval.SUMMARY_WITH_PIN,

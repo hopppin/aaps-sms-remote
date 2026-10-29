@@ -18,4 +18,17 @@ sealed interface ExpectedCommand {
 
         override fun toString(): String = "ExpectedCommand.Carbs(***)"
     }
+
+    /** Rzuca IllegalArgumentException dla centiUnits < 1 (komunikat bez danych SMS). */
+    class Bolus(val centiUnits: Int) : ExpectedCommand {
+        init {
+            require(centiUnits >= 1) { "centiUnits must be >= 1" }
+        }
+
+        override fun equals(other: Any?): Boolean = other is Bolus && other.centiUnits == centiUnits
+
+        override fun hashCode(): Int = centiUnits
+
+        override fun toString(): String = "ExpectedCommand.Bolus(***)"
+    }
 }

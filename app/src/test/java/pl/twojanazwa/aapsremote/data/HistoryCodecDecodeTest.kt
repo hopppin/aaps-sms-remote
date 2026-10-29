@@ -17,7 +17,7 @@ import pl.twojanazwa.aapsremote.session.UnknownReason
 class HistoryCodecDecodeTest {
 
     // Niezalezna tabela kodow (literaly z design.md); kompletnosc sprawdzana wzgledem entries.
-    private val commandCodes = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS")
+    private val commandCodes = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS")
 
     private val failureCodes = mapOf(
         FailureReason.SEND_FAILED to "SEND_FAILED",
@@ -67,7 +67,7 @@ class HistoryCodecDecodeTest {
         assertEquals(FailureReason.entries.toSet(), failureCodes.keys)
         assertEquals(UnknownReason.entries.toSet(), unknownCodes.keys)
         assertEquals(SessionPhase.entries.toSet(), phaseCodes.keys)
-        assertEquals(3, commandCodes.size)
+        assertEquals(4, commandCodes.size)
         assertEquals(8, failureCodes.size)
         assertEquals(7, unknownCodes.size)
         assertEquals(8, phaseCodes.size)
@@ -80,6 +80,7 @@ class HistoryCodecDecodeTest {
             CommandId.BG -> Command.Bg
             CommandId.PUMP -> Command.Pump
             CommandId.CARBS -> HistoryFixtures.carbs20
+            CommandId.BOLUS -> HistoryFixtures.bolus
         }
         val row = HistoryCodec.toRow(HistoryFixtures.withOutcome(SessionOutcome.Cancelled).copy(command = command))
         assertEquals(commandCodes.getValue(id), row.command)
@@ -87,6 +88,7 @@ class HistoryCodecDecodeTest {
             CommandId.BG -> HistoryCommand.BG
             CommandId.PUMP -> HistoryCommand.PUMP
             CommandId.CARBS -> HistoryCommand.CARBS
+            CommandId.BOLUS -> HistoryCommand.UNRECOGNIZED // do zad. 4 spec 012
         }
         assertEquals(expected, HistoryCodec.toEntry(row).command)
     }
