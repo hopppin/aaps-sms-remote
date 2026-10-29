@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.text.Normalizer
 
 class ProfileReplyParserTest {
 
@@ -142,6 +143,88 @@ class ProfileReplyParserTest {
         )) {
             assertEquals(AapsReply.ProfileSwitchMismatch(body), parse(body, c))
         }
+    }
+
+    // Uzupelnienia z recenzji (PROF-07..09)
+
+    @Test
+    fun `PROF-08 nazwy z procentem w srodku prosba o kod przy rownej nazwie i procencie`() {
+        val a = request("Sport 50% extra", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(a), parse(a, switch("Sport 50% extra", 100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(a), parse(a, switch("Sport", 50)))
+        val b = request("Sport 50%", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(b), parse(b, switch("Sport 50%", 100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(b), parse(b, switch("Sport", 50)))
+        val c = request("Sport 100%", 50)
+        assertEquals(AapsReply.ProfileCodeRequest(c), parse(c, switch("Sport 100%", 50)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(c), parse(c, switch("Sport", 100)))
+    }
+
+    @Test
+    fun `PROF-09 wiodace i koncowe spacje w nazwie to scisla rownosc`() {
+        val lead = request(" Sport", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(lead), parse(lead, switch(" Sport", 100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(lead), parse(lead, switch("Sport", 100)))
+        val trail = request("Sport ", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(trail), parse(trail, switch("Sport ", 100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(trail), parse(trail, switch("Sport", 100)))
+    }
+
+    @Test
+    fun `PROF-09 polskie znaki i NFC kontra NFD to scisla rownosc`() {
+        val nfc = Normalizer.normalize("Zażółć ąż", Normalizer.Form.NFC)
+        val nfd = Normalizer.normalize(nfc, Normalizer.Form.NFD)
+        assertTrue(nfc != nfd)
+        val body = request(nfc, 100)
+        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(nfc, 100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(body), parse(body, switch(nfd, 100)))
+        val bodyNfd = request(nfd, 100)
+        assertEquals(AapsReply.ProfileSwitchMismatch(bodyNfd), parse(bodyNfd, switch(nfc, 100)))
+    }
+
+    @Test
+    fun `PROF-09 metaznaki regexu w oczekiwanej nazwie sa porownywane doslownie`() {
+        for (name in listOf("A.B*", "(x)")) {
+            val body = request(name, 100)
+            assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(name, 100)))
+        }
+        val dot = request("AxB", 100)
+        assertEquals(AapsReply.ProfileSwitchMismatch(dot), parse(dot, switch("A.B*", 100)))
+        val grp = request("x", 100)
+        assertEquals(AapsReply.ProfileSwitchMismatch(grp), parse(grp, switch("(x)", 100)))
+    }
+
+    @Test
+    fun `PROF-09 procent 1150 kontra 115 i zapis 0115`() {
+        val big = request("A", 1150)
+        assertEquals(AapsReply.ProfileSwitchMismatch(big), parse(big, switch("A", 115)))
+        assertEquals(AapsReply.ProfileCodeRequest(big), parse(big, switch("A", 1150)))
+        val small = request("A", 115)
+        assertEquals(AapsReply.ProfileSwitchMismatch(small), parse(small, switch("A", 1150)))
+        val zero = "Aby przelaczyc profil na A 0115% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em"
+        assertEquals(unrecognized(zero), parse(zero, switch("A", 115)))
+    }
+
+    @Test
+    fun `PROF-07 lista i status przyjmuja nazwe zaczynajaca sie spacja`() {
+        // Obecne zachowanie: lista zachowuje spacje w nazwie, a status ja gubi, bo normalizator
+        // obcina biale znaki na poczatku calej tresci (sprawdzenie startsWith(' ') w statusie jest martwe).
+        // Niespojnosc opisana w PR, nie naprawiana tutaj.
+        val list = "1.  A"
+        val reply = parse(list, ExpectedCommand.ProfileList) as AapsReply.ProfileListReport
+        assertEquals(listOf(AapsReply.ProfileListItem(1, " A")), reply.items)
+        val status = "  A (115%)"
+        assertEquals(AapsReply.ProfileStatusReport(status), parse(status, ExpectedCommand.ProfileStatus))
+    }
+
+    @Test
+    fun `PROF-07 limit 99 pozycji listy a wpis setny to nierozpoznana`() {
+        // shortcut: wzorzec numeru [1-9][0-9]? ogranicza liste do 99 pozycji; wpis 100. to Unrecognized
+        // (SMS i tak ma limit 2000 znakow), zmiana tylko gdy AAPS pokaze wiecej profili.
+        val ok = (1..99).joinToString("\n") { "$it. P$it" }
+        assertEquals(99, (parse(ok, ExpectedCommand.ProfileList) as AapsReply.ProfileListReport).items.size)
+        val over = (1..100).joinToString("\n") { "$it. P$it" }
+        assertEquals(unrecognized(over), parse(over, ExpectedCommand.ProfileList))
     }
 
     // PROF-10
