@@ -66,6 +66,21 @@ class CommandLauncherLimitsTest {
     }
 
     @Test
+    fun `LIM-09 LoadFailed bez uprawnien SMS daje SMS_PERMISSIONS_MISSING, uprawnienia przed limitami`() = runTest {
+        val env = CommandTestEnv(this).withSecret()
+        env.limits.setState(CommandLimitsState.LoadFailed)
+        env.permissions.send = false
+        val pin = CommandTestFixtures.pin()
+
+        assertEquals(
+            LaunchResult.Rejected(LaunchRejection.SMS_PERMISSIONS_MISSING),
+            env.launcher().launch(CommandTestFixtures.carbs(20), pin),
+        )
+        assertTrue(pin.isCleared)
+        env.assertNotStarted()
+    }
+
+    @Test
     fun `LIM-09 Loading daje LIMITS_UNAVAILABLE dla CARBS`() = runTest {
         val env = CommandTestEnv(this).withSecret()
         env.limits.setState(CommandLimitsState.Loading)

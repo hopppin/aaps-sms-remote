@@ -4,6 +4,8 @@ import app.cash.turbine.test
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -16,6 +18,7 @@ import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
+import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.sms.FakeSmsPermissions
 import pl.twojanazwa.aapsremote.ui.MainDispatcherExtension
@@ -168,5 +171,106 @@ class CommandsViewModelLimitsTest {
         assertFalse(CommandMessage.EXTRA_CONFIRMATION_REQUIRED.opensSettings)
         assertFalse(CommandMessage.AMOUNT_ABOVE_LIMIT.opensSettings)
         assertTrue(CommandMessage.LIMITS_UNAVAILABLE.opensSettings)
+    }
+
+    /** Zbiera każdy [AapsPin] utworzony przez ViewModel, żeby sprawdzić jego wyczyszczenie. */
+    private fun capturingPins(block: (List<AapsPin>) -> Unit) {
+        val pins = mutableListOf<AapsPin>()
+        mockkObject(AapsPin.Companion)
+        try {
+            io.mockk.every { AapsPin.fromChars(any()) } answers { callOriginal().also { pins.add(it) } }
+            block(pins)
+        } finally {
+            unmockkObject(AapsPin.Companion)
+        }
+    }
+
+    @Test
+    fun `LIM-09 limity niedostepne po otwarciu podsumowania daja LIMITS_UNAVAILABLE, PIN wyczyszczony, launcher niewolany`() =
+        runTest(main.dispatcher) {
+            capturingPins { pins ->
+                val vm = viewModel()
+                settle()
+                vm.type("20")
+                limits.setState(CommandLimitsState.LoadFailed)
+                vm.onPinChanged("4321")
+                settle()
+                vm.onSendClicked()
+                settle()
+                assertEquals(CommandMessage.LIMITS_UNAVAILABLE, vm.uiState.value.message)
+                assertNull(vm.uiState.value.summaryGrams)
+                assertEquals(1, pins.size)
+                assertTrue(pins.single().isCleared)
+                coVerify(exactly = 0) { launcher.launch(any<Command>(), any(), any()) }
+            }
+        }
+
+    @Test
+    fun `LIM-09 AMOUNT_ABOVE_LIMIT w ViewModelu czyści PIN`() = runTest(main.dispatcher) {
+        capturingPins { pins ->
+            val vm = viewModel()
+            settle()
+            vm.type("40")
+            vm.onPinChanged("4321")
+            limits.setCarbsMax(30)
+            settle()
+            vm.onSendClicked()
+            settle()
+            assertEquals(1, pins.size)
+            assertTrue(pins.single().isCleared)
+            coVerify(exactly = 0) { launcher.launch(any<Command>(), any(), any()) }
+        }
+    }
+
+    private fun CommandsViewModel.send() {
+        onPinChanged("4321")
+        settle()
+        onSendClicked()
+        settle()
+    }
+
+    @Test
+    fun `LIM-09 extraConfirmed nie przecieka po Anuluj podsumowania`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        settle()
+        vm.type("41")
+        vm.onLargeAmountConfirmed()
+        vm.onSummaryDismissed()
+        vm.type("35")
+        assertNull(vm.uiState.value.confirmingLargeGrams)
+        assertEquals(35, vm.uiState.value.summaryGrams)
+        vm.send()
+        coVerify(exactly = 1) { launcher.launch(any<Command>(), any(), false) }
+        coVerify(exactly = 0) { launcher.launch(any<Command>(), any(), true) }
+    }
+
+    @Test
+    fun `LIM-09 extraConfirmed nie przecieka po onStop`() = runTest(main.dispatcher) {
+        val vm = viewModel()
+        settle()
+        vm.type("41")
+        vm.onLargeAmountConfirmed()
+        vm.onStop()
+        vm.type("35")
+        assertNull(vm.uiState.value.confirmingLargeGrams)
+        assertEquals(35, vm.uiState.value.summaryGrams)
+        vm.send()
+        coVerify(exactly = 1) { launcher.launch(any<Command>(), any(), false) }
+        coVerify(exactly = 0) { launcher.launch(any<Command>(), any(), true) }
+    }
+
+    @Test
+    fun `LIM-05 LoadFailed - Dalej i szybka wartosc nic nie robia`() = runTest(main.dispatcher) {
+        limits.setState(CommandLimitsState.LoadFailed)
+        val vm = viewModel()
+        settle()
+        vm.type("20")
+        assertNull(vm.uiState.value.summaryGrams)
+        assertNull(vm.uiState.value.confirmingLargeGrams)
+        assertNull(vm.uiState.value.carbsError)
+        vm.onQuickValueClicked(20)
+        settle()
+        assertNull(vm.uiState.value.summaryGrams)
+        assertNull(vm.uiState.value.confirmingLargeGrams)
     }
 }
