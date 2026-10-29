@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.ui.commands.ResultMessage
 import pl.twojanazwa.aapsremote.ui.commands.resultMessageText
 import pl.twojanazwa.aapsremote.ui.commands.textRes
 import pl.twojanazwa.aapsremote.ui.commands.titleRes
@@ -42,11 +43,22 @@ fun HistoryMessage.textRes(): Int = when (this) {
 @StringRes
 fun HistoryResultView.titleRes(): Int = kind?.titleRes() ?: R.string.history_kind_unrecognized
 
-/** message == null -> history_result_details_missing, inaczej ResultMessage.textRes() (Spec 009). */
+/**
+ * message == null -> history_result_details_missing, PROFILE_LIST -> neutralny tekst bez „Wybierz profil”
+ * (w historii nie ma przycisków wyboru), inaczej ResultMessage.textRes() (Spec 009).
+ */
 @StringRes
-fun HistoryResultView.messageRes(): Int = message?.textRes() ?: R.string.history_result_details_missing
+fun HistoryResultView.messageRes(): Int = when (message) {
+    null -> R.string.history_result_details_missing
+    ResultMessage.PROFILE_LIST_REPLY -> R.string.history_result_profile_list_reply
+    else -> message.textRes()
+}
 
 /** Tekst wyniku z argumentem (gramy, minuty albo ilość bolusa). */
 @Composable
 internal fun historyMessageText(result: HistoryResultView): String =
-    result.message?.let { resultMessageText(it, result.messageArg) } ?: stringResource(result.messageRes())
+    if (result.message == null || result.message == ResultMessage.PROFILE_LIST_REPLY) {
+        stringResource(result.messageRes())
+    } else {
+        resultMessageText(result.message, result.messageArg)
+    }

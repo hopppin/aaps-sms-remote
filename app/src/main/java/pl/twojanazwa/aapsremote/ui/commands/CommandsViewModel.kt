@@ -193,9 +193,12 @@ class CommandsViewModel @Inject constructor(
         when (val result = Command.ProfileSwitch.parsePercent(form.choice, form.percentText)) {
             is ProfileSwitchValidation.Invalid ->
                 local.update { it.copy(profile = form.copy(error = result.error)) }
-            is ProfileSwitchValidation.Valid -> {
-                local.update { it.copy(profile = null) }
-                openSummary(result.command, extraConfirmed = false)
+            // Jedna aktualizacja: nigdy nie ma chwili bez formularza i bez podsumowania (secureWindow).
+            is ProfileSwitchValidation.Valid -> local.update {
+                it.copy(
+                    profile = null, confirming = null, summary = SummaryState(result.command),
+                    pinText = "", extraConfirmed = false,
+                )
             }
         }
     }

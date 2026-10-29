@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchError
+import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.security.LoadResult
 import pl.twojanazwa.aapsremote.security.SecretState
 import pl.twojanazwa.aapsremote.session.SessionTestFixtures
@@ -86,6 +88,27 @@ class CommandsViewModelProfileTest {
         assertEquals(Triple(1, "LocalProfile1", 115), Triple(launched.number, launched.profileName, launched.percent))
         s.env.coordinator.activeSession.value?.cancel()
         settle()
+    }
+
+    @Test
+    fun `PROF-15 wysylka zmiany profilu dziala, gdy limity sa LoadFailed lub niewczytane`() = runTest(main.dispatcher) {
+        for (limits in listOf(CommandLimitsState.LoadFailed, CommandLimitsState.Loading)) {
+            val s = setup()
+            s.env.limits.setState(limits)
+            s.env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
+            s.choose(1, "LocalProfile1")
+            s.next("115")
+            checkNotNull(s.state().summary)
+            s.vm.onPinChanged("4321")
+            s.vm.onSendClicked()
+            settle()
+            main.dispatcher.scheduler.advanceTimeBy(1_000)
+            main.dispatcher.scheduler.runCurrent()
+            assertEquals(listOf("PROFILE 1 115"), s.env.sender.sentCommands, limits.toString())
+            assertNotNull(s.env.currentRun.state.value, limits.toString())
+            s.env.coordinator.activeSession.value?.cancel()
+            settle()
+        }
     }
 
     @Test
@@ -186,7 +209,7 @@ class CommandsViewModelProfileTest {
         val strings = File("src/main/res/values/strings.xml").readText()
         for (
             expected in listOf(
-                "Profil: %1\$d. %2\$s", "Procent (%%)", "Podaj procent (%1\$d–%2\$d).", "Tylko cyfry.",
+                "Profil: %1\$d. %2\$s", "Procent (%)","Podaj procent (%1\$d–%2\$d).", "Tylko cyfry.",
                 "Najmniejszy procent to %1\$d.", "Największy procent to %1\$d.",
                 "Zmienić profil na %1\$s (%2\$d%%)?",
                 "Aplikacja wyśle %1\$s, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %2\$s %3\$d%%.",

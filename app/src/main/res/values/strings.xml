@@ -86,7 +86,7 @@
     <string name="commands_summary_title">Wysłać CARBS %1$d g do AAPS?</string>
     <string name="commands_summary_text">Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g.</string>
     <string name="commands_profile_form_title">Profil: %1$d. %2$s</string>
-    <string name="commands_profile_percent_label">Procent (%%)</string>
+    <string name="commands_profile_percent_label" formatted="false">Procent (%)</string>
     <string name="commands_profile_next">Dalej</string>
     <string name="commands_profile_error_empty">Podaj procent (%1$d–%2$d).</string>
     <string name="commands_profile_error_invalid_characters">Tylko cyfry.</string>
@@ -237,6 +237,7 @@
     <string name="history_command_unrecognized">Nieznane polecenie</string>
     <string name="history_kind_unrecognized">Nierozpoznany wynik</string>
     <string name="history_result_details_missing">Brak szczegółów wyniku (wpis z innej wersji aplikacji).</string>
+    <string name="history_result_profile_list_reply">Odpowiedź AAPS na PROFILE LIST.</string>
     <string name="history_details_title">Szczegóły polecenia</string>
     <string name="history_time_started">Rozpoczęcie</string>
     <string name="history_time_command_sent">Wysłanie polecenia</string>
