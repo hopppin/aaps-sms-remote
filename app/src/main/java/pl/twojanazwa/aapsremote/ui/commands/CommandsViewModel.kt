@@ -86,6 +86,11 @@ class CommandsViewModel @Inject constructor(
 
     fun onPumpClicked() = startNoCode(Command.Pump)
 
+    /** PROF-13: jak `BG`, bez sekretu i limitów. */
+    fun onProfileStatusClicked() = startNoCode(Command.ProfileStatus)
+
+    fun onProfileListClicked() = startNoCode(Command.ProfileList)
+
     fun onCarbsInputChanged(text: String) {
         local.update { it.copy(carbsInput = text, carbsError = null) }
     }

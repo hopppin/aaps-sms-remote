@@ -69,6 +69,25 @@ class ProgressStepsTest {
     }
 
     @Test
+    fun `PROF-16 PROFILE_SWITCH ma kroki jak CARBS w kazdej fazie`() {
+        SessionPhase.entries.forEach { phase ->
+            assertEquals(
+                ProgressSteps.of(CommandId.CARBS, phase),
+                ProgressSteps.of(CommandId.PROFILE_SWITCH, phase),
+                "faza $phase",
+            )
+        }
+    }
+
+    @Test
+    fun `PROF-16 PROFILE_STATUS i PROFILE_LIST maja kroki jak BG w kazdej fazie`() {
+        SessionPhase.entries.forEach { phase ->
+            assertEquals(ProgressSteps.of(CommandId.BG, phase), ProgressSteps.of(CommandId.PROFILE_STATUS, phase))
+            assertEquals(ProgressSteps.of(CommandId.BG, phase), ProgressSteps.of(CommandId.PROFILE_LIST, phase))
+        }
+    }
+
+    @Test
     fun `CMDUI-18 tryb anulowania zalezy od fazy`() {
         val cancel = listOf(
             SessionPhase.NOT_STARTED, SessionPhase.SENDING_COMMAND, SessionPhase.AWAITING_REPLY,

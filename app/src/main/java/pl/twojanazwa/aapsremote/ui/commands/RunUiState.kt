@@ -7,6 +7,8 @@ sealed interface RunView {
     val commandId: CommandId
     val commandGrams: Int?
     val commandCentiUnits: Int?
+    val profileName: String?
+    val profilePercent: Int?
 
     data class Active(
         override val commandId: CommandId,
@@ -15,6 +17,8 @@ sealed interface RunView {
         val steps: List<ProgressStep>,
         val cancelMode: CancelMode,
         val unexpectedCount: Int,
+        override val profileName: String? = null,
+        override val profilePercent: Int? = null,
     ) : RunView {
         /** CMDUI-26: bez ilości. */
         override fun toString(): String = "Active(commandId=$commandId, cancelMode=$cancelMode, ***)"
@@ -24,12 +28,16 @@ sealed interface RunView {
         override val commandId: CommandId get() = result.commandId
         override val commandGrams: Int? get() = result.commandGrams
         override val commandCentiUnits: Int? get() = result.commandCentiUnits
+        override val profileName: String? get() = result.profileName
+        override val profilePercent: Int? get() = result.profilePercent
     }
 }
 
 data class RunUiState(
     val view: RunView? = null,
     val commandActive: Boolean = false,
+    /** PROF-14: wybór pozycji listy jest możliwy tylko bez ABSENT / INVALIDATED. */
+    val secret: SecretReadiness = SecretReadiness.UNKNOWN,
     val confirmingStopWaiting: Boolean = false,
     val confirmingExit: Boolean = false,
     /** Jednorazowe żądanie Activity.finish() (CMDUI-24); kasowane przez onExitHandled. */

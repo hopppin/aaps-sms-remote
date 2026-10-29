@@ -82,7 +82,7 @@ package pl.twojanazwa.aapsremote.ui.commands
     fun clear()
 }
 // ResultView: + profileItems: List<ProfileChoice>? (tylko Completed PROFILE_LIST).
-// CommandRunViewModel.onProfileChosen(number): select + onResultDismissed().
+// CommandRunViewModel.onProfileChosen(number): select + onResultDismissed(). CommandRunViewModel dostaje TotpSecretStore (tylko `state`, bez `load()`) i ProfileSelection; wybór blokuje się przy ABSENT / INVALIDATED na bieżącym `secrets.state.value`, nie na kopii w `RunUiState`.
 // CommandsViewModel: onProfileStatusClicked, onProfileListClicked, onProfilePercentChanged,
 //   onProfileNextClicked, onProfileFormCancelled; formularz: ProfileFormState(choice, percentText, error).
 ```

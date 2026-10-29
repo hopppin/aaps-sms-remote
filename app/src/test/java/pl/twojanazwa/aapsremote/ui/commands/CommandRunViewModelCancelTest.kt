@@ -24,7 +24,7 @@ class CommandRunViewModelCancelTest {
     @RegisterExtension
     val main = MainDispatcherExtension()
 
-    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator)
+    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator, ProfileSelection(), secrets)
 
     private suspend fun CommandTestEnv.startCarbs1(): CommandRunViewModel {
         secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))

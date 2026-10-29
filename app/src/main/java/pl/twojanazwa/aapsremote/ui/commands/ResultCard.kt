@@ -11,6 +11,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,7 +21,13 @@ import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CommandId
 
 @Composable
-fun ResultCard(result: ResultView, onResultDismissed: () -> Unit, modifier: Modifier = Modifier) {
+fun ResultCard(
+    result: ResultView,
+    secret: SecretReadiness,
+    onProfileChosen: (Int) -> Unit,
+    onResultDismissed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val container = when (result.kind) {
         ResultKind.SUCCESS -> MaterialTheme.colorScheme.primaryContainer
         ResultKind.FAILURE -> MaterialTheme.colorScheme.errorContainer
@@ -32,7 +39,10 @@ fun ResultCard(result: ResultView, onResultDismissed: () -> Unit, modifier: Modi
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            commandTitle(result.commandId, result.commandGrams, result.commandCentiUnits),
+            commandTitle(
+                result.commandId, result.commandGrams, result.commandCentiUnits,
+                result.profileName, result.profilePercent,
+            ),
             style = MaterialTheme.typography.headlineSmall,
         )
         Card(colors = CardDefaults.cardColors(containerColor = container)) {
@@ -52,6 +62,18 @@ fun ResultCard(result: ResultView, onResultDismissed: () -> Unit, modifier: Modi
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+        }
+        result.profileItems?.takeIf { it.isNotEmpty() }?.let { items ->
+            // PROF-14: pozycje nieaktywne przy braku sekretu, z banerem.
+            val enabled = secret != SecretReadiness.ABSENT && secret != SecretReadiness.INVALIDATED
+            secret.bannerRes()?.let { Card { Text(stringResource(it), Modifier.padding(16.dp)) } }
+            items.forEach { item ->
+                OutlinedButton(
+                    onClick = { onProfileChosen(item.number) },
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.result_profile_item, item.number, item.name)) }
             }
         }
         Button(onClick = onResultDismissed, modifier = Modifier.fillMaxWidth()) {

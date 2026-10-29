@@ -2,13 +2,19 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
+import pl.twojanazwa.aapsremote.commands.ProfileChoice
+import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionResult
 import pl.twojanazwa.aapsremote.session.SessionTimeouts
 
 private fun ResultMessage.forCommand(command: Command): ResultMessage =
-    if (command is Command.Bolus) forBolus() else this
+    when (command) {
+        is Command.Bolus -> forBolus()
+        is Command.ProfileSwitch -> forProfile()
+        else -> this
+    }
 
 object ResultMapper {
     /** CMDUI-19, CMDUI-20. Powody i fazy odwzorowuje ResultMessages.kt (wspólne z historią, HISTUI-04). */
@@ -16,6 +22,7 @@ object ResultMapper {
         val command = result.command
         val outcome = result.outcome
 
+        var items: List<ProfileChoice>? = null
         val kind: ResultKind
         val message: ResultMessage
         var arg: Int? = null
@@ -29,10 +36,15 @@ object ResultMapper {
                     is Command.Pump -> ResultMessage.PUMP_REPLY
                     is Command.Carbs -> ResultMessage.DETAILS_MISSING
                     is Command.Bolus -> ResultMessage.DETAILS_MISSING
-                    is Command.ProfileStatus, is Command.ProfileList, is Command.ProfileSwitch ->
-                        ResultMessage.DETAILS_MISSING
+                    is Command.ProfileStatus -> ResultMessage.PROFILE_STATUS_REPLY
+                    is Command.ProfileList -> ResultMessage.PROFILE_LIST_REPLY
+                    is Command.ProfileSwitch -> ResultMessage.DETAILS_MISSING
                 }
                 text = outcome.text
+                val reply = outcome.reply
+                if (command is Command.ProfileList && reply is AapsReply.ProfileListReport) {
+                    items = reply.items.map { ProfileChoice(it.number, it.name) }
+                }
             }
             is SessionOutcome.CarbsConfirmed -> {
                 kind = ResultKind.SUCCESS
@@ -79,6 +91,9 @@ object ResultMapper {
             commandId = command.id,
             commandGrams = (command as? Command.Carbs)?.grams,
             commandCentiUnits = (command as? Command.Bolus)?.centiUnits,
+            profileName = (command as? Command.ProfileSwitch)?.profileName,
+            profilePercent = (command as? Command.ProfileSwitch)?.percent,
+            profileItems = items,
             kind = kind,
             message = message,
             messageArg = arg,

@@ -73,7 +73,7 @@ class CommandRunViewModelResultTest {
     @Test
     fun `CMDUI-21 wynik Completed i onResultDismissed czysci widok i CurrentRun`() = runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
-        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
+        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
         finishedBg(env)
         assertTrue(viewModel.uiState.value.view is RunView.Finished)
 
@@ -87,7 +87,7 @@ class CommandRunViewModelResultTest {
     @Test
     fun `CMDUI-21 onResultDismissed w trakcie przebiegu nic nie zmienia`() = runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
-        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
+        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
         env.launcher().launch(Command.Bg, null)
         runCurrent()
         val before = viewModel.uiState.value
@@ -105,7 +105,7 @@ class CommandRunViewModelResultTest {
     fun `CMDUI-21 pola ViewModelu i stanu wyniku nie trzymaja sesji ani sekretow ani strumieni`() =
         runTest(main.dispatcher) {
             val env = CommandTestEnv(this)
-            val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
+            val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
             val session = finishedBg(env)
             val state = viewModel.uiState.value
 
@@ -140,7 +140,7 @@ class CommandRunViewModelResultTest {
     @Test
     fun `CMDUI-21 po zamknieciu wyniku ViewModel stan i CurrentRun nie wskazuja sesji`() = runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
-        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
+        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
         val session = finishedBg(env)
         viewModel.onResultDismissed()
         runCurrent()
@@ -162,7 +162,7 @@ class CommandRunViewModelResultTest {
         val constructor = CommandRunViewModel::class.java.declaredConstructors.single()
         assertNotNull(constructor.getAnnotation(Inject::class.java))
         assertFalse(constructor.parameterTypes.any { it.name.endsWith("SavedStateHandle") })
-        assertEquals(2, constructor.parameterCount)
+        assertEquals(4, constructor.parameterCount)
         val sources = java.io.File("src/main/java/pl/twojanazwa/aapsremote/ui/commands")
             .walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
         assertTrue(sources.any { it.name == "CommandRunViewModel.kt" })

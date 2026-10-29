@@ -31,6 +31,8 @@ fun CommandsPanel(
     state: CommandsUiState,
     onBgClicked: () -> Unit,
     onPumpClicked: () -> Unit,
+    onProfileStatusClicked: () -> Unit,
+    onProfileListClicked: () -> Unit,
     onCarbsInputChanged: (String) -> Unit,
     onQuickValueClicked: (Int) -> Unit,
     onCarbsNextClicked: () -> Unit,
@@ -144,6 +146,26 @@ fun CommandsPanel(
                     enabled = state.canStartBolus,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.commands_bolus_next)) }
+            }
+        }
+
+        // PROF-13: dostępność jak BG; bez sekretu i limitów.
+        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.commands_profile_title), style = MaterialTheme.typography.titleLarge)
+                FilledTonalButton(
+                    onClick = onProfileStatusClicked,
+                    enabled = state.canSendNoCode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.commands_profile_status)) }
+                FilledTonalButton(
+                    onClick = onProfileListClicked,
+                    enabled = state.canSendNoCode,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.commands_profile_list)) }
             }
         }
     }

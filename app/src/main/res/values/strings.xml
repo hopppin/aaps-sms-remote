@@ -144,7 +144,7 @@
     <string name="run_title_bolus">Polecenie BOLUS %1$s j.</string>
     <string name="run_title_profile_status">Polecenie PROFILE STATUS</string>
     <string name="run_title_profile_list">Polecenie PROFILE LIST</string>
-    <string name="run_title_profile_switch">Zmiana profilu</string>
+    <string name="run_title_profile_switch">Zmiana profilu: %1$s %2$d%%</string>
     <string name="run_step_send_command">Wysyłanie SMS z poleceniem</string>
     <string name="run_step_await_reply">Czekanie na odpowiedź AAPS (do %1$d min)</string>
     <string name="run_step_await_code_request">Czekanie na prośbę AAPS o kod (do %1$d min)</string>
@@ -180,6 +180,15 @@
     <string name="result_unknown_warning_bolus">Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.</string>
     <string name="history_command_bolus">BOLUS %1$s j.</string>
     <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>
+    <string name="result_profile_status_reply">Odpowiedź AAPS na PROFILE STATUS</string>
+    <string name="result_profile_list_reply">Lista profili z AAPS. Wybierz profil, aby go zmienić.</string>
+    <string name="result_profile_amount_mismatch">AAPS podał inny profil lub procent niż wybrany. Pobierz listę ponownie.</string>
+    <string name="result_profile_unknown_amount_mismatch">Po wysłaniu kodu AAPS podał inny profil lub procent.</string>
+    <string name="result_profile_unknown_unrecognized_reply">Po wysłaniu kodu przyszła odpowiedź AAPS, której aplikacja nie rozpoznaje. Przeczytaj treść SMS i sprawdź w AAPS.</string>
+    <string name="result_profile_item">%1$d. %2$s</string>
+    <string name="commands_profile_title">Profil</string>
+    <string name="commands_profile_status">Aktualny profil</string>
+    <string name="commands_profile_list">Zmień profil…</string>
     <string name="result_details_missing">Brak szczegółów wyniku.</string>
     <string name="result_send_failed">Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.</string>
     <string name="result_unrecognized_reply">Nierozpoznana odpowiedź AAPS.</string>

@@ -36,6 +36,11 @@ fun ResultMessage.textRes(): Int = when (this) {
     ResultMessage.BOLUS_CONFIRMED -> R.string.result_bolus_confirmed
     ResultMessage.BOLUS_AMOUNT_MISMATCH -> R.string.result_bolus_amount_mismatch
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY -> R.string.result_bolus_unknown_unrecognized_reply
+    ResultMessage.PROFILE_STATUS_REPLY -> R.string.result_profile_status_reply
+    ResultMessage.PROFILE_LIST_REPLY -> R.string.result_profile_list_reply
+    ResultMessage.PROFILE_AMOUNT_MISMATCH -> R.string.result_profile_amount_mismatch
+    ResultMessage.PROFILE_UNKNOWN_AMOUNT_MISMATCH -> R.string.result_profile_unknown_amount_mismatch
+    ResultMessage.PROFILE_UNKNOWN_UNRECOGNIZED_REPLY -> R.string.result_profile_unknown_unrecognized_reply
     ResultMessage.DETAILS_MISSING -> R.string.result_details_missing
     ResultMessage.SEND_FAILED -> R.string.result_send_failed
     ResultMessage.UNRECOGNIZED_REPLY -> R.string.result_unrecognized_reply
@@ -77,7 +82,14 @@ fun unknownWarningRes(bolus: Boolean): Int =
 
 /** Nagłówek przebiegu i wyniku z ilością (CARBS w gramach, BOLUS w setnych jednostki). */
 @Composable
-fun commandTitle(id: CommandId, grams: Int?, centiUnits: Int?): String = when {
+fun commandTitle(
+    id: CommandId,
+    grams: Int?,
+    centiUnits: Int?,
+    profileName: String? = null,
+    profilePercent: Int? = null,
+): String = when {
+    profileName != null && profilePercent != null -> stringResource(id.titleRes(), profileName, profilePercent)
     grams != null -> stringResource(id.titleRes(), grams)
     centiUnits != null -> stringResource(id.titleRes(), formatCentiUnits(centiUnits))
     else -> stringResource(id.titleRes())
