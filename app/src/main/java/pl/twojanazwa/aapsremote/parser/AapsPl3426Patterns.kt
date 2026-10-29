@@ -27,5 +27,14 @@ internal object AapsPl3426Patterns {
 
     val BOLUS_DONE_FIRST_LINE = Regex("""Bolus $U U podany prawidlowo""")
 
+    // Spec 013: profil. Nazwa to dowolny tekst bez LF; procent 1-9999.
+    val PROFILE_STATUS = Regex("""([^\n]+) \(([1-9][0-9]{0,3})%\)""")
+
+    val PROFILE_LIST_LINE = Regex("""([1-9][0-9]?)\. ([^\n]+)""")
+
+    val PROFILE_CODE_REQUEST = Regex(
+        """Aby przelaczyc profil na ([^\n]+) ([1-9][0-9]{0,3})% odpowiedz kodem z aplikacji Authenticator dla: [^\n]+, z doklejonym PIN-em""",
+    )
+
     val WRONG_CODE = Regex("""Zly kod\. Polecenie anulowano\.""")
 }

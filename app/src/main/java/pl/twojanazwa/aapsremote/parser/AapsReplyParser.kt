@@ -23,10 +23,39 @@ object AapsReplyParser {
 
             is ExpectedCommand.Bolus -> parseBolus(n, firstLine, body, expected.centiUnits)
 
-            // Wzorce profilu - spec 013, zad. 2; do tego czasu polecenia profilu nie odsyłają kodu.
-            ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, is ExpectedCommand.ProfileSwitch -> null
+            ExpectedCommand.ProfileStatus -> parseProfileStatus(n, body)
+
+            ExpectedCommand.ProfileList -> parseProfileList(n, body)
+
+            is ExpectedCommand.ProfileSwitch -> parseProfileSwitch(n, body, expected)
         }
         return result ?: AapsReply.Unrecognized(body)
+    }
+
+    private fun parseProfileStatus(n: String, body: String): AapsReply? {
+        val name = AapsPl3426Patterns.PROFILE_STATUS.matchEntire(n)?.groupValues?.get(1) ?: return null
+        return if (name.startsWith(' ')) null else AapsReply.ProfileStatusReport(body)
+    }
+
+    private fun parseProfileList(n: String, body: String): AapsReply? {
+        val items = n.split('\n').mapIndexed { i, line ->
+            val m = AapsPl3426Patterns.PROFILE_LIST_LINE.matchEntire(line) ?: return null
+            if (m.groupValues[1].toInt() != i + 1) return null
+            AapsReply.ProfileListItem(i + 1, m.groupValues[2])
+        }
+        if (items.map { it.name }.toSet().size != items.size) return null
+        return AapsReply.ProfileListReport(items, body)
+    }
+
+    private fun parseProfileSwitch(n: String, body: String, expected: ExpectedCommand.ProfileSwitch): AapsReply? {
+        if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
+        val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues ?: return null
+        // Porównanie dokładne (wielkość liter); inaczej stop, nigdy kod (PROF-09).
+        return if (g[1] == expected.profileName && g[2].toInt() == expected.percent) {
+            AapsReply.ProfileCodeRequest(body)
+        } else {
+            AapsReply.ProfileSwitchMismatch(body)
+        }
     }
 
     private fun centiUnits(m: MatchResult): Int = m.groupValues[1].toInt() * 100 + m.groupValues[2].toInt()
