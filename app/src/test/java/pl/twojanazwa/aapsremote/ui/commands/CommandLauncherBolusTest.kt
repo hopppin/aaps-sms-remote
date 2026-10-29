@@ -1,17 +1,28 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.commands.LimitsValidation
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
+import pl.twojanazwa.aapsremote.data.CommandLimitsStore
+import pl.twojanazwa.aapsremote.data.SaveLimitsResult
+import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.data.HistoryCommand
 import pl.twojanazwa.aapsremote.data.HistoryEntry
 import pl.twojanazwa.aapsremote.data.HistoryOutcome
@@ -134,5 +145,87 @@ class CommandLauncherBolusTest {
         val env = env(this)
         env.limits.setState(CommandLimitsState.LoadFailed)
         env.assertRejected(LaunchRejection.LIMITS_UNAVAILABLE)
+    }
+
+    @Test
+    fun `BOL-12 wyjatek ze strumienia historii daje BOLUS_HISTORY_UNAVAILABLE`() = runTest {
+        val env = env(this)
+        env.history.entries = flow { throw IllegalStateException("blad odczytu") }
+        env.assertRejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE)
+    }
+
+    @Test
+    fun `BOL-12 CancellationException z historii jest propagowany, a PIN wyczyszczony`() = runTest {
+        val env = env(this)
+        env.history.entries = flow { throw CancellationException("anulowano") }
+        val pin = CommandTestFixtures.pin()
+
+        assertThrows(CancellationException::class.java) {
+            runBlocking { env.launcher().launch(bolus(10), pin) }
+        }
+
+        assertTrue(pin.isCleared)
+        assertEquals(1, env.secrets.loadResults.size) // load() niewywołane
+        assertNull(env.coordinator.activeSession.value)
+    }
+
+    @Test
+    fun `BOL-12 wyjatek z zegara daje BOLUS_HISTORY_UNAVAILABLE`() = runTest {
+        val env = env(this)
+        val pin = CommandTestFixtures.pin()
+        val launcher = CommandLauncher(
+            env.coordinator, env.numbers, env.limits, env.permissions, env.secrets, env.recorder, env.history,
+            EpochClock { throw IllegalStateException("zegar") }, env.currentRun, env.appScope,
+        )
+
+        assertEquals(
+            LaunchResult.Rejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE),
+            launcher.launch(bolus(10), pin),
+        )
+        assertTrue(pin.isCleared)
+        assertEquals(1, env.secrets.loadResults.size) // load() niewywołane
+        assertNull(env.coordinator.activeSession.value)
+    }
+
+    @Test
+    fun `BOL-12 EXTRA_CONFIRMATION_REQUIRED ma pierwszenstwo przed BOLUS_INTERVAL`() = runTest {
+        val env = env(this, bolusEntry(HistoryOutcome.BolusConfirmed, codeSentAt = T0 - 60_000))
+        env.setLimits(bolusMax = 100)
+        env.assertRejected(LaunchRejection.EXTRA_CONFIRMATION_REQUIRED, amount = 60)
+    }
+
+    @Test
+    fun `BOL-12 limity i odstep pochodza z jednej migawki odczytanej raz`() = runTest {
+        val env = env(this)
+        val state = mockk<StateFlow<CommandLimitsState>>()
+        every { state.value } returnsMany listOf(
+            CommandLimitsState.Loaded((CommandLimits.of(50, 500, 15) as LimitsValidation.Valid).limits),
+            CommandLimitsState.LoadFailed,
+        )
+        val store = object : CommandLimitsStore {
+            override val state = state
+            override suspend fun save(limits: CommandLimits) = SaveLimitsResult.Saved
+        }
+        val launcher = CommandLauncher(
+            env.coordinator, env.numbers, store, env.permissions, env.secrets, env.recorder, env.history, env.clock,
+            env.currentRun, env.appScope,
+        )
+
+        assertEquals(LaunchResult.Started, launcher.launch(bolus(10), CommandTestFixtures.pin()))
+        verify(exactly = 1) { state.value }
+        env.coordinator.activeSession.value?.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `BOL-12 1 ms przed koncem odstepu 1 min nadal blokuje, dokladnie na koncu startuje`() = runTest {
+        val before = env(this, bolusEntry(HistoryOutcome.BolusConfirmed, codeSentAt = T0 - 59_999))
+        before.setLimits(interval = 1)
+        before.assertRejected(LaunchRejection.BOLUS_INTERVAL, 1)
+
+        val exact = env(this, bolusEntry(HistoryOutcome.BolusConfirmed, codeSentAt = T0 - 60_000))
+        exact.setLimits(interval = 1)
+        exact.assertStarted()
+        runCurrent()
     }
 }

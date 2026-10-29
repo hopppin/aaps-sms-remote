@@ -99,6 +99,11 @@ internal fun rememberHistoryZone(): ZoneId {
 @Composable
 internal fun historyCommandText(command: HistoryCommandLabel, grams: Int?, bolusCentiUnits: Int?): String = when (command) {
     HistoryCommandLabel.CARBS -> stringResource(command.textRes(), grams ?: 0)
-    HistoryCommandLabel.BOLUS -> stringResource(command.textRes(), formatCentiUnits(bolusCentiUnits ?: 0))
+    HistoryCommandLabel.BOLUS ->
+        if (bolusCentiUnits == null) {
+            stringResource(HistoryCommandLabel.BOLUS_NO_AMOUNT.textRes())
+        } else {
+            stringResource(command.textRes(), formatCentiUnits(bolusCentiUnits))
+        }
     else -> stringResource(command.textRes())
 }

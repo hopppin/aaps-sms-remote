@@ -132,7 +132,14 @@ class CommandLauncher @Inject constructor(
         }
         val entries = (snapshot as? HistorySnapshot.Entries)?.entries
             ?: return LaunchResult.Rejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE)
-        val left = BolusInterval.minutesLeft(entries, clock.nowEpochMillis(), intervalMinutes) ?: return null
+        // Wyjątek zegara lub obliczenia = bezpieczna strona (blokada), launch nie rzuca.
+        val left = try {
+            BolusInterval.minutesLeft(entries, clock.nowEpochMillis(), intervalMinutes)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return LaunchResult.Rejected(LaunchRejection.BOLUS_HISTORY_UNAVAILABLE)
+        } ?: return null
         return LaunchResult.Rejected(LaunchRejection.BOLUS_INTERVAL, left)
     }
 }
