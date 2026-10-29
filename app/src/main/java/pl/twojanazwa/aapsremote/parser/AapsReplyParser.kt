@@ -21,10 +21,29 @@ object AapsReplyParser {
 
             is ExpectedCommand.Carbs -> parseCarbs(n, firstLine, body, expected.grams)
 
-            // Parser bolusa: spec 012, zad. 2. Do tego czasu nic nie jest rozpoznawane.
-            is ExpectedCommand.Bolus -> null
+            is ExpectedCommand.Bolus -> parseBolus(n, firstLine, body, expected.centiUnits)
         }
         return result ?: AapsReply.Unrecognized(body)
+    }
+
+    private fun centiUnits(m: MatchResult): Int = m.groupValues[1].toInt() * 100 + m.groupValues[2].toInt()
+
+    private fun parseBolus(n: String, firstLine: String, body: String, expected: Int): AapsReply? {
+        if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
+        AapsPl3426Patterns.BOLUS_CODE_REQUEST.matchEntire(n)?.let {
+            val received = centiUnits(it)
+            return if (received == expected) {
+                AapsReply.BolusCodeRequest(received, body)
+            } else {
+                AapsReply.BolusAmountMismatch(expected, received, CarbsStage.CODE_REQUEST, body)
+            }
+        }
+        val done = AapsPl3426Patterns.BOLUS_DONE_FIRST_LINE.matchEntire(firstLine)?.let(::centiUnits) ?: return null
+        return if (done == expected) {
+            AapsReply.BolusDone(done, body)
+        } else {
+            AapsReply.BolusAmountMismatch(expected, done, CarbsStage.CONFIRMATION, body)
+        }
     }
 
     private fun parseCarbs(n: String, firstLine: String, body: String, expectedGrams: Int): AapsReply? {

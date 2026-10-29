@@ -18,5 +18,14 @@ internal object AapsPl3426Patterns {
 
     val CARBS_DONE_FIRST_LINE = Regex("""Pomyslnie wprowadzono $G g weglowodanow""")
 
+    // Ilość bolusa: tylko przecinek i dokładnie 2 miejsca (spec 012, BOL-07).
+    private const val U = """(0|[1-9][0-9]{0,2}),([0-9]{2})"""
+
+    val BOLUS_CODE_REQUEST = Regex(
+        """Aby dostarczyc bolus ${U}U wprowadz kod z aplikacji Authenticator dla: [^\n]+, z doklejonym PIN-em""",
+    )
+
+    val BOLUS_DONE_FIRST_LINE = Regex("""Bolus $U U podany prawidlowo""")
+
     val WRONG_CODE = Regex("""Zly kod\. Polecenie anulowano\.""")
 }

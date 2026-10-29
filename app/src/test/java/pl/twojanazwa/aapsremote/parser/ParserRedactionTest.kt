@@ -56,6 +56,11 @@ class ParserRedactionTest {
     }
 
     @Test
+    fun `BOL-09 toString kontekstu Bolus nie zawiera ilosci`() {
+        assertFalse(ExpectedCommand.Bolus(137).toString().contains("137"))
+    }
+
+    @Test
     fun `PARSER-10 toString kontekstu CARBS nie zawiera ilosci`() {
         assertFalse(ExpectedCommand.Carbs(37).toString().contains("37"))
     }
