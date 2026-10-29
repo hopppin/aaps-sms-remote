@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CommandSmsTextTest {
-    private fun carbs(g: Int) = (Command.Carbs.of(g) as CarbsValidation.Valid).command
+    private fun carbs(g: Int) = (Command.Carbs.of(g, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
     fun `CMD-07 BG to tekst BG`() {
@@ -33,7 +33,7 @@ class CommandSmsTextTest {
 
     @Test
     fun `CMD-07 tekst 007 daje CARBS 7`() {
-        val command = (Command.Carbs.parse("007") as CarbsValidation.Valid).command
+        val command = (Command.Carbs.parse("007", CommandLimits.DEFAULT) as CarbsValidation.Valid).command
         assertEquals("CARBS 7", command.smsText())
     }
 

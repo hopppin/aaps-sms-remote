@@ -6,8 +6,6 @@ sealed interface CommandParameter {
 
     data class Grams(
         val min: Int,
-        val max: Int,
-        val extraConfirmationAboveGrams: Int,
         val quickValues: List<Int>,
     ) : CommandParameter
 }

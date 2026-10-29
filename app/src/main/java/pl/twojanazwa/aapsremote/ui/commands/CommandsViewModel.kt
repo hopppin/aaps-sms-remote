@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.AapsNumberSettingsStore
 import pl.twojanazwa.aapsremote.security.AapsPin
 import pl.twojanazwa.aapsremote.security.TotpSecretStore
@@ -80,12 +81,12 @@ class CommandsViewModel @Inject constructor(
 
     fun onCarbsNextClicked() {
         if (!compose().canStartCarbs) return
-        when (val result = Command.Carbs.parse(local.value.carbsInput)) {
+        when (val result = Command.Carbs.parse(local.value.carbsInput, CommandLimits.DEFAULT)) {
             is CarbsValidation.Invalid ->
                 local.update { it.copy(carbsError = result.error) }
             is CarbsValidation.Valid -> {
                 val carbs = result.command
-                if (carbs.requiresExtraConfirmation) {
+                if (carbs.requiresExtraConfirmation(CommandLimits.DEFAULT)) {
                     local.update { it.copy(confirmingLargeGrams = carbs.grams) }
                 } else {
                     local.update { it.copy(summaryGrams = carbs.grams, pinText = "") }
@@ -132,7 +133,7 @@ class CommandsViewModel @Inject constructor(
         val chars = state.pinText.toCharArray()
         local.update { it.copy(pinText = "") }
         val pin = AapsPin.fromChars(chars)
-        val carbs = (Command.Carbs.of(grams) as? CarbsValidation.Valid)?.command
+        val carbs = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as? CarbsValidation.Valid)?.command
         if (carbs == null) {
             pin.clear()
             local.update { it.copy(summaryGrams = null) }

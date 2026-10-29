@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.HistoryOutcome
 import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionOutcome
@@ -13,7 +14,7 @@ import pl.twojanazwa.aapsremote.session.UnknownReason
 import pl.twojanazwa.aapsremote.ui.commands.ResultMapper
 
 class HistoryResultParityTest {
-    private val command: Command = (Command.Carbs.of(20) as CarbsValidation.Valid).command
+    private val command: Command = (Command.Carbs.of(20, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private fun session(outcome: SessionOutcome) = SessionResult(
         command = command,

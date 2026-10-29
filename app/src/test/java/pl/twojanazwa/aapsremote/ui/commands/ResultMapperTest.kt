@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.IncomingSms
@@ -21,7 +22,7 @@ import kotlin.time.Duration.Companion.minutes
 class ResultMapperTest {
 
     private fun carbs(grams: Int): Command =
-        (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+        (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private fun result(
         command: Command,

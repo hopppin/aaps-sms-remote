@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionResult
@@ -34,7 +35,7 @@ class ResultRedactionTest {
 
     @Test
     fun `CMDUI-26 toString wyniku CarbsConfirmed nie zawiera ilosci ani tresci`() {
-        val command = (Command.Carbs.of(37) as CarbsValidation.Valid).command
+        val command = (Command.Carbs.of(37, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
         val view = ResultMapper.map(
             result(command, SessionOutcome.CarbsConfirmed(37, "Tajna tresc SMS")),
         )

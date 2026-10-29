@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 
@@ -25,7 +26,7 @@ class CommandSessionSendTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs20(): Command = (Command.Carbs.of(20) as CarbsValidation.Valid).command
+    private fun carbs20(): Command = (Command.Carbs.of(20, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private fun TestScope.session(
         command: Command,

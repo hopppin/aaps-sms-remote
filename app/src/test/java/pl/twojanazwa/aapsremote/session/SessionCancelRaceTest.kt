@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 
@@ -16,7 +17,7 @@ class SessionCancelRaceTest {
     @Test
     fun `SESSION-17 1000 powtorzen rownoczesnego cancel i run - zawsze Cancelled bez kodu z PIN-em wyczyszczonym`() =
         runBlocking(Dispatchers.Default) {
-            val command = (Command.Carbs.of(1) as CarbsValidation.Valid).command
+            val command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
             val clock = EpochClock { SessionTestFixtures.T0 }
             repeat(1000) {
                 val credentials = SessionTestFixtures.credentials()

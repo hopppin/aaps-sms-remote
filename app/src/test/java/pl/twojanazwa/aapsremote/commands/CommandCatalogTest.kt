@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class CommandCatalogTest {
-    private fun carbs(g: Int) = (Command.Carbs.of(g) as CarbsValidation.Valid).command
+    private fun carbs(g: Int) = (Command.Carbs.of(g, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
     fun `CMD-01 katalog ma BG PUMP CARBS w tej kolejnosci`() {
@@ -46,7 +46,7 @@ class CommandCatalogTest {
         assertEquals(CommandParameter.None, CommandCatalog.definitionOf(CommandId.BG).parameter)
         assertEquals(CommandParameter.None, CommandCatalog.definitionOf(CommandId.PUMP).parameter)
         assertEquals(
-            CommandParameter.Grams(1, 50, 40, listOf(10, 20, 30)),
+            CommandParameter.Grams(1, listOf(10, 20, 30)),
             CommandCatalog.definitionOf(CommandId.CARBS).parameter,
         )
     }
@@ -89,9 +89,9 @@ class CommandCatalogTest {
     fun `CMD-06 szybkie wartosci sa poprawne i bez dodatkowego potwierdzenia`() {
         val p = CommandCatalog.definitionOf(CommandId.CARBS).parameter as CommandParameter.Grams
         for (g in p.quickValues) {
-            val result = Command.Carbs.of(g)
+            val result = Command.Carbs.of(g, CommandLimits.DEFAULT)
             assertTrue(result is CarbsValidation.Valid)
-            assertFalse((result as CarbsValidation.Valid).command.requiresExtraConfirmation)
+            assertFalse((result as CarbsValidation.Valid).command.requiresExtraConfirmation(CommandLimits.DEFAULT))
         }
     }
 }

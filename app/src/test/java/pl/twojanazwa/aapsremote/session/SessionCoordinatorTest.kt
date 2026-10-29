@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
@@ -36,7 +37,7 @@ class SessionCoordinatorTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private fun TestScope.coordinator(): SessionCoordinator {
         val clock = virtualClock()

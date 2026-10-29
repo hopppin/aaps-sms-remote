@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsLimits
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 
 class CommandTextsTest {
     private val strings: Map<String, String> by lazy {
@@ -35,9 +36,9 @@ class CommandTextsTest {
 
     @Test
     fun `CMDUI-25 ABOVE_MAX podaje MAX_GRAMS jako jedyny argument, BELOW_MIN i EMPTY podaja MIN i MAX`() {
-        assertEquals(listOf(CarbsLimits.MAX_GRAMS), CarbsAmountError.ABOVE_MAX.textArgs())
-        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CarbsLimits.MAX_GRAMS), CarbsAmountError.BELOW_MIN.textArgs())
-        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CarbsLimits.MAX_GRAMS), CarbsAmountError.EMPTY.textArgs())
+        assertEquals(listOf(CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.ABOVE_MAX.textArgs())
+        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.BELOW_MIN.textArgs())
+        assertEquals(listOf(CarbsLimits.MIN_GRAMS, CommandLimits.DEFAULT.carbsMaxGrams), CarbsAmountError.EMPTY.textArgs())
     }
 
     @Test

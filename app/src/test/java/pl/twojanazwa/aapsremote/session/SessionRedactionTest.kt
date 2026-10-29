@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsSamples
@@ -17,7 +18,7 @@ import pl.twojanazwa.aapsremote.parser.AapsSamples
 class SessionRedactionTest {
 
     private fun carbs37(): Command {
-        val valid = Command.Carbs.of(37) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid
+        val valid = Command.Carbs.of(37, CommandLimits.DEFAULT) as pl.twojanazwa.aapsremote.commands.CarbsValidation.Valid
         return valid.command
     }
 

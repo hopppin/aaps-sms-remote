@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 import kotlin.time.Duration.Companion.seconds
 
@@ -21,7 +22,7 @@ class CommandSessionReplyTimeoutTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs1(): Command = (Command.Carbs.of(1) as CarbsValidation.Valid).command
+    private fun carbs1(): Command = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
     fun `SESSION-07 BG bez odpowiedzi - 179999 ms AWAITING_REPLY a 180000 ms TimedOut`() = runTest {

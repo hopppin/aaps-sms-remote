@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.parser.AapsSamples
 import pl.twojanazwa.aapsremote.security.AapsPin
 
@@ -21,7 +22,7 @@ class CarbsSessionCodeTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams) as CarbsValidation.Valid).command
+    private fun carbs(grams: Int): Command = (Command.Carbs.of(grams, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     private suspend fun TestScope.requestAt(millis: Long, body: String = AapsSamples.carbsCodeRequest) {
         advanceTimeBy(millis - currentTime)
