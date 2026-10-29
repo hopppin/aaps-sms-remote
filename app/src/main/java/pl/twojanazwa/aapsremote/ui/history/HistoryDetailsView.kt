@@ -23,15 +23,15 @@ import androidx.compose.ui.unit.dp
 import java.time.ZoneId
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.ui.commands.formatCentiUnits
+import pl.twojanazwa.aapsremote.ui.commands.unknownWarningRes
 
 /** HISTUI-05 – HISTUI-07: szczegóły wpisu; treść SMS jako zwykły tekst bez linków (HISTUI-06). */
 @Composable
 fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
     val zone = rememberHistoryZone()
     val result = details.result
-    val messageText = result.messageArg
-        ?.let { stringResource(result.messageRes(), it) }
-        ?: stringResource(result.messageRes())
+    val messageText = historyMessageText(result)
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -42,7 +42,7 @@ fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = historyCommandText(details.command, details.grams),
+            text = historyCommandText(details.command, details.grams, details.bolusCentiUnits),
             style = MaterialTheme.typography.titleMedium,
         )
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -57,7 +57,9 @@ fun HistoryDetailsView(details: HistoryDetails, onDetailsClosed: () -> Unit) {
                     Text(stringResource(R.string.result_code_not_sent), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (result.unknownWarning) {
-                    Text(stringResource(R.string.result_unknown_warning), style = MaterialTheme.typography.bodyMedium)
+                    val bolus = details.command == HistoryCommandLabel.BOLUS ||
+                        details.command == HistoryCommandLabel.BOLUS_NO_AMOUNT
+                    Text(stringResource(unknownWarningRes(bolus)), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -95,7 +97,8 @@ internal fun rememberHistoryZone(): ZoneId {
 
 /** Nazwa polecenia z ilością dla CARBS (HISTUI-03). */
 @Composable
-internal fun historyCommandText(command: HistoryCommandLabel, grams: Int?): String = when (command) {
+internal fun historyCommandText(command: HistoryCommandLabel, grams: Int?, bolusCentiUnits: Int?): String = when (command) {
     HistoryCommandLabel.CARBS -> stringResource(command.textRes(), grams ?: 0)
+    HistoryCommandLabel.BOLUS -> stringResource(command.textRes(), formatCentiUnits(bolusCentiUnits ?: 0))
     else -> stringResource(command.textRes())
 }

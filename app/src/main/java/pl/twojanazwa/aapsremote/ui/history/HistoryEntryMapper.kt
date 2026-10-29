@@ -7,9 +7,13 @@ import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionTimeouts
 import pl.twojanazwa.aapsremote.ui.commands.ResultKind
 import pl.twojanazwa.aapsremote.ui.commands.ResultMessage
+import pl.twojanazwa.aapsremote.ui.commands.forBolus
 import pl.twojanazwa.aapsremote.ui.commands.minutesArg
 import pl.twojanazwa.aapsremote.ui.commands.timedOutResultMessage
 import pl.twojanazwa.aapsremote.ui.commands.toResultMessage
+
+private fun ResultMessage.forCommand(entry: HistoryEntry): ResultMessage =
+    if (entry.command == HistoryCommand.BOLUS) forBolus() else this
 
 object HistoryEntryMapper {
     /** HISTUI-03, HISTUI-05. */
@@ -19,6 +23,7 @@ object HistoryEntryMapper {
         grams = carbsGrams(entry),
         result = result(entry, timeouts),
         listTimeEpochMillis = entry.startedAtEpochMillis ?: entry.finishedAtEpochMillis,
+        bolusCentiUnits = bolusCentiUnits(entry),
     )
 
     /** HISTUI-05, HISTUI-06. */
@@ -37,6 +42,7 @@ object HistoryEntryMapper {
         },
         replyText = entry.replyText,
         unexpectedCount = entry.unexpectedMessageCount.takeIf { it > 0 },
+        bolusCentiUnits = bolusCentiUnits(entry),
     )
 
     private fun commandLabel(entry: HistoryEntry): HistoryCommandLabel = when (entry.command) {
@@ -44,12 +50,16 @@ object HistoryEntryMapper {
         HistoryCommand.PUMP -> HistoryCommandLabel.PUMP
         HistoryCommand.CARBS ->
             if (entry.carbsGrams != null) HistoryCommandLabel.CARBS else HistoryCommandLabel.CARBS_NO_AMOUNT
-        // Etykieta BOLUS w historii: zad. 5 (spec 012); do tego czasu jak nierozpoznane.
-        HistoryCommand.BOLUS, HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
+        HistoryCommand.BOLUS ->
+            if (entry.bolusCentiUnits != null) HistoryCommandLabel.BOLUS else HistoryCommandLabel.BOLUS_NO_AMOUNT
+        HistoryCommand.UNRECOGNIZED -> HistoryCommandLabel.UNRECOGNIZED
     }
 
     private fun carbsGrams(entry: HistoryEntry): Int? =
         if (entry.command == HistoryCommand.CARBS) entry.carbsGrams else null
+
+    private fun bolusCentiUnits(entry: HistoryEntry): Int? =
+        if (entry.command == HistoryCommand.BOLUS) entry.bolusCentiUnits else null
 
     /** HISTUI-04. Wyczerpujący when po HistoryOutcome (bez else); null i Unrecognized bez wyjątku (DATA-09). */
     fun result(entry: HistoryEntry, timeouts: SessionTimeouts = SessionTimeouts()): HistoryResultView {
@@ -73,9 +83,17 @@ object HistoryEntryMapper {
                     null
                 }
             }
+            HistoryOutcome.BolusConfirmed -> {
+                kind = ResultKind.SUCCESS
+                message = if (entry.command == HistoryCommand.BOLUS && entry.bolusCentiUnits != null) {
+                    ResultMessage.BOLUS_CONFIRMED
+                } else {
+                    null
+                }
+            }
             is HistoryOutcome.Failed -> {
                 kind = ResultKind.FAILURE
-                message = outcome.reason?.toResultMessage()
+                message = outcome.reason?.toResultMessage()?.forCommand(entry)
             }
             is HistoryOutcome.TimedOut -> {
                 kind = ResultKind.NO_RESPONSE
@@ -83,14 +101,13 @@ object HistoryEntryMapper {
             }
             is HistoryOutcome.Unknown -> {
                 kind = ResultKind.UNKNOWN
-                message = outcome.reason?.toResultMessage()
+                message = outcome.reason?.toResultMessage()?.forCommand(entry)
             }
             HistoryOutcome.Cancelled -> {
                 kind = ResultKind.CANCELLED
                 message = ResultMessage.CANCELLED
             }
-            // BolusConfirmed: wynik w UI w zad. 5 (spec 012); do tego czasu jak nierozpoznany.
-            HistoryOutcome.BolusConfirmed, HistoryOutcome.Unrecognized -> {
+            HistoryOutcome.Unrecognized -> {
                 kind = null
                 message = null
             }
@@ -98,9 +115,10 @@ object HistoryEntryMapper {
         val arg = when (message) {
             null -> null
             ResultMessage.CARBS_CONFIRMED -> entry.carbsGrams
+            ResultMessage.BOLUS_CONFIRMED -> entry.bolusCentiUnits
             else -> message.minutesArg(timeouts)
         }
-        val codeNotSent = entry.command == HistoryCommand.CARBS &&
+        val codeNotSent = (entry.command == HistoryCommand.CARBS || entry.command == HistoryCommand.BOLUS) &&
             (
                 (outcome is HistoryOutcome.Failed && outcome.reason != null && outcome.reason != FailureReason.WRONG_CODE) ||
                     outcome is HistoryOutcome.TimedOut ||

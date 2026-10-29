@@ -35,11 +35,10 @@ fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Mo
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (run.commandGrams == null) {
-            Text(stringResource(run.commandId.titleRes()), style = MaterialTheme.typography.headlineSmall)
-        } else {
-            Text(stringResource(run.commandId.titleRes(), run.commandGrams), style = MaterialTheme.typography.headlineSmall)
-        }
+        Text(
+            commandTitle(run.commandId, run.commandGrams, run.commandCentiUnits),
+            style = MaterialTheme.typography.headlineSmall,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             run.steps.forEach { step ->
                 val statusDescription = stringResource(step.status.descriptionRes())

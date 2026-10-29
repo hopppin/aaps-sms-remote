@@ -1,6 +1,8 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import pl.twojanazwa.aapsremote.R
 import pl.twojanazwa.aapsremote.commands.CommandId
 
@@ -28,6 +30,9 @@ fun ResultMessage.textRes(): Int = when (this) {
     ResultMessage.BG_REPLY -> R.string.result_bg_reply
     ResultMessage.PUMP_REPLY -> R.string.result_pump_reply
     ResultMessage.CARBS_CONFIRMED -> R.string.result_carbs_confirmed
+    ResultMessage.BOLUS_CONFIRMED -> R.string.result_bolus_confirmed
+    ResultMessage.BOLUS_AMOUNT_MISMATCH -> R.string.result_bolus_amount_mismatch
+    ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY -> R.string.result_bolus_unknown_unrecognized_reply
     ResultMessage.DETAILS_MISSING -> R.string.result_details_missing
     ResultMessage.SEND_FAILED -> R.string.result_send_failed
     ResultMessage.UNRECOGNIZED_REPLY -> R.string.result_unrecognized_reply
@@ -57,6 +62,30 @@ fun ProgressStepId.textRes(): Int = when (this) {
     ProgressStepId.PREPARE_CODE -> R.string.run_step_prepare_code
     ProgressStepId.SEND_CODE -> R.string.run_step_send_code
     ProgressStepId.AWAIT_CONFIRMATION -> R.string.run_step_await_confirmation
+}
+
+/** Setne jednostki jako tekst z przecinkiem i dwoma miejscami (np. 120 -> „1,20”). */
+fun formatCentiUnits(centiUnits: Int): String = "${centiUnits / 100},${(centiUnits % 100).toString().padStart(2, '0')}"
+
+/** BOL-16: ostrzeżenie dla każdego `Unknown`; bolus ma własny tekst. */
+@StringRes
+fun unknownWarningRes(bolus: Boolean): Int =
+    if (bolus) R.string.result_unknown_warning_bolus else R.string.result_unknown_warning
+
+/** Nagłówek przebiegu i wyniku z ilością (CARBS w gramach, BOLUS w setnych jednostki). */
+@Composable
+fun commandTitle(id: CommandId, grams: Int?, centiUnits: Int?): String = when {
+    grams != null -> stringResource(id.titleRes(), grams)
+    centiUnits != null -> stringResource(id.titleRes(), formatCentiUnits(centiUnits))
+    else -> stringResource(id.titleRes())
+}
+
+/** Komunikat wyniku z argumentem: ilość bolusa jest formatowana, reszta (gramy, minuty) idzie wprost. */
+@Composable
+fun resultMessageText(message: ResultMessage, arg: Int?): String = when {
+    arg == null -> stringResource(message.textRes())
+    message == ResultMessage.BOLUS_CONFIRMED -> stringResource(message.textRes(), formatCentiUnits(arg))
+    else -> stringResource(message.textRes(), arg)
 }
 
 /** CMDUI-17: opis stanu kroku dla czytnika ekranu (stateDescription). */

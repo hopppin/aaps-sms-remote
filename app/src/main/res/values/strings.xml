@@ -127,7 +127,7 @@
     <string name="run_title_bg">Polecenie BG</string>
     <string name="run_title_pump">Polecenie PUMP</string>
     <string name="run_title_carbs">Polecenie CARBS %1$d g</string>
-    <string name="run_title_bolus">Polecenie BOLUS</string>
+    <string name="run_title_bolus">Polecenie BOLUS %1$s j.</string>
     <string name="run_step_send_command">Wysyłanie SMS z poleceniem</string>
     <string name="run_step_await_reply">Czekanie na odpowiedź AAPS (do %1$d min)</string>
     <string name="run_step_await_code_request">Czekanie na prośbę AAPS o kod (do %1$d min)</string>
@@ -157,6 +157,12 @@
     <string name="result_bg_reply">Odpowiedź AAPS na BG</string>
     <string name="result_pump_reply">Odpowiedź AAPS na PUMP</string>
     <string name="result_carbs_confirmed">AAPS potwierdził wprowadzenie %1$d g</string>
+    <string name="result_bolus_confirmed">AAPS potwierdził podanie %1$s j.</string>
+    <string name="result_bolus_amount_mismatch">AAPS poprosił o kod dla innej ilości niż wysłana (np. obciętej przez limit w AAPS). Kod nie został wysłany.</string>
+    <string name="result_bolus_unknown_unrecognized_reply">Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS. Przeczytaj treść SMS i sprawdź w AAPS.</string>
+    <string name="result_unknown_warning_bolus">Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.</string>
+    <string name="history_command_bolus">BOLUS %1$s j.</string>
+    <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>
     <string name="result_details_missing">Brak szczegółów wyniku.</string>
     <string name="result_send_failed">Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.</string>
     <string name="result_unrecognized_reply">Nierozpoznana odpowiedź AAPS.</string>

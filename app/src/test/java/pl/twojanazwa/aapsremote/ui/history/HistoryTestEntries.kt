@@ -18,6 +18,7 @@ fun historyEntry(
     finishedAt: Long? = T0 + 2_000,
     replyText: String? = null,
     unexpected: Int = 0,
+    bolusCentiUnits: Int? = null,
 ) = HistoryEntry(
     id = id,
     command = command,
@@ -29,5 +30,5 @@ fun historyEntry(
     finishedAtEpochMillis = finishedAt,
     replyText = replyText,
     unexpectedMessageCount = unexpected,
-    bolusCentiUnits = null,
+    bolusCentiUnits = bolusCentiUnits,
 )

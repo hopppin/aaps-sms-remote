@@ -1,6 +1,6 @@
 package pl.twojanazwa.aapsremote.ui.history
 
-enum class HistoryCommandLabel { BG, PUMP, CARBS, CARBS_NO_AMOUNT, UNRECOGNIZED }
+enum class HistoryCommandLabel { BG, PUMP, CARBS, CARBS_NO_AMOUNT, BOLUS, BOLUS_NO_AMOUNT, UNRECOGNIZED }
 
 enum class HistoryTimeLabel { STARTED, COMMAND_SENT, CODE_SENT, FINISHED }
 
