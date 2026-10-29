@@ -8,7 +8,6 @@ import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
 import pl.twojanazwa.aapsremote.data.HistoryFixtures.T0
 import pl.twojanazwa.aapsremote.parser.AapsSamples
-import pl.twojanazwa.aapsremote.session.SessionOutcome
 import pl.twojanazwa.aapsremote.session.SessionResult
 
 class HistoryCodecEncodeTest {
@@ -17,7 +16,7 @@ class HistoryCodecEncodeTest {
     fun `DATA-07 wynik BG Completed trafia do wiersza`() {
         val row = HistoryCodec.toRow(HistoryFixtures.bgCompleted())
         assertEquals(
-            HistoryRow(0, "BG", null, "COMPLETED", null, T0, T0 + 1000, null, T0 + 5000, AapsSamples.bg, 0),
+            HistoryRow(0, "BG", null, "COMPLETED", null, T0, T0 + 1000, null, T0 + 5000, AapsSamples.bg, 0, null),
             row,
         )
     }
@@ -28,7 +27,7 @@ class HistoryCodecEncodeTest {
         assertEquals(
             HistoryRow(
                 0, "CARBS", 20, "CARBS_CONFIRMED", null, T0, T0 + 1000, T0 + 61000, T0 + 120000,
-                AapsSamples.carbsDone, 2,
+                AapsSamples.carbsDone, 2, null,
             ),
             row,
         )
@@ -41,18 +40,6 @@ class HistoryCodecEncodeTest {
         assertEquals(outcome, row.outcome)
         assertEquals(reason, row.reason)
         assertEquals(text, row.replyText)
-    }
-
-    @Test
-    fun `BOL-11 wynik BolusConfirmed jest zapisywany bez ilosci a odczyt daje Unrecognized`() {
-        val row = HistoryCodec.toRow(
-            HistoryFixtures.withOutcome(SessionOutcome.BolusConfirmed(120, AapsSamples.bolusDone)),
-        )
-        assertEquals("BOLUS_CONFIRMED", row.outcome)
-        assertNull(row.reason)
-        assertNull(row.carbsGrams)
-        assertEquals(AapsSamples.bolusDone, row.replyText)
-        assertEquals(HistoryOutcome.Unrecognized, HistoryCodec.toEntry(row).outcome)
     }
 
     @Test

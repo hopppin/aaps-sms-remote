@@ -57,7 +57,7 @@ class HistoryCodecDecodeTest {
         outcome: String = "COMPLETED",
         reason: String? = null,
         text: String? = "tekst",
-    ) = HistoryRow(7, command, carbs, outcome, reason, T0, T0 + 1000, T0 + 2000, T0 + 3000, text, 3)
+    ) = HistoryRow(7, command, carbs, outcome, reason, T0, T0 + 1000, T0 + 2000, T0 + 3000, text, 3, null)
 
     // ---- Kompletnosc tabeli kodow wzgledem wartosci wyliczeniowych ----
 
@@ -88,7 +88,7 @@ class HistoryCodecDecodeTest {
             CommandId.BG -> HistoryCommand.BG
             CommandId.PUMP -> HistoryCommand.PUMP
             CommandId.CARBS -> HistoryCommand.CARBS
-            CommandId.BOLUS -> HistoryCommand.UNRECOGNIZED // do zad. 4 spec 012
+            CommandId.BOLUS -> HistoryCommand.BOLUS
         }
         assertEquals(expected, HistoryCodec.toEntry(row).command)
     }
@@ -213,9 +213,9 @@ class HistoryCodecDecodeTest {
     }
 
     @Test
-    fun `BOL-01 wiersz BOLUS nie rzuca wyjatku i nie ustawia ilosci`() {
+    fun `BOL-17 wiersz BOLUS nie rzuca wyjatku i nie ustawia ilosci weglowodanow`() {
         val entry = HistoryCodec.toEntry(row(command = "BOLUS", carbs = 20))
-        assertEquals(HistoryCommand.UNRECOGNIZED, entry.command)
+        assertEquals(HistoryCommand.BOLUS, entry.command)
         assertNull(entry.carbsGrams)
         assertEquals(HistoryOutcome.Completed, entry.outcome)
     }
@@ -237,7 +237,7 @@ class HistoryCodecDecodeTest {
         assertEquals(
             HistoryEntry(
                 0, HistoryCommand.BG, null, HistoryOutcome.Completed, T0, T0 + 1000, null, T0 + 5000,
-                AapsSamples.bg, 0,
+                AapsSamples.bg, 0, null,
             ),
             e,
         )
@@ -249,7 +249,7 @@ class HistoryCodecDecodeTest {
         assertEquals(
             HistoryEntry(
                 0, HistoryCommand.CARBS, 20, HistoryOutcome.CarbsConfirmed, T0, T0 + 1000, T0 + 61000,
-                T0 + 120000, AapsSamples.carbsDone, 2,
+                T0 + 120000, AapsSamples.carbsDone, 2, null,
             ),
             e,
         )

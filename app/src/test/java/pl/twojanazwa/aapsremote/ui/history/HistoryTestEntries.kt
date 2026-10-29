@@ -29,4 +29,5 @@ fun historyEntry(
     finishedAtEpochMillis = finishedAt,
     replyText = replyText,
     unexpectedMessageCount = unexpected,
+    bolusCentiUnits = null,
 )
