@@ -29,6 +29,12 @@ class AapsReplyParserContextTest {
     }
 
     @Test
+    fun `BOL-06 prosba o kod bolusa z poprawna iloscia jest nierozpoznana, bo parser bolusa to zad 2`() {
+        val body = AapsSamples.bolusCodeRequest
+        assertEquals(AapsReply.Unrecognized(body), AapsReplyParser.parse(body, ExpectedCommand.Bolus(10)))
+    }
+
+    @Test
     fun `PARSER-01 pusta tresc w kontekscie BG i PUMP bez wyjatku`() {
         for (expected in listOf(ExpectedCommand.Bg, ExpectedCommand.Pump)) {
             assertEquals(AapsReply.Unrecognized(""), AapsReplyParser.parse("", expected))

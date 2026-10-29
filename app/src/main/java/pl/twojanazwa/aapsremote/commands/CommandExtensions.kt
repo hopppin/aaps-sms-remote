@@ -11,6 +11,7 @@ fun Command.smsText(): String = when (this) {
     Command.Bg -> definition.keyword
     Command.Pump -> definition.keyword
     is Command.Carbs -> "${definition.keyword} $grams"
+    is Command.Bolus -> "${definition.keyword} ${BolusAmountText.toSms(centiUnits)}"
 }
 
 /** CMD-08: kontekst parsera wyliczany z tego samego polecenia co treść SMS. */
@@ -18,4 +19,5 @@ fun Command.toExpectedCommand(): ExpectedCommand = when (this) {
     Command.Bg -> ExpectedCommand.Bg
     Command.Pump -> ExpectedCommand.Pump
     is Command.Carbs -> ExpectedCommand.Carbs(grams)
+    is Command.Bolus -> ExpectedCommand.Bolus(centiUnits)
 }

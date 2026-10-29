@@ -20,6 +20,7 @@ fun CommandId.titleRes(): Int = when (this) {
     CommandId.BG -> R.string.run_title_bg
     CommandId.PUMP -> R.string.run_title_pump
     CommandId.CARBS -> R.string.run_title_carbs
+    CommandId.BOLUS -> R.string.run_title_bolus
 }
 
 @StringRes

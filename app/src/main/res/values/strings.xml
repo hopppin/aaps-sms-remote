@@ -108,6 +108,7 @@
     <string name="run_title_bg">Polecenie BG</string>
     <string name="run_title_pump">Polecenie PUMP</string>
     <string name="run_title_carbs">Polecenie CARBS %1$d g</string>
+    <string name="run_title_bolus">Polecenie BOLUS</string>
     <string name="run_step_send_command">Wysyłanie SMS z poleceniem</string>
     <string name="run_step_await_reply">Czekanie na odpowiedź AAPS (do %1$d min)</string>
     <string name="run_step_await_code_request">Czekanie na prośbę AAPS o kod (do %1$d min)</string>

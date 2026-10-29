@@ -4,6 +4,12 @@ package pl.twojanazwa.aapsremote.commands
 sealed interface CommandParameter {
     data object None : CommandParameter
 
+    /** Ilość insuliny w setnych jednostki (BOL-01). */
+    data class InsulinUnits(
+        val minCentiUnits: Int,
+        val stepCentiUnits: Int,
+    ) : CommandParameter
+
     data class Grams(
         val min: Int,
         val quickValues: List<Int>,

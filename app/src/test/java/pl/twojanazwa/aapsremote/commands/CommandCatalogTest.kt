@@ -9,16 +9,16 @@ class CommandCatalogTest {
     private fun carbs(g: Int) = (Command.Carbs.of(g, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
-    fun `CMD-01 katalog ma BG PUMP CARBS w tej kolejnosci`() {
+    fun `CMD-01 katalog ma BG PUMP CARBS BOLUS w tej kolejnosci`() {
         assertEquals(
-            listOf(CommandId.BG, CommandId.PUMP, CommandId.CARBS),
+            listOf(CommandId.BG, CommandId.PUMP, CommandId.CARBS, CommandId.BOLUS),
             CommandCatalog.entries.map { it.id },
         )
     }
 
     @Test
     fun `CMD-01 definitionOf zwraca wpis o tym samym id i slowie kluczowym`() {
-        val expected = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS")
+        val expected = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS")
         for (id in CommandId.entries) {
             val d = CommandCatalog.definitionOf(id)
             assertEquals(id, d.id)
@@ -35,10 +35,11 @@ class CommandCatalogTest {
     }
 
     @Test
-    fun `CMD-01 requiresCode tylko dla CARBS`() {
+    fun `CMD-01 requiresCode dla CARBS i BOLUS`() {
         assertFalse(CommandCatalog.definitionOf(CommandId.BG).requiresCode)
         assertFalse(CommandCatalog.definitionOf(CommandId.PUMP).requiresCode)
         assertTrue(CommandCatalog.definitionOf(CommandId.CARBS).requiresCode)
+        assertTrue(CommandCatalog.definitionOf(CommandId.BOLUS).requiresCode)
     }
 
     @Test
@@ -63,6 +64,7 @@ class CommandCatalogTest {
         assertEquals(Approval.ONE_TAP, CommandCatalog.definitionOf(CommandId.BG).approval)
         assertEquals(Approval.ONE_TAP, CommandCatalog.definitionOf(CommandId.PUMP).approval)
         assertEquals(Approval.SUMMARY_WITH_PIN, CommandCatalog.definitionOf(CommandId.CARBS).approval)
+        assertEquals(Approval.SUMMARY_WITH_PIN, CommandCatalog.definitionOf(CommandId.BOLUS).approval)
     }
 
     @Test

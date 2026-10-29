@@ -50,4 +50,34 @@ sealed interface Command {
             }
         }
     }
+
+    /** Tylko przez of()/parse() – konstruktor prywatny (BOL-02). toString() bez ilości (BOL-06). */
+    class Bolus private constructor(val centiUnits: Int) : Command {
+        override val id: CommandId = CommandId.BOLUS
+        override fun requiresExtraConfirmation(limits: CommandLimits): Boolean =
+            limits.bolusRequiresExtraConfirmation(centiUnits)
+
+        override fun equals(other: Any?): Boolean = other is Bolus && other.centiUnits == centiUnits
+
+        override fun hashCode(): Int = centiUnits
+
+        override fun toString(): String = "Command.Bolus(***)"
+
+        companion object {
+            /** BOL-02. Nigdy nie rzuca. Kolejność: minimum, maksimum, krok. */
+            fun of(centiUnits: Int, limits: CommandLimits): BolusValidation = when {
+                centiUnits < BolusLimits.MIN_CENTI_UNITS -> BolusValidation.Invalid(BolusAmountError.BELOW_MIN)
+                centiUnits > limits.bolusMaxCentiUnits -> BolusValidation.Invalid(BolusAmountError.ABOVE_MAX)
+                centiUnits % BolusLimits.STEP_CENTI_UNITS != 0 -> BolusValidation.Invalid(BolusAmountError.NOT_STEP)
+                else -> BolusValidation.Valid(Bolus(centiUnits))
+            }
+
+            /** BOL-03. Nigdy nie rzuca. Bez trim(). */
+            fun parse(input: String, limits: CommandLimits): BolusValidation =
+                when (val parsed = BolusAmountText.parse(input)) {
+                    is BolusAmountText.Parsed.Error -> BolusValidation.Invalid(parsed.error)
+                    is BolusAmountText.Parsed.Value -> of(parsed.centiUnits, limits)
+                }
+        }
+    }
 }
