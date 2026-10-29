@@ -47,6 +47,16 @@ class BolusAmountTextTest {
     }
 
     @Test
+    fun `BOL-03 zera wiodace przed czescia calkowita sa dozwolone (00,5 to 0,50)`() {
+        assertEquals(50, value("00,5"))
+    }
+
+    @Test
+    fun `BOL-03 1000,5 to powyzej maksimum (cztery cyfry czesci calkowitej)`() {
+        assertEquals(BolusAmountError.ABOVE_MAX, error("1000,5"))
+    }
+
+    @Test
     fun `BOL-06 toString wartosci bez ilosci`() {
         assertFalse(BolusAmountText.parse("2,35").toString().contains("235"))
     }

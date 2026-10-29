@@ -42,7 +42,16 @@ object LimitsInput {
     }
 
     private fun bolusField(text: String): Field = when (val p = BolusAmountText.parse(text)) {
-        is BolusAmountText.Parsed.Error -> Field.Bad(LimitValueError.valueOf(p.error.name))
+        is BolusAmountText.Parsed.Error -> Field.Bad(
+            when (p.error) {
+                BolusAmountError.EMPTY -> LimitValueError.EMPTY
+                BolusAmountError.INVALID_CHARACTERS -> LimitValueError.INVALID_CHARACTERS
+                BolusAmountError.TOO_MANY_DECIMALS -> LimitValueError.TOO_MANY_DECIMALS
+                BolusAmountError.BELOW_MIN -> LimitValueError.BELOW_MIN
+                BolusAmountError.ABOVE_MAX -> LimitValueError.ABOVE_MAX
+                BolusAmountError.NOT_STEP -> LimitValueError.NOT_STEP
+            }
+        )
         is BolusAmountText.Parsed.Value ->
             range(p.centiUnits, LimitRanges.BOLUS_MAX_MIN, LimitRanges.BOLUS_MAX_MAX, LimitRanges.BOLUS_STEP)
     }
