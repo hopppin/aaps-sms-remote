@@ -37,6 +37,14 @@ fun ResultMessage.forBolus(): ResultMessage = when (this) {
     else -> this
 }
 
+/** PROF-16: zmiana profilu ma własne teksty niezgodności i nierozpoznanej odpowiedzi po kodzie. */
+fun ResultMessage.forProfile(): ResultMessage = when (this) {
+    ResultMessage.AMOUNT_MISMATCH -> ResultMessage.PROFILE_AMOUNT_MISMATCH
+    ResultMessage.UNKNOWN_AMOUNT_MISMATCH -> ResultMessage.PROFILE_UNKNOWN_AMOUNT_MISMATCH
+    ResultMessage.UNKNOWN_UNRECOGNIZED_REPLY -> ResultMessage.PROFILE_UNKNOWN_UNRECOGNIZED_REPLY
+    else -> this
+}
+
 /** SENDING_COMMAND -> SEND_TIMEOUT; każda inna faza i null -> NO_RESPONSE. */
 fun timedOutResultMessage(phase: SessionPhase?): ResultMessage = when (phase) {
     SessionPhase.SENDING_COMMAND -> ResultMessage.SEND_TIMEOUT
@@ -63,6 +71,11 @@ fun ResultMessage.minutesArg(timeouts: SessionTimeouts = SessionTimeouts()): Int
     ResultMessage.BOLUS_CONFIRMED,
     ResultMessage.BOLUS_AMOUNT_MISMATCH,
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
+    ResultMessage.PROFILE_STATUS_REPLY,
+    ResultMessage.PROFILE_LIST_REPLY,
+    ResultMessage.PROFILE_AMOUNT_MISMATCH,
+    ResultMessage.PROFILE_UNKNOWN_AMOUNT_MISMATCH,
+    ResultMessage.PROFILE_UNKNOWN_UNRECOGNIZED_REPLY,
     ResultMessage.DETAILS_MISSING,
     ResultMessage.SEND_FAILED,
     ResultMessage.UNRECOGNIZED_REPLY,

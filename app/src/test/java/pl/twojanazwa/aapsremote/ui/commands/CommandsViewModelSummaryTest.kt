@@ -250,7 +250,7 @@ class CommandsViewModelSummaryTest {
         runTest(main.dispatcher) {
             val env = env()
             val vm = env.viewModel()
-            val run = CommandRunViewModel(env.currentRun, env.coordinator)
+            val run = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
             fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
             vm.onBgClicked()
             settle()
@@ -272,7 +272,7 @@ class CommandsViewModelSummaryTest {
         val env = env()
         env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
         val vm = env.viewModel()
-        val run = CommandRunViewModel(env.currentRun, env.coordinator)
+        val run = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
         fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
         vm.openSummary("1")
         vm.onPinChanged("4321")

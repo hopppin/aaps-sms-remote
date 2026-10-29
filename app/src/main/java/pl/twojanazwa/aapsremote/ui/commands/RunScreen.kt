@@ -36,7 +36,10 @@ fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Mo
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            commandTitle(run.commandId, run.commandGrams, run.commandCentiUnits),
+            commandTitle(
+                run.commandId, run.commandGrams, run.commandCentiUnits,
+                run.profileName, run.profilePercent,
+            ),
             style = MaterialTheme.typography.headlineSmall,
         )
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {

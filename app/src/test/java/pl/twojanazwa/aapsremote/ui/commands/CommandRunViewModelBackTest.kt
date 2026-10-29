@@ -24,7 +24,7 @@ class CommandRunViewModelBackTest {
     @RegisterExtension
     val main = MainDispatcherExtension()
 
-    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator)
+    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator, ProfileSelection(), secrets)
 
     @Test
     fun `CMDUI-24 wynik na ekranie i Wstecz zamyka wynik`() = runTest(main.dispatcher) {

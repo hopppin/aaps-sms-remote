@@ -1,6 +1,7 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import pl.twojanazwa.aapsremote.commands.CommandId
+import pl.twojanazwa.aapsremote.commands.ProfileChoice
 
 enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
 
@@ -8,6 +9,9 @@ enum class ResultMessage {
     BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED, BOLUS_CONFIRMED,
     /** Bolus: osobne teksty niezgodnej ilości przed kodem i nierozpoznanej odpowiedzi po kodzie (BOL-16). */
     BOLUS_AMOUNT_MISMATCH, BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
+    /** Profil (PROF-16): odpowiedzi na PROFILE STATUS / LIST i niezgodność lub nierozpoznana odpowiedź zmiany profilu. */
+    PROFILE_STATUS_REPLY, PROFILE_LIST_REPLY, PROFILE_AMOUNT_MISMATCH, PROFILE_UNKNOWN_AMOUNT_MISMATCH,
+    PROFILE_UNKNOWN_UNRECOGNIZED_REPLY,
     /** Completed dla CARBS (nie występuje, Spec 004); jak „brak szczegółów” w HISTUI-04 (Spec 010). */
     DETAILS_MISSING,
     SEND_FAILED, UNRECOGNIZED_REPLY, AMOUNT_MISMATCH, UNEXPECTED_REPLY, WRONG_CODE,
@@ -24,6 +28,11 @@ data class ResultView(
     val commandGrams: Int?,
     /** Ilość z polecenia BOLUS w setnych (nagłówek „Polecenie BOLUS X j.”), inaczej null. */
     val commandCentiUnits: Int? = null,
+    /** Nazwa i procent z polecenia zmiany profilu (nagłówek PROF-16), inaczej null. */
+    val profileName: String? = null,
+    val profilePercent: Int? = null,
+    /** Pozycje do wyboru, tylko `Completed` dla PROFILE_LIST (PROF-14); inaczej null. */
+    val profileItems: List<ProfileChoice>? = null,
     val kind: ResultKind,
     val message: ResultMessage,
     /** Argument komunikatu: gramy (CARBS_CONFIRMED) albo minuty (NO_RESPONSE, SEND_TIMEOUT, UNKNOWN_CONFIRMATION_TIMEOUT). */

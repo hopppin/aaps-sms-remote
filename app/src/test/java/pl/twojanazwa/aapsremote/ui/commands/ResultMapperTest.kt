@@ -367,6 +367,10 @@ class ResultMapperTest {
     }
 
     /** Po jednym wyniku na każdy [ResultMessage] (wspólne z RunTextsTest). */
+    private fun profileSwitch(): Command =
+        (Command.ProfileSwitch.of(pl.twojanazwa.aapsremote.commands.ProfileChoice(1, "LocalProfile1"), 115)
+            as pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation.Valid).command
+
     internal fun resultSamples(): List<SessionResult> {
         val c = carbs(20)
         return listOf(
@@ -377,6 +381,11 @@ class ResultMapperTest {
             result(bolus(120), SessionOutcome.BolusConfirmed(120, "t")),
             result(bolus(120), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null)),
             result(bolus(120), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, null)),
+            result(Command.ProfileStatus, SessionOutcome.Completed(AapsReply.ProfileStatusReport("p"), "p")),
+            result(Command.ProfileList, SessionOutcome.Completed(AapsReply.ProfileStatusReport("p"), "p")),
+            result(profileSwitch(), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null)),
+            result(profileSwitch(), SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, null)),
+            result(profileSwitch(), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, null)),
             result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.SENDING_COMMAND)),
             result(Command.Bg, SessionOutcome.TimedOut(SessionPhase.AWAITING_REPLY)),
             result(c, SessionOutcome.Cancelled),
