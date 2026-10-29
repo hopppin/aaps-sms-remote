@@ -94,6 +94,18 @@ class ProfileReplyParserTest {
     }
 
     @Test
+    fun `PROF-07 lista z nazwa zawierajaca kropke i liczbe rozpoznaje pelna nazwe w wielu liniach`() {
+        val body = "1. A 2. B\n2. C"
+        assertEquals(
+            AapsReply.ProfileListReport(
+                listOf(AapsReply.ProfileListItem(1, "A 2. B"), AapsReply.ProfileListItem(2, "C")),
+                body,
+            ),
+            parse(body, ExpectedCommand.ProfileList),
+        )
+    }
+
+    @Test
     fun `PROF-07 prosba dla nazwy A 2 B przy innej nazwie to niezgodny profil`() {
         val body = request("A 2. B", 100)
         // Greedy nazwa: "A 2. B" == oczekiwana -> kod; inny podzial -> stop.

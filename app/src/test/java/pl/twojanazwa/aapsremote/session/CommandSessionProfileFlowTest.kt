@@ -113,6 +113,26 @@ class CommandSessionProfileFlowTest {
     }
 
     @Test
+    fun `PROF-11 druga linia obrony - BgReport w sesji PROFILE STATUS nie konczy sie Completed`() = runTest {
+        val (_, run) = start(Command.ProfileStatus) { body, _ -> AapsReply.BgReport(210, body) }
+        deliver(60_000, AapsSamples.bg)
+        assertEquals(
+            SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, AapsSamples.bg),
+            run.await().outcome,
+        )
+    }
+
+    @Test
+    fun `PROF-11 druga linia obrony - PumpStatus w sesji PROFILE STATUS nie konczy sie Completed`() = runTest {
+        val (_, run) = start(Command.ProfileStatus) { body, _ -> AapsReply.PumpStatus(body) }
+        deliver(60_000, AapsSamples.pump)
+        assertEquals(
+            SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, AapsSamples.pump),
+            run.await().outcome,
+        )
+    }
+
+    @Test
     fun `PROF-12 zgodna prosba o kod w chwili 60000 wysyla PROFILE 1 i kod`() = runTest {
         val (session, _) = start(local1)
         assertEquals(listOf("PROFILE 1"), sender.sentCommands)

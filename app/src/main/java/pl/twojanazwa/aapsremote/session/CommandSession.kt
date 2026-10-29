@@ -267,7 +267,7 @@ class CommandSession(
                     // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
                     is AapsReply.MatchingDone -> addUnexpected(sms)
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
-                    // Unrecognized oraz wyniki niemożliwe dla CARBS (BgReport, PumpStatus).
+                    // Unrecognized (także raporty BG/PUMP niezgodne z poleceniem, patrz amountMatches).
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }
@@ -316,8 +316,9 @@ class CommandSession(
             is AapsReply.ProfileListReport -> sent is Command.ProfileList
             is AapsReply.ProfileCodeRequest -> sent is Command.ProfileSwitch && profileRequestMatches(reply.text, sent)
             is AapsReply.ProfileSwitchMismatch -> sent is Command.ProfileSwitch
+            is AapsReply.BgReport -> sent is Command.Bg
+            is AapsReply.PumpStatus -> sent is Command.Pump
             is AapsReply.BolusAmountMismatch, is AapsReply.CarbsAmountMismatch,
-            is AapsReply.BgReport, is AapsReply.PumpStatus,
             AapsReply.WrongCode, is AapsReply.Unrecognized,
             -> true
         }

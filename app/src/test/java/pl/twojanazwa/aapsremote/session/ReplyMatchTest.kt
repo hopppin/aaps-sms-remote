@@ -27,7 +27,7 @@ class ReplyMatchTest {
     }
 
     @Test
-    fun `PROF-05 polecenia profilu nie sa zgodne z prosba o kod bolusa ani CARBS i zadnym potwierdzeniem`() {
+    fun `PROF-12 polecenia profilu nie sa zgodne z prosba o kod bolusa ani CARBS i zadnym potwierdzeniem`() {
         val profile = listOf(CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH)
         for (id in profile) {
             for (reply in codeRequests.keys.filter { it !is AapsReply.ProfileCodeRequest }) assertEquals(false, ReplyMatch.isCodeRequestFor(id, reply))
