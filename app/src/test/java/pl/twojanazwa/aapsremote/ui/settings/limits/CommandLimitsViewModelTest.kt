@@ -31,6 +31,7 @@ class CommandLimitsViewModelTest {
         val saved = mutableListOf<CommandLimits>()
         var gate: CompletableDeferred<Unit>? = null
         var result = SaveLimitsResult.Saved
+        var failure: Throwable? = null
 
         fun set(value: CommandLimitsState) {
             mutable.value = value
@@ -39,6 +40,7 @@ class CommandLimitsViewModelTest {
         override suspend fun save(limits: CommandLimits): SaveLimitsResult {
             saved += limits
             gate?.await()
+            failure?.let { throw it }
             return result
         }
     }
@@ -103,7 +105,7 @@ class CommandLimitsViewModelTest {
     }
 
     @Test
-    fun `LIM-10 niepowodzenie zapisu daje komunikat i zostawia pola`() = runTest(main.dispatcher) {
+    fun `LIM-10 niepowodzenie zapisu daje komunikat i przywraca obowiazujace pola`() = runTest(main.dispatcher) {
         val store = Store(CommandLimitsState.Loaded(CommandLimits.DEFAULT)).also { it.result = SaveLimitsResult.Failed }
         val vm = viewModel(store)
         settle()
@@ -111,8 +113,45 @@ class CommandLimitsViewModelTest {
         vm.onSaveClicked()
         settle()
         assertEquals(LimitsMessage.SAVE_FAILED, vm.uiState.value.message)
-        assertEquals("60", vm.uiState.value.carbsMax)
+        val s = vm.uiState.value
+        assertEquals(Triple("50", "5,00", "15"), Triple(s.carbsMax, s.bolusMax, s.interval))
+        assertTrue(s.canSave)
+    }
+
+    @Test
+    fun `LIM-10 wyjatek z zapisu daje SAVE_FAILED i obowiazujace pola`() = runTest(main.dispatcher) {
+        val store = Store(CommandLimitsState.Loaded(CommandLimits.DEFAULT)).also { it.failure = IllegalStateException() }
+        val vm = viewModel(store)
+        settle()
+        vm.type("60", "3", "0")
+        vm.onSaveClicked()
+        settle()
+        assertEquals(LimitsMessage.SAVE_FAILED, vm.uiState.value.message)
+        assertEquals("50", vm.uiState.value.carbsMax)
         assertTrue(vm.uiState.value.canSave)
+    }
+
+    @Test
+    fun `LIM-10 LoadFailed pozwala zapisac bez edycji wartosci domyslne`() = runTest(main.dispatcher) {
+        val store = Store(CommandLimitsState.LoadFailed)
+        val vm = viewModel(store)
+        settle()
+        vm.onSaveClicked()
+        settle()
+        assertEquals(listOf(CommandLimits.DEFAULT), store.saved)
+        assertEquals(LimitsMessage.SAVED, vm.uiState.value.message)
+    }
+
+    @Test
+    fun `LIM-10 niepowodzenie zapisu przy LoadFailed zostawia pola`() = runTest(main.dispatcher) {
+        val store = Store(CommandLimitsState.LoadFailed).also { it.result = SaveLimitsResult.Failed }
+        val vm = viewModel(store)
+        settle()
+        vm.onCarbsChanged("60")
+        vm.onSaveClicked()
+        settle()
+        assertEquals(LimitsMessage.SAVE_FAILED, vm.uiState.value.message)
+        assertEquals("60", vm.uiState.value.carbsMax)
     }
 
     @Test

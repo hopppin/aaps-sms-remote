@@ -12,6 +12,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
@@ -35,9 +38,15 @@ fun CommandLimitsSection(
                 text = stringResource(R.string.limits_command_active),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
-        if (state.load == LimitsLoad.LOAD_FAILED) Text(stringResource(R.string.limits_load_failed))
+        if (state.load == LimitsLoad.LOAD_FAILED) {
+            Text(
+                text = stringResource(R.string.limits_load_failed),
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
         Text(text = stringResource(R.string.limits_note), style = MaterialTheme.typography.bodyMedium)
         LimitInput(state, LimitField.CARBS_MAX, state.carbsMax, R.string.limits_carbs_label, KeyboardType.Number, editable, onCarbsChanged)
         LimitInput(state, LimitField.BOLUS_MAX, state.bolusMax, R.string.limits_bolus_label, KeyboardType.Decimal, editable, onBolusChanged)

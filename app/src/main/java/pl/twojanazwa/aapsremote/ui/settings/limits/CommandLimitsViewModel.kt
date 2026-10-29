@@ -102,30 +102,45 @@ class CommandLimitsViewModel @Inject constructor(
     }
 
     fun onSaveClicked() {
-        val current = local.value
-        if (current.busy || store.state.value == CommandLimitsState.Loading) return // LIM-11
+        if (store.state.value == CommandLimitsState.Loading) return // LIM-11
         if (coordinator.activeSession.value != null) { // LIM-11: sprawdzenie w chwili akcji
             local.update { it.copy(message = LimitsMessage.COMMAND_ACTIVE) }
             return
         }
-        when (val v = LimitsInput.parse(current.carbsMax, current.bolusMax, current.interval)) {
-            is LimitsValidation.Invalid -> local.update { it.copy(errors = v.errors) }
-            is LimitsValidation.Valid -> {
-                local.update { it.copy(busy = true, errors = emptyMap()) }
-                viewModelScope.launch {
-                    val result = try {
-                        store.save(v.limits)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        SaveLimitsResult.Failed
+        var toSave: CommandLimits? = null
+        // Sprawdzenie busy, walidacja i ustawienie busy w jednym atomowym update (LIM-11).
+        local.update {
+            toSave = null
+            if (it.busy) {
+                it
+            } else {
+                when (val v = LimitsInput.parse(it.carbsMax, it.bolusMax, it.interval)) {
+                    is LimitsValidation.Invalid -> it.copy(errors = v.errors)
+                    is LimitsValidation.Valid -> {
+                        toSave = v.limits
+                        it.copy(busy = true, errors = emptyMap())
                     }
-                    local.update {
-                        when (result) {
-                            SaveLimitsResult.Saved ->
-                                it.filledWith(v.limits).copy(busy = false, message = LimitsMessage.SAVED)
-                            SaveLimitsResult.Failed -> it.copy(busy = false, message = LimitsMessage.SAVE_FAILED)
-                        }
+                }
+            }
+        }
+        val limits = toSave ?: return
+        viewModelScope.launch {
+            val result = try {
+                store.save(limits)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SaveLimitsResult.Failed
+            }
+            local.update {
+                when (result) {
+                    SaveLimitsResult.Saved ->
+                        it.filledWith(limits).copy(busy = false, message = LimitsMessage.SAVED)
+                    SaveLimitsResult.Failed -> {
+                        // LIM-10: pola pokazują obowiązujące limity, nie niezapisane teksty.
+                        val effective = (store.state.value as? CommandLimitsState.Loaded)?.limits
+                        (if (effective != null) it.filledWith(effective) else it)
+                            .copy(busy = false, message = LimitsMessage.SAVE_FAILED)
                     }
                 }
             }
