@@ -24,7 +24,6 @@ object HistoryCodec {
         when (outcome) {
             is SessionOutcome.Completed -> { kind = "COMPLETED"; reason = null; text = outcome.text }
             is SessionOutcome.CarbsConfirmed -> { kind = "CARBS_CONFIRMED"; reason = null; text = outcome.text }
-            // Zapis bez ilości; odczyt (HistoryOutcome.BolusConfirmed) i kolumna w zad. 5 (spec 012).
             is SessionOutcome.BolusConfirmed -> { kind = "BOLUS_CONFIRMED"; reason = null; text = outcome.text }
             is SessionOutcome.Failed -> { kind = "FAILED"; reason = encode(outcome.reason); text = outcome.text }
             is SessionOutcome.TimedOut -> { kind = "TIMED_OUT"; reason = encode(outcome.phase); text = null }
@@ -35,6 +34,7 @@ object HistoryCodec {
             id = 0,
             command = encode(result.command.id),
             carbsGrams = (result.command as? Command.Carbs)?.grams,
+            bolusCentiUnits = (result.command as? Command.Bolus)?.centiUnits,
             outcome = kind,
             reason = reason,
             startedAtEpochMillis = result.startedAtEpochMillis,
@@ -53,6 +53,7 @@ object HistoryCodec {
         val outcome: HistoryOutcome = when (row.outcome) {
             "COMPLETED" -> HistoryOutcome.Completed
             "CARBS_CONFIRMED" -> HistoryOutcome.CarbsConfirmed
+            "BOLUS_CONFIRMED" -> HistoryOutcome.BolusConfirmed
             "FAILED" -> HistoryOutcome.Failed(reason?.let { FAILURE_REASONS[it] })
             "TIMED_OUT" -> HistoryOutcome.TimedOut(reason?.let { PHASES[it] })
             "UNKNOWN" -> HistoryOutcome.Unknown(reason?.let { UNKNOWN_REASONS[it] })
@@ -63,6 +64,7 @@ object HistoryCodec {
             id = row.id,
             command = command,
             carbsGrams = if (command == HistoryCommand.CARBS) row.carbsGrams else null,
+            bolusCentiUnits = if (command == HistoryCommand.BOLUS) row.bolusCentiUnits else null,
             outcome = outcome,
             startedAtEpochMillis = row.startedAtEpochMillis,
             commandSentAtEpochMillis = row.commandSentAtEpochMillis,
@@ -78,6 +80,7 @@ object HistoryCodec {
         "BG" to HistoryCommand.BG,
         "PUMP" to HistoryCommand.PUMP,
         "CARBS" to HistoryCommand.CARBS,
+        "BOLUS" to HistoryCommand.BOLUS,
     )
 
     private val FAILURE_REASONS: Map<String, FailureReason> = mapOf(

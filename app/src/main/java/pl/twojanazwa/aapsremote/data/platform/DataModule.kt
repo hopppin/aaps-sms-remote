@@ -69,7 +69,9 @@ abstract class DataModule {
         @Provides
         @Singleton
         fun database(@ApplicationContext context: Context): AapsRemoteDatabase =
-            Room.databaseBuilder(context, AapsRemoteDatabase::class.java, AapsRemoteDatabase.FILE_NAME).build()
+            Room.databaseBuilder(context, AapsRemoteDatabase::class.java, AapsRemoteDatabase.FILE_NAME)
+                .addMigrations(AapsRemoteDatabase.MIGRATION_1_2)
+                .build()
 
         @Provides
         fun historyDao(database: AapsRemoteDatabase): HistoryDao = database.historyDao()

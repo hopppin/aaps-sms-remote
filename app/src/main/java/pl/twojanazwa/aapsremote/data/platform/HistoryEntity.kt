@@ -20,6 +20,7 @@ data class HistoryEntity(
     @ColumnInfo(name = "finished_at") val finishedAtEpochMillis: Long?,
     @ColumnInfo(name = "reply_text") val replyText: String?,
     @ColumnInfo(name = "unexpected_count") val unexpectedMessageCount: Int,
+    @ColumnInfo(name = "bolus_centi_units") val bolusCentiUnits: Int?,
 ) {
     fun toRow(): HistoryRow = HistoryRow(
         id = id,
@@ -33,6 +34,7 @@ data class HistoryEntity(
         finishedAtEpochMillis = finishedAtEpochMillis,
         replyText = replyText,
         unexpectedMessageCount = unexpectedMessageCount,
+        bolusCentiUnits = bolusCentiUnits,
     )
 
     override fun toString(): String = "HistoryEntity(***)"
@@ -50,6 +52,7 @@ data class HistoryEntity(
             finishedAtEpochMillis = row.finishedAtEpochMillis,
             replyText = row.replyText,
             unexpectedMessageCount = row.unexpectedMessageCount,
+            bolusCentiUnits = row.bolusCentiUnits,
         )
     }
 }
