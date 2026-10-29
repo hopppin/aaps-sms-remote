@@ -9,16 +9,22 @@ class CommandCatalogTest {
     private fun carbs(g: Int) = (Command.Carbs.of(g, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
 
     @Test
-    fun `CMD-01 katalog ma BG PUMP CARBS BOLUS w tej kolejnosci`() {
+    fun `PROF-01 katalog ma 7 wpisow w kolejnosci`() {
         assertEquals(
-            listOf(CommandId.BG, CommandId.PUMP, CommandId.CARBS, CommandId.BOLUS),
+            listOf(
+                CommandId.BG, CommandId.PUMP, CommandId.CARBS, CommandId.BOLUS,
+                CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH,
+            ),
             CommandCatalog.entries.map { it.id },
         )
     }
 
     @Test
     fun `CMD-01 definitionOf zwraca wpis o tym samym id i slowie kluczowym`() {
-        val expected = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS")
+        val expected = mapOf(CommandId.BG to "BG", CommandId.PUMP to "PUMP", CommandId.CARBS to "CARBS", CommandId.BOLUS to "BOLUS",
+            CommandId.PROFILE_STATUS to "PROFILE STATUS", CommandId.PROFILE_LIST to "PROFILE LIST",
+            CommandId.PROFILE_SWITCH to "PROFILE",
+        )
         for (id in CommandId.entries) {
             val d = CommandCatalog.definitionOf(id)
             assertEquals(id, d.id)
@@ -27,11 +33,11 @@ class CommandCatalogTest {
     }
 
     @Test
-    fun `CMD-01 identyfikatory i slowa kluczowe sa unikalne i pasuja do A-Z`() {
+    fun `PROF-01 identyfikatory i slowa kluczowe sa unikalne i pasuja do wzorca`() {
         val entries = CommandCatalog.entries
         assertEquals(entries.size, entries.map { it.id }.toSet().size)
         assertEquals(entries.size, entries.map { it.keyword }.toSet().size)
-        assertTrue(entries.all { Regex("[A-Z]+").matches(it.keyword) })
+        assertTrue(entries.all { Regex("[A-Z]+( [A-Z]+)*").matches(it.keyword) })
     }
 
     @Test

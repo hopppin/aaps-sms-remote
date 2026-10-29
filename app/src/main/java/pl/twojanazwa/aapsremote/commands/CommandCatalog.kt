@@ -38,6 +38,31 @@ object CommandCatalog {
             requiresCode = true,
             approval = Approval.SUMMARY_WITH_PIN,
         ),
+        CommandDefinition(
+            id = CommandId.PROFILE_STATUS,
+            keyword = "PROFILE STATUS",
+            parameter = CommandParameter.None,
+            requiresCode = false,
+            approval = Approval.ONE_TAP,
+        ),
+        CommandDefinition(
+            id = CommandId.PROFILE_LIST,
+            keyword = "PROFILE LIST",
+            parameter = CommandParameter.None,
+            requiresCode = false,
+            approval = Approval.ONE_TAP,
+        ),
+        CommandDefinition(
+            id = CommandId.PROFILE_SWITCH,
+            keyword = "PROFILE",
+            parameter = CommandParameter.ProfileAndPercent(
+                minPercent = ProfileLimits.MIN_PERCENT,
+                maxPercent = ProfileLimits.MAX_PERCENT,
+                defaultPercent = Command.ProfileSwitch.DEFAULT_PERCENT,
+            ),
+            requiresCode = true,
+            approval = Approval.SUMMARY_WITH_PIN,
+        ),
     )
 
     /** Zawsze zwraca wpis; każdy CommandId ma dokładnie jeden. */

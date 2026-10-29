@@ -22,6 +22,9 @@ object AapsReplyParser {
             is ExpectedCommand.Carbs -> parseCarbs(n, firstLine, body, expected.grams)
 
             is ExpectedCommand.Bolus -> parseBolus(n, firstLine, body, expected.centiUnits)
+
+            // Wzorce profilu - spec 013, zad. 2; do tego czasu polecenia profilu nie odsyłają kodu.
+            ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, is ExpectedCommand.ProfileSwitch -> null
         }
         return result ?: AapsReply.Unrecognized(body)
     }

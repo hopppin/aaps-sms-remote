@@ -23,6 +23,9 @@ fun CommandId.titleRes(): Int = when (this) {
     CommandId.PUMP -> R.string.run_title_pump
     CommandId.CARBS -> R.string.run_title_carbs
     CommandId.BOLUS -> R.string.run_title_bolus
+    CommandId.PROFILE_STATUS -> R.string.run_title_profile_status
+    CommandId.PROFILE_LIST -> R.string.run_title_profile_list
+    CommandId.PROFILE_SWITCH -> R.string.run_title_profile_switch
 }
 
 @StringRes

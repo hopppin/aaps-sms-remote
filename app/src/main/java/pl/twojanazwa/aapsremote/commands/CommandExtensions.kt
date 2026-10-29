@@ -12,6 +12,14 @@ fun Command.smsText(): String = when (this) {
     Command.Pump -> definition.keyword
     is Command.Carbs -> "${definition.keyword} $grams"
     is Command.Bolus -> "${definition.keyword} ${BolusAmountText.toSms(centiUnits)}"
+    Command.ProfileStatus -> definition.keyword
+    Command.ProfileList -> definition.keyword
+    is Command.ProfileSwitch ->
+        if (percent == Command.ProfileSwitch.DEFAULT_PERCENT) {
+            "${definition.keyword} $number"
+        } else {
+            "${definition.keyword} $number $percent"
+        }
 }
 
 /** CMD-08: kontekst parsera wyliczany z tego samego polecenia co treść SMS. */
@@ -20,4 +28,7 @@ fun Command.toExpectedCommand(): ExpectedCommand = when (this) {
     Command.Pump -> ExpectedCommand.Pump
     is Command.Carbs -> ExpectedCommand.Carbs(grams)
     is Command.Bolus -> ExpectedCommand.Bolus(centiUnits)
+    Command.ProfileStatus -> ExpectedCommand.ProfileStatus
+    Command.ProfileList -> ExpectedCommand.ProfileList
+    is Command.ProfileSwitch -> ExpectedCommand.ProfileSwitch(profileName, percent)
 }

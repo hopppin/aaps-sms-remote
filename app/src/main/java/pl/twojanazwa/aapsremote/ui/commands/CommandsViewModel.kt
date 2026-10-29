@@ -194,7 +194,13 @@ class CommandsViewModel @Inject constructor(
         val command = when (val c = summary.command) {
             is Command.Carbs -> (Command.Carbs.of(c.grams, limits) as? CarbsValidation.Valid)?.command
             is Command.Bolus -> (Command.Bolus.of(c.centiUnits, limits) as? BolusValidation.Valid)?.command
-            else -> null
+            // Polecenia profilu nie mają jeszcze UI (spec 013, zad. 4+); nic nie wysyłamy.
+            is Command.ProfileSwitch -> {
+                pin.clear()
+                local.update { it.copy(summary = null) }
+                return
+            }
+            Command.ProfileStatus, Command.ProfileList, Command.Bg, Command.Pump -> null
         }
         if (command == null) {
             pin.clear()

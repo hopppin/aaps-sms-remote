@@ -1,6 +1,6 @@
 package pl.twojanazwa.aapsremote.commands
 
-/** Wpis katalogu. keyword: tylko A-Z. */
+/** Wpis katalogu. keyword: A-Z, słowa rozdzielone pojedynczą spacją. */
 data class CommandDefinition(
     val id: CommandId,
     val keyword: String,

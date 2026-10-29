@@ -120,6 +120,9 @@ object HistoryCodec {
         CommandId.PUMP -> "PUMP"
         CommandId.CARBS -> "CARBS"
         CommandId.BOLUS -> "BOLUS"
+        CommandId.PROFILE_STATUS -> "PROFILE_STATUS"
+        CommandId.PROFILE_LIST -> "PROFILE_LIST"
+        CommandId.PROFILE_SWITCH -> "PROFILE_SWITCH"
     }
 
     private fun encode(reason: FailureReason): String = when (reason) {
