@@ -212,6 +212,14 @@ class HistoryCodecDecodeTest {
         assertEquals(20, HistoryCodec.toEntry(row(command = "CARBS", carbs = 20)).carbsGrams)
     }
 
+    @Test
+    fun `BOL-01 wiersz BOLUS nie rzuca wyjatku i nie ustawia ilosci`() {
+        val entry = HistoryCodec.toEntry(row(command = "BOLUS", carbs = 20))
+        assertEquals(HistoryCommand.UNRECOGNIZED, entry.command)
+        assertNull(entry.carbsGrams)
+        assertEquals(HistoryOutcome.Completed, entry.outcome)
+    }
+
     // ---- DATA-07: wpis ----
 
     @Test

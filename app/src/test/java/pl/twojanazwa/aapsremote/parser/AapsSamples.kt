@@ -8,6 +8,7 @@ object AapsSamples {
     val pump: String get() = read("pump.txt")
     val carbsCodeRequest: String get() = read("carbs-prosba-o-kod.txt")
     val carbsDone: String get() = read("carbs-sukces.txt")
+    val bolusCodeRequest: String get() = read("bolus-prosba-o-kod-0-10.txt")
     val wrongCode: String get() = read("zly-kod.txt")
 
     fun read(name: String): String {
