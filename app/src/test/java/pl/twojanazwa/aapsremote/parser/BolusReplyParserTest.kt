@@ -193,4 +193,35 @@ class BolusReplyParserTest {
             assertTrue(text.contains("Bolus"))
         }
     }
+
+    @Test
+    fun `BOL-07 BOL-09 macierz kontekst x plik - pozostale pliki w kontekscie Bolus`() {
+        val others = listOf(
+            AapsSamples.bg, AapsSamples.pump, AapsSamples.carbsCodeRequest, AapsSamples.carbsDone,
+            AapsSamples.wrongCode,
+        )
+        for (body in others) {
+            for (amount in listOf(10, 120, 500)) {
+                val expectedReply = if (body == AapsSamples.wrongCode) AapsReply.WrongCode else unrecognized(body)
+                assertEquals(expectedReply, parse(body, ExpectedCommand.Bolus(amount)))
+            }
+        }
+    }
+
+    @Test
+    fun `BOL-09 ataki na potwierdzenie bolusa sa nierozpoznane`() {
+        val ok = "Bolus 1,20 U podany prawidlowo"
+        val variants = listOf(
+            "$ok dopisek",
+            "$ok 5",
+            "$ok.",
+            "Uwaga $ok",
+            "5 $ok",
+            "Bolus 1,200 U podany prawidlowo",
+            "Bolus 01,20 U podany prawidlowo",
+            "Bolus 1.20 U podany prawidlowo",
+            "Bolus 1,2 U podany prawidlowo",
+        )
+        for (body in variants) assertEquals(unrecognized(body), parse(body, ExpectedCommand.Bolus(120)))
+    }
 }

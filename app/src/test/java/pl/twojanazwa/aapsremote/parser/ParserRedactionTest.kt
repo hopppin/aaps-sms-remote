@@ -71,4 +71,14 @@ class ParserRedactionTest {
         assertTrue(e is IllegalArgumentException)
         assertFalse(e?.message.orEmpty().contains("5"))
     }
+
+    @Test
+    fun `BOL-08 toString niezgodnej ilosci bolusa nie zawiera ilosci`() {
+        for (stage in CarbsStage.values()) {
+            val text = AapsReply.BolusAmountMismatch(737, 419, stage, "Bolus 4,19 U podany prawidlowo").toString()
+            for (word in listOf("737", "419", "7,37", "4,19", "podany")) {
+                assertFalse(text.contains(word), "zawiera zabroniony fragment")
+            }
+        }
+    }
 }
