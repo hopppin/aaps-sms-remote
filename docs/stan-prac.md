@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-10-28 (po #219)_
+_Ostatnia aktualizacja: 2026-10-29 (po #253)_
 
 ## Zrobione
 
@@ -32,16 +32,21 @@ _Ostatnia aktualizacja: 2026-10-28 (po #219)_
 | Poprawki UI 009/010 | spec: czytnik ekranu (`stateDescription` kroków, CMDUI-17), `FLAG_SECURE` od startu polecenia do zamknięcia wyniku na każdej zakładce i w oknie „Na pewno” (CMDUI-09, CMDUI-23), przypadek brzegowy czyszczenia historii zapisany jako przyjęty (HISTUI-10); kod i testy | PR #207 (spec), #214, #215, #212 (issues #209–#211) |
 | Ikona aplikacji | adaptacyjna ikona wektorowa (dymek SMS z kroplą, warstwa monochrome), bez osobnej spec (same zasoby) | PR #213 (issue #208) |
 | CMDUI-11 | czyszczenie PIN-u i podsumowania przy zmianie zakładki (`DisposableEffect` w `CommandsScreen`), PIN nie przeżywa zmiany zakładki; przebieg i `FLAG_SECURE` bez zmian | PR #217 (spec), #219 (issue #218) |
+| Spec 011 limity poleceń | zatwierdzona, w całości zaimplementowana: `CommandLimits` (max CARBS domyślnie 50 g, max bolus 5,00 j., odstęp między bolusami 15 min), zapis w `SharedPreferences` (`command_limits`), sekcja „Limity poleceń” w Ustawieniach, sprawdzanie przy starcie | PR #221 (spec); kod: #238–#240, #242 |
+| Spec 012 bolus | zatwierdzona, w całości zaimplementowana: `BOLUS <j>` (kwoty w setnych j., SMS z kropką, odpowiedzi AAPS z przecinkiem), parser, sesja z drugą linią obrony (`amountMatches`), odstęp między bolusami, okno „Na pewno”, historia, migracja Room 1 → 2 | PR #221 (spec); kod: #241, #243–#247 |
+| Spec 013 profil | zatwierdzona, w całości zaimplementowana: `PROFILE STATUS`, `PROFILE LIST`, `PROFILE <nr> [<proc>]` (50–200%, domyślnie 100), sesja zgodna z nazwą i procentem, sekcja „Profil” z listą i formularzem, historia, migracja Room 2 → 3 (przetestowana na telefonie, 2 → 3) | PR #221 (spec); kod: #248–#252 |
+| Spec 002–010 po 011–013 | wpisy „Planowane zmiany” zamienione na zwykłe; wymagania przepisane zgodnie z kodem | PR #253 (issue #237) |
 | Test na telefonie | pierwsza instalacja APK (debug) na telefonie z AAPS: Historia, `BG`, `CARBS 1` z kodem działają; `PUMP` bez pompy przy telefonie nie dostaje stanu pompy (AAPS odpowiada spóźnionym „Odczyt statusu nie powiodl sie”, aplikacja traktuje to jako wiadomość nieoczekiwaną) | zamknięte issue #205 |
 
 ## W toku
 
-Brak otwartych issues i PR-ów. Prace przerwane na prośbę użytkownika; wznowienie na jego znak.
+Brak otwartych issues i PR-ów. Bolus i zmiana profilu czekają na ręczny test na wirtualnej pompie (nigdy na prawdziwej).
 
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 ## Następne kroki
 
+0. Test na telefonie z wirtualną pompą AAPS (APK z `main`): bolus W1–W6 ze [spec 012](specs/012-bolus/spec.md) i profil W1, W2, W4 ze [spec 013](specs/013-profil/spec.md); zanotować dokładne teksty AAPS (patrz „Otwarte”); po teście przywrócić profil 100%. Migracja bazy 1 → 3 nie była sprawdzana na urządzeniu.
 1. Dokończyć ręczną weryfikację na telefonie (nowy APK): ikona aplikacji (#213), W13 ze specyfikacji 009 (TalkBack na krokach), W4–W12 ze [specyfikacji 009](specs/009-ui-polecenia/spec.md) (m.in. W6: zmiana zakładki z otwartym podsumowaniem i PIN-em czyści PIN, a przebieg trwa; W10: `FLAG_SECURE` także po zmianie zakładki w trakcie polecenia i w oknie „Na pewno”; zrzut ekranu zablokowany na podsumowaniu, przebiegu i wyniku, Wstecz i „Wyjdź”, tryb samolotowy, AAPS wyłączony), W1–W8 ze [spec 010](specs/010-ui-historia/spec.md) (szczegóły, czyszczenie, `FLAG_SECURE` na Historii, kopia zapasowa, zmiana strefy czasowej), W7 ze spec 008 (aparat zajęty przez inną aplikację), punkty ze spec 005, 006 i 007. Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo.
 2. Ewentualnie później: przyczyna w `SendResult.Failed` (zmiana spec 004), usługa pierwszoplanowa na czas polecenia (osobna spec), `TotpSecret.clear()` po zakończeniu polecenia (zmiana spec 001 i 004, „Przyszłe zmiany” w spec 006), doprecyzowanie w design 006: `encrypt` przy pustym tekście jawnym → `UNAVAILABLE`, `CancellationException` w szkicach `KeyGenerationPolicy`/klasyfikatora; numer AAPS ustalany raz na polecenie (zmiana spec 004/005, „Przyszłe zmiany” w spec 007); jawne rozpoznanie „Odczyt statusu nie powiodl sie” jako niepowodzenia `PUMP` (odrzucone na razie – limit 3 min zostaje).
 
@@ -64,3 +69,9 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
 - Etap 2 planu: porównanie kodu z aplikacji z Authenticatorem na żywo – częściowo (kod w `CARBS 1` przyjęty przez AAPS), pełne porównanie jeszcze niezrobione.
 - Rozstrzygnięte 2026-10-28: kroki przebiegu mają trzy statusy dla czytnika ekranu (wykonany, w toku, oczekuje); HISTUI-10 bez zmiany zachowania (okno pokazuje liczbę z chwili otwarcia); `FLAG_SECURE` trwa do końca polecenia na każdej zakładce (skutek: w trakcie polecenia zrzuty blokuje także zakładka Ustawienia); okno „Na pewno” chronione.
+- **Brakujące lub niezweryfikowane teksty AAPS** (do uzupełnienia po teście na wirtualnej pompie; pliki z danymi i ich README mówią, co jest prawdziwe, a co założone):
+  - sukces zmiany profilu: [docs/specs/013-profil/dane/](specs/013-profil/dane/) (dodać `profile-sukces-*.txt`, potem wzorzec w parserze i test),
+  - odmowa AAPS przy zbyt krótkim odstępie między bolusami: [docs/specs/012-bolus/dane/](specs/012-bolus/dane/) (dodać `bolus-odstep-*.txt`),
+  - zły kod przy `BOLUS` i przy zmianie profilu: `bolus-zly-kod.txt` i `profile-zly-kod.txt` w tych samych katalogach,
+  - bolus w kolejce pompy (odpowiedź po dłuższym czasie) i błąd bolusa (`bolus-niepowodzenie-*.txt`).
+- **Dług techniczny/dokumentacyjny:** `design.md` spec 002, 007, 009, 010 nie uwzględnia zmian 011–013 (np. sygnatura `CommandLauncher.launch(command, pin, extraConfirmed)`, pola bolusa i profilu w historii, mapowanie etykiet); kryteria HISTUI-04 dla `CARBS`/`Completed` i bolusa bez ilości używają „sukces/brak szczegółów” zamiast dokładnego tekstu z tabeli; brak testu `CARBS 100` w `CommandSmsTextTest` (wzorzec obejmuje 1–50); brak testów migracji Room na urządzeniu (`androidTest`); baner sekretu mówi tylko o `CARBS`; `onQuickValueClicked` po cichu nie otwiera podsumowania przy wartości ponad próg (nieosiągalne przy spójnych limitach); nieaktualny KDoc w `CommandsViewModel`.
