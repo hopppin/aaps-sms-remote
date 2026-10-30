@@ -295,6 +295,12 @@ class CommandSession(
     /** BOL-19: prośba o kod / potwierdzenie innego rodzaju niż polecenie sesji = Unrecognized. */
     private fun parseMatching(sms: IncomingSms): AapsReply {
         val reply = parse(sms.body, command.toExpectedCommand())
+        // PROF-12: prośba o kod z innym procentem niż wysłany (np. błąd parsera) to niezgodny profil, nigdy kod.
+        if (reply is AapsReply.ProfileCodeRequest && command is Command.ProfileSwitch &&
+            !profileRequestMatches(reply.text, command)
+        ) {
+            return AapsReply.ProfileSwitchMismatch(sms.body)
+        }
         val matches = when (reply) {
             is AapsReply.MatchingCodeRequest -> ReplyMatch.isCodeRequestFor(command.id, reply)
             is AapsReply.MatchingDone -> ReplyMatch.isDoneFor(command.id, reply)

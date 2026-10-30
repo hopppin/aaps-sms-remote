@@ -15,11 +15,11 @@ class ProfileReplyParserTest {
     private fun request(name: String, percent: Int) =
         "Aby przelaczyc profil na $name $percent% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em"
 
-    private fun switch(name: String, percent: Int) = ExpectedCommand.ProfileSwitch(name, percent)
+    private fun switch(percent: Int) = ExpectedCommand.ProfileSwitch(percent)
 
     private val allContexts = listOf(
         ExpectedCommand.Bg, ExpectedCommand.Pump, ExpectedCommand.Carbs(1), ExpectedCommand.Bolus(10),
-        ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, switch("LocalProfile1", 100),
+        ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList, switch(100),
     )
 
     // PROF-06
@@ -106,32 +106,30 @@ class ProfileReplyParserTest {
     }
 
     @Test
-    fun `PROF-07 prosba dla nazwy A 2 B przy innej nazwie to niezgodny profil`() {
-        val body = request("A 2. B", 100)
-        // Greedy nazwa: "A 2. B" == oczekiwana -> kod; inny podzial -> stop.
-        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch("A 2. B", 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(body), parse(body, switch("A", 100)))
+    fun `PROF-08 nazwa nie jest porownywana tylko procent`() {
+        for (name in listOf("A 2. B", "LocalProfile2", "Zażółć ąż", " Sport ")) {
+            val body = request(name, 100)
+            assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(100)))
+        }
     }
-
-    // PROF-08
 
     @Test
     fun `PROF-08 plik prosby w zmianie LocalProfile1 100 to prosba o kod`() {
         val body = AapsSamples.profileCodeRequest
-        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch("LocalProfile1", 100)))
+        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(100)))
     }
 
     @Test
     fun `PROF-08 prosba dla Dzien roboczy 115 to prosba o kod`() {
         val body = request("Dzien roboczy", 115)
-        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch("Dzien roboczy", 115)))
+        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(115)))
     }
 
     @Test
     fun `PROF-08 prosba z druga linia albo z przelaczyc to nierozpoznana`() {
         val base = AapsSamples.profileCodeRequest
         for (body in listOf(base + "\nDruga", base.replace("przelaczyc", "przełączyć"))) {
-            assertEquals(unrecognized(body), parse(body, switch("LocalProfile1", 100)))
+            assertEquals(unrecognized(body), parse(body, switch(100)))
         }
     }
 
@@ -147,74 +145,34 @@ class ProfileReplyParserTest {
     // PROF-09
 
     @Test
-    fun `PROF-09 niezgodna nazwa lub procent to niezgodny profil nigdy prosba o kod`() {
+    fun `PROF-09 niezgodny procent to niezgodny profil nigdy prosba o kod`() {
         val body = AapsSamples.profileCodeRequest
-        for (c in listOf(
-            switch("LocalProfile2", 100), switch("LocalProfile1", 115),
-            switch("LocalProfile", 100), switch("localprofile1", 100),
-        )) {
+        for (c in listOf(switch(115), switch(50), switch(200))) {
             assertEquals(AapsReply.ProfileSwitchMismatch(body), parse(body, c))
         }
-    }
-
-    // Uzupelnienia z recenzji (PROF-07..09)
-
-    @Test
-    fun `PROF-08 nazwy z procentem w srodku prosba o kod przy rownej nazwie i procencie`() {
-        val a = request("Sport 50% extra", 100)
-        assertEquals(AapsReply.ProfileCodeRequest(a), parse(a, switch("Sport 50% extra", 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(a), parse(a, switch("Sport", 50)))
-        val b = request("Sport 50%", 100)
-        assertEquals(AapsReply.ProfileCodeRequest(b), parse(b, switch("Sport 50%", 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(b), parse(b, switch("Sport", 50)))
-        val c = request("Sport 100%", 50)
-        assertEquals(AapsReply.ProfileCodeRequest(c), parse(c, switch("Sport 100%", 50)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(c), parse(c, switch("Sport", 100)))
+        val big = request("LocalProfile1", 1000)
+        assertEquals(AapsReply.ProfileSwitchMismatch(big), parse(big, switch(100)))
     }
 
     @Test
-    fun `PROF-09 wiodace i koncowe spacje w nazwie to scisla rownosc`() {
-        val lead = request(" Sport", 100)
-        assertEquals(AapsReply.ProfileCodeRequest(lead), parse(lead, switch(" Sport", 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(lead), parse(lead, switch("Sport", 100)))
-        val trail = request("Sport ", 100)
-        assertEquals(AapsReply.ProfileCodeRequest(trail), parse(trail, switch("Sport ", 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(trail), parse(trail, switch("Sport", 100)))
-    }
-
-    @Test
-    fun `PROF-09 polskie znaki i NFC kontra NFD to scisla rownosc`() {
-        val nfc = Normalizer.normalize("Zażółć ąż", Normalizer.Form.NFC)
-        val nfd = Normalizer.normalize(nfc, Normalizer.Form.NFD)
-        assertTrue(nfc != nfd)
-        val body = request(nfc, 100)
-        assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(nfc, 100)))
-        assertEquals(AapsReply.ProfileSwitchMismatch(body), parse(body, switch(nfd, 100)))
-        val bodyNfd = request(nfd, 100)
-        assertEquals(AapsReply.ProfileSwitchMismatch(bodyNfd), parse(bodyNfd, switch(nfc, 100)))
-    }
-
-    @Test
-    fun `PROF-09 metaznaki regexu w oczekiwanej nazwie sa porownywane doslownie`() {
-        for (name in listOf("A.B*", "(x)")) {
-            val body = request(name, 100)
-            assertEquals(AapsReply.ProfileCodeRequest(body), parse(body, switch(name, 100)))
-        }
-        val dot = request("AxB", 100)
-        assertEquals(AapsReply.ProfileSwitchMismatch(dot), parse(dot, switch("A.B*", 100)))
-        val grp = request("x", 100)
-        assertEquals(AapsReply.ProfileSwitchMismatch(grp), parse(grp, switch("(x)", 100)))
+    fun `PROF-08 nazwy z liczba lub procentem w srodku nie myla procentu`() {
+        val zima = request("Zima 200", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(zima), parse(zima, switch(100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(zima), parse(zima, switch(200)))
+        val plan = request("Plan 50%", 100)
+        assertEquals(AapsReply.ProfileCodeRequest(plan), parse(plan, switch(100)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(plan), parse(plan, switch(50)))
     }
 
     @Test
     fun `PROF-09 procent 1150 kontra 115 i zapis 0115`() {
         val big = request("A", 1150)
-        assertEquals(AapsReply.ProfileSwitchMismatch(big), parse(big, switch("A", 115)))
-        assertEquals(AapsReply.ProfileCodeRequest(big), parse(big, switch("A", 1150)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(big), parse(big, switch(115)))
+        assertEquals(AapsReply.ProfileCodeRequest(big), parse(big, switch(1150)))
         val small = request("A", 115)
-        assertEquals(AapsReply.ProfileSwitchMismatch(small), parse(small, switch("A", 1150)))
+        assertEquals(AapsReply.ProfileSwitchMismatch(small), parse(small, switch(1150)))
         val zero = "Aby przelaczyc profil na A 0115% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em"
-        assertEquals(unrecognized(zero), parse(zero, switch("A", 115)))
+        assertEquals(unrecognized(zero), parse(zero, switch(115)))
     }
 
     @Test
@@ -243,13 +201,13 @@ class ProfileReplyParserTest {
 
     @Test
     fun `PROF-10 zly kod w zmianie profilu to zly kod`() {
-        assertEquals(AapsReply.WrongCode, parse(AapsSamples.wrongCode, switch("LocalProfile1", 100)))
+        assertEquals(AapsReply.WrongCode, parse(AapsSamples.wrongCode, switch(100)))
     }
 
     @Test
     fun `PROF-10 bledny format w kontekstach profilu to nierozpoznana`() {
         val body = AapsSamples.profileBadFormat
-        for (c in listOf(switch("LocalProfile1", 100), ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList)) {
+        for (c in listOf(switch(100), ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList)) {
             assertEquals(unrecognized(body), parse(body, c))
         }
     }
@@ -261,9 +219,9 @@ class ProfileReplyParserTest {
         val cases = listOf(
             AapsSamples.profileStatus to ExpectedCommand.ProfileStatus,
             AapsSamples.profileList to ExpectedCommand.ProfileList,
-            AapsSamples.profileCodeRequest to switch("LocalProfile1", 100),
-            AapsSamples.profileCodeRequest to switch("LocalProfile2", 100),
-            AapsSamples.profileBadFormat to switch("LocalProfile1", 100),
+            AapsSamples.profileCodeRequest to switch(100),
+            AapsSamples.profileCodeRequest to switch(100),
+            AapsSamples.profileBadFormat to switch(100),
         )
         for ((body, ctx) in cases) {
             val s = parse(body, ctx).toString()
@@ -280,7 +238,7 @@ class ProfileReplyParserTest {
         val files = mapOf(
             AapsSamples.profileStatus to ExpectedCommand.ProfileStatus,
             AapsSamples.profileList to ExpectedCommand.ProfileList,
-            AapsSamples.profileCodeRequest to switch("LocalProfile1", 100),
+            AapsSamples.profileCodeRequest to switch(100),
         )
         for ((body, owner) in files) {
             for (ctx in allContexts) {

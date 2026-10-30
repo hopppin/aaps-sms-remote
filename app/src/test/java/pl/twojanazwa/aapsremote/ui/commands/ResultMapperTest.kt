@@ -368,7 +368,7 @@ class ResultMapperTest {
 
     /** Po jednym wyniku na każdy [ResultMessage] (wspólne z RunTextsTest). */
     private fun profileSwitch(): Command =
-        (Command.ProfileSwitch.of(pl.twojanazwa.aapsremote.commands.ProfileChoice(1, "LocalProfile1"), 115)
+        (Command.ProfileSwitch.of(115)
             as pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation.Valid).command
 
     internal fun resultSamples(): List<SessionResult> {
