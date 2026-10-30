@@ -74,4 +74,13 @@ class HistoryCodecProfileTest {
         )
         assertNull(carbs.profileNumber)
     }
+
+    @Test
+    fun `PROF-17 stary wiersz PROFILE_SWITCH z numerem 2 i procentem 115 dekoduje sie bez bledu i bez walidacji zakresu`() {
+        val row = HistoryRow(1, "PROFILE_SWITCH", null, "COMPLETED", null, t0, t0, null, t0, null, 0, null, 2, 115)
+        val entry = HistoryCodec.toEntry(row)
+        assertEquals(HistoryCommand.PROFILE_SWITCH, entry.command)
+        assertEquals(2, entry.profileNumber)
+        assertEquals(115, entry.profilePercent)
+    }
 }
