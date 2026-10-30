@@ -524,7 +524,7 @@ Klucze są wiążące; treści – jak w spec. Każde zadanie dodaje swój blok 
 | `commands_large_confirm` | Tak, %1$d g | d |
 | `commands_large_dismiss` | Nie | |
 | `commands_summary_title` | Wysłać CARBS %1$d g do AAPS? | d |
-| `commands_summary_text` | Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g. | d |
+| `commands_summary_text` | Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla %1$d g. | d |
 | `commands_pin_label` | PIN AAPS | |
 | `commands_send` | Wyślij | |
 | `commands_open_settings` | Przejdź do Ustawień | |

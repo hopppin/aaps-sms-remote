@@ -367,7 +367,7 @@ Brak. Decyzje przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
-- **Planowane zmiany (Spec 013, 2026-10-30).** DATA-07: kryterium zmiany profilu z numerem 1 (aplikacja zmienia tylko profil 1, [PROF-17](../013-profil/spec.md#prof-17-historia)); wpisy z innym numerem mogą istnieć tylko sprzed zmiany. Schemat i kolumny bez zmian. Treść kryterium zostanie przepisana w zadaniu 4 design 013 po wdrożeniu.
+- **Planowane zmiany (Spec 013, 2026-10-30).** DATA-07: kryterium zmiany profilu z numerem 1 (aplikacja zmienia tylko profil 1, [PROF-17](../013-profil/spec.md#prof-17-historia)); wpisy z innym numerem mogą istnieć tylko sprzed zmiany. Schemat i kolumny bez zmian. Treść kryterium zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013 (PROF-17: nowe wpisy mają numer 1).
 
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - Nowy plik ustawień `command_limits` (LIM-04); DATA-01 i plik `settings` bez zmian; DATA-16 obejmuje oba pliki (domena `sharedpref`).

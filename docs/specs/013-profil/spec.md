@@ -35,10 +35,10 @@ Użytkownik sprawdza z aplikacji aktualny profil AAPS (`PROFILE STATUS`) i zmien
 | R2 | `PROFILE STATUS` → `LocalProfile1 (115%)`; bez kodu. | SMS | PROF-06. |
 | R3 | `PROFILE 1` → `Aby przelaczyc profil na LocalProfile1 100% odpowiedz kodem z aplikacji Authenticator dla: <nazwa>, z doklejonym PIN-em`. Nazwa profilu w prośbie pochodzi z listy profili AAPS. | SMS, kod | PROF-08: porównanie procentu; nazwa tylko pokazywana (w treści SMS), nie porównywana. |
 | R4 | `PROFILE 99` (numer spoza listy) i `PROFILE 1 0` (procent 0) → `Bledny format`. Numer 0 też daje błąd formatu; numer ujemny może nie być obsłużony przez AAPS. | SMS, kod | Aplikacja wysyła tylko numer 1 i procent 50–200 (PROF-02); odpowiedź `Bledny format` = nierozpoznana (PROF-10). |
-| R5 | Po kodzie AAPS tworzy zmianę profilu (`createProfileSwitch`, czas trwania 0, procent). Procent **nie** przechodzi w AAPS przez żadne ograniczenia. | kod | Aplikacja sama ogranicza procent (PROF-02, P3). |
+| R5 | Po kodzie AAPS tworzy zmianę profilu (`createProfileSwitch`, czas trwania 0, procent). Poza odrzuceniem procentu 0 (R4, błąd formatu) AAPS **nie** ogranicza zakresu procentu. | kod | Aplikacja sama ogranicza procent do 50–200 (PROF-02, P3). |
 | R6 | Każde nowe polecenie nadpisuje oczekującą w AAPS prośbę o kod (A6). | kod | Aplikacja ma jedną aktywną sesję (SESSION-22), więc `PROFILE STATUS` nie trafia w środek innego polecenia z aplikacji. |
 
-**Niezweryfikowane na telefonie:** odpowiedź po poprawnym kodzie zmiany profilu, „Zly kod” dla profilu, odpowiedź przy pustej liście profili, odpowiedź na `PROFILE 1 100` (procent 100 podany jawnie; W2).
+**Niezweryfikowane na telefonie (otwarte, nie traktować jako potwierdzony kontrakt AAPS; „Otwarte pytania” O1 – O4):** odpowiedź na `PROFILE 1 100` (procent 100 podany jawnie; W2), odpowiedź po poprawnym kodzie zmiany profilu, „Zly kod” dla profilu, odpowiedź przy pustej liście profili.
 
 ## Pojęcia
 
@@ -105,6 +105,8 @@ Pole procentu jest wypełnione tekstem `100` przy otwarciu formularza. Walidacja
 
 - **Zakładając** polecenia `PROFILE STATUS`, `PROFILE LIST`, zmianę z procentem 100, 115 i 50, **gdy** zbudowano treści, **wtedy** są to kolejno `PROFILE STATUS`, `PROFILE LIST`, `PROFILE 1 100`, `PROFILE 1 115`, `PROFILE 1 50`.
 
+**Plan awaryjny (O1):** jeśli W2 pokaże, że AAPS nie prosi o kod dla `PROFILE 1 100` (np. `Bledny format`), dla procentu 100 wysyłamy `PROFILE 1` (dowód R3), a kontekst parsera, porównanie procentu i reszta spec zostają bez zmian. Wymaga osobnego PR `Spec:` zmieniającego PROF-04 (i kryterium `PROFILE 1 100` w CMD-07) przed zmianą kodu.
+
 ### PROF-05: Kontekst parsera i brak ujawniania
 
 `PROFILE STATUS` → kontekst „stan profilu”, `PROFILE LIST` → „lista profili”, zmiana profilu → „zmiana profilu (procent)”. Kontekst zmiany profilu nie zawiera nazwy ani numeru profilu. `toString()` poleceń, wyników walidacji, kontekstów i wyników parsera nie zawiera nazwy profilu, numeru, procentu ani treści SMS.
@@ -162,6 +164,8 @@ Aby przelaczyc profil na <nazwa> <P>% odpowiedz kodem z aplikacji Authenticator 
 - **Zakładając** `profile-prosba-o-kod.txt`, **gdy** kontekst = zmiana (100), **wtedy** prośba o kod z treścią równą wejściu.
 - **Zakładając** wariant syntetyczny `Aby przelaczyc profil na LocalProfile2 100% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em` (inna nazwa, ten sam procent), **gdy** kontekst = zmiana (100), **wtedy** prośba o kod.
 - **Zakładając** wariant syntetyczny dla `Dzien roboczy 115%`, **gdy** kontekst = zmiana (115), **wtedy** prośba o kod.
+- **Zakładając** wariant syntetyczny z nazwą `Zima 200` i prośbą o `100%`, **gdy** kontekst = zmiana (100), **wtedy** prośba o kod; **gdy** kontekst = zmiana (200), **wtedy** niezgodny profil (liczba w nazwie nie jest procentem).
+- **Zakładając** wariant syntetyczny z nazwą `Plan 50%` i prośbą o `100%` (treść `… na Plan 50% 100% odpowiedz kodem …`), **gdy** kontekst = zmiana (100), **wtedy** prośba o kod; **gdy** kontekst = zmiana (50), **wtedy** niezgodny profil.
 - **Zakładając** `profile-prosba-o-kod.txt` z drugą linią albo z `przełączyć`, **gdy** kontekst = zmiana (100), **wtedy** nierozpoznana.
 - **Zakładając** `profile-prosba-o-kod.txt`, **gdy** kontekst = `Carbs(1)`, `Bolus(10)`, `BG` albo lista profili, **wtedy** nierozpoznana.
 
@@ -208,7 +212,7 @@ Sesja zmiany profilu przebiega jak `CARBS`/`BOLUS` (fazy, limity, SESSION-08 –
 | zły kod | `Failed(UNEXPECTED_REPLY)` | `Failed(WRONG_CODE)` (P4) |
 | nierozpoznana (np. `Bledny format`, nieznane potwierdzenie) | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | `Unknown(UNRECOGNIZED_REPLY)` z treścią |
 
-Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_MISMATCH` obejmuje dla profilu niezgodny procent (bez nowego powodu w `FailureReason`). Kod jest odsyłany tylko na `ProfileCodeRequest` w sesji zmiany profilu; prośba o kod innego polecenia daje stop bez kodu (BOL-19). Sesja niezależnie od parsera sprawdza w treści prośby, że procent jest równy wysłanemu (druga linia obrony, jak BOL-10); nazwy profilu nie sprawdza (PROF-08). Inny nadawca, wiadomość sprzed wysłania polecenia i nierozpoznana treść kończą się jak dotychczas – bez kodu (Spec 004, 005).
+Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_MISMATCH` obejmuje dla profilu niezgodny procent (bez nowego powodu w `FailureReason`). Kod jest odsyłany tylko na `ProfileCodeRequest` w sesji zmiany profilu; prośba o kod innego polecenia daje stop bez kodu (BOL-19). Sesja niezależnie od parsera sprawdza w treści prośby, że procent jest równy wysłanemu (druga linia obrony, jak BOL-10); nazwy profilu nie sprawdza (PROF-08). Inny nadawca (SMS-04), wiadomość sprzed wysłania polecenia (SESSION-05) i nierozpoznana treść kończą się jak dotychczas – bez kodu; każdy z tych przypadków ma własne kryterium poniżej.
 
 **Kryteria akceptacji:**
 
@@ -216,9 +220,13 @@ Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_M
 - **Zakładając** sesję zmiany (100), **gdy** przychodzi syntetyczna prośba `Aby przelaczyc profil na LocalProfile2 100% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em` (inna nazwa, zgodny procent), **wtedy** kod `0504714321` jest wysłany, a faza = `AWAITING_CONFIRMATION`.
 - **Zakładając** sesję zmiany (115), **gdy** przychodzi `profile-prosba-o-kod.txt` (100%), **wtedy** `Failed(AMOUNT_MISMATCH)` i port nie dostał kodu.
 - **Zakładając** sesję zmiany (115), **gdy** przychodzi `profile-bledny-format.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i bez kodu.
-- **Zakładając** sesję zmiany (100), **gdy** `profile-prosba-o-kod.txt` przychodzi z czasem odbioru wcześniejszym niż wysłanie polecenia, **wtedy** wiadomość jest pomijana (SESSION-05), faza = `AWAITING_CODE_REQUEST` i port nie dostał kodu. Wiadomość z innego numeru nie dociera do sesji (SMS-04, bez zmian).
+- **Zakładając** sesję zmiany (100), **gdy** `profile-prosba-o-kod.txt` przychodzi z czasem odbioru wcześniejszym niż wysłanie polecenia, **wtedy** wiadomość jest pomijana (SESSION-05), faza = `AWAITING_CODE_REQUEST` i port nie dostał kodu.
 - **Zakładając** sesję zmiany po kodzie, **gdy** przychodzi syntetyczny `Profil zmieniony`, **wtedy** `Unknown(UNRECOGNIZED_REPLY)` z tą treścią; gdy `zly-kod.txt` – `Failed(WRONG_CODE)`.
 - **Zakładając** sesję zmiany (100), **gdy** przychodzi `bolus-prosba-o-kod-0-10.txt` albo `carbs-prosba-o-kod.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i bez kodu (BOL-19).
+- **Zakładając** sesję `CARBS 1` i osobno sesję `BOLUS 10` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `profile-prosba-o-kod.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i port nie dostał kodu (odwrotny kierunek BOL-19).
+- **Zakładając** sesję zmiany (115) i podstawiony parser, który dla `profile-prosba-o-kod.txt` (100%) zwraca `ProfileCodeRequest`, **gdy** przychodzi ta wiadomość, **wtedy** `Failed(AMOUNT_MISMATCH)` i port nie dostał kodu (druga linia obrony działa niezależnie od parsera, jak BOL-10).
+- **Zakładając** sesję zmiany (200) i wariant syntetyczny z nazwą `Zima 200` i prośbą o `100%`, **gdy** przychodzi, **wtedy** `Failed(AMOUNT_MISMATCH)` i bez kodu; **zakładając** sesję zmiany (100) i ten sam wariant, **wtedy** kod `0504714321` jest wysłany.
+- **Zakładając** sesję zmiany (100), **gdy** `profile-prosba-o-kod.txt` przychodzi z innego numeru niż numer AAPS, **wtedy** (SMS-04, test odbioru z trwającą sesją zmiany profilu) sesja nie dostaje wiadomości, faza = `AWAITING_CODE_REQUEST` i port nie dostał kodu.
 
 ### UI
 
@@ -245,7 +253,7 @@ Panel nie ma przycisku wysyłającego `PROFILE LIST`.
 
 ### PROF-15: Formularz procentu i podsumowanie z PIN-em
 
-Formularz pokazuje tytuł „Zmiana profilu 1”, pole „Procent (%)” (`KeyboardType.Number`, tekst początkowy `100`), „Dalej” i „Anuluj”. „Dalej” waliduje procent (PROF-03; błędy: „Podaj procent (50–200).”, „Tylko cyfry.”, „Najmniejszy procent to 50.”, „Największy procent to 200.”) i otwiera podsumowanie z PIN-em (zachowanie CMDUI-10, CMDUI-11, fokus pola PIN – CMDUI-28): „Zmienić profil 1 na P%?” i „Aplikacja wyśle PROFILE 1 P, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla zmiany profilu na P%. Nazwę profilu podaje AAPS – aplikacja jej nie sprawdza.”. „Anuluj”, Wstecz i `onStop()` zamykają formularz i podsumowanie i czyszczą PIN; ponowne „Zmień profil” otwiera formularz z tekstem `100`. Formularz i podsumowanie mają `FLAG_SECURE` (znacznik „ekran chroniony” obejmuje formularz; CMDUI-23).
+Formularz pokazuje tytuł „Zmiana profilu 1”, pole „Procent (%)” (`KeyboardType.Number`, tekst początkowy `100`), „Dalej” i „Anuluj”. „Dalej” waliduje procent (PROF-03; błędy: „Podaj procent (50–200).”, „Tylko cyfry.”, „Najmniejszy procent to 50.”, „Największy procent to 200.”) i otwiera podsumowanie z PIN-em (zachowanie CMDUI-10, CMDUI-11, fokus pola PIN – CMDUI-28): „Zmienić profil 1 na P%?” i „Aplikacja wyśle PROFILE 1 P, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla zmiany profilu na P%. Nazwę profilu podaje AAPS – aplikacja jej nie sprawdza.”. „Anuluj”, Wstecz i `onStop()` zamykają formularz i podsumowanie i czyszczą PIN; ponowne „Zmień profil” otwiera formularz z tekstem `100`. Formularz i podsumowanie mają `FLAG_SECURE` (znacznik „ekran chroniony” obejmuje formularz; CMDUI-23).
 
 **Kryteria akceptacji:**
 
@@ -261,7 +269,7 @@ Nagłówki: „Polecenie PROFILE STATUS”, „Polecenie PROFILE LIST”, „Zmi
 | Wynik | Rodzaj | Komunikat |
 | --- | --- | --- |
 | `Completed`, `PROFILE STATUS` | sukces | „Odpowiedź AAPS na PROFILE STATUS” |
-| `Completed`, `PROFILE LIST` (nieosiągalny z UI) | sukces | „Lista profili z AAPS. Wybierz profil, aby go zmienić.” (bez pozycji do wyboru) |
+| `Completed`, `PROFILE LIST` (nieosiągalny z UI) | sukces | „Lista profili z AAPS.” (bez pozycji do wyboru; tekst w kodzie zmienia się w zadaniu 2 razem z usunięciem wyboru) |
 | `Failed(AMOUNT_MISMATCH)`, zmiana profilu | błąd | „AAPS poprosił o kod dla innego procentu niż wysłany.” |
 | `Unknown(AMOUNT_MISMATCH)`, zmiana profilu | nieznany | „Po wysłaniu kodu AAPS podał inny procent.” |
 | `Unknown(UNRECOGNIZED_REPLY)`, zmiana profilu | nieznany | „Po wysłaniu kodu przyszła odpowiedź AAPS, której aplikacja nie rozpoznaje. Przeczytaj treść SMS i sprawdź w AAPS.” |
@@ -277,7 +285,7 @@ Wynik każdej zmiany profilu z treścią SMS pokazuje tę treść (CMDUI-20), wi
 
 ### PROF-17: Historia
 
-Zmiana DATA-07, DATA-09, DATA-14, HISTUI-03: stałe teksty poleceń `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` (`PROFILE_LIST` zostaje także dla wpisów zapisanych przed 2026-10-30); pola wpisu „numer profilu” i „procent profilu” (tylko `PROFILE_SWITCH`, inaczej brak; dla nowych wpisów numer = 1). Nazwa profilu nie jest osobnym polem (jest w treści odpowiedzi). Baza w wersji 3: migracja 2 → 3 dodaje kolumny `profile_number INTEGER` i `profile_percent INTEGER` (obie dopuszczają `NULL`); plik `3.json` w repo. Obie migracje są rejestrowane jednym wywołaniem `addMigrations(MIGRATION_1_2, MIGRATION_2_3)`, więc baza w wersji 1 przechodzi do 3 kolejno przez 2. Zadanie z migracją można scalić dopiero po ręcznym sprawdzeniu W3 na prawdziwej bazie (wynik w opisie PR). Etykiety: „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%”, przy braku pól „Zmiana profilu (szczegóły nieznane)”.
+Zmiana DATA-07, DATA-09, DATA-14, HISTUI-03: stałe teksty poleceń `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` (`PROFILE_LIST` zostaje także dla wpisów zapisanych przed 2026-10-30); pola wpisu „numer profilu” i „procent profilu” (tylko `PROFILE_SWITCH`, inaczej brak; dla nowych wpisów numer = 1). Nazwa profilu nie jest osobnym polem (jest w treści odpowiedzi). Baza w wersji 3: migracja 2 → 3 dodaje kolumny `profile_number INTEGER` i `profile_percent INTEGER` (obie dopuszczają `NULL`); plik `3.json` w repo. Obie migracje są rejestrowane jednym wywołaniem `addMigrations(MIGRATION_1_2, MIGRATION_2_3)`, więc baza w wersji 1 przechodzi do 3 kolejno przez 2. Migracja jest już scalona i sprawdzona na prawdziwej bazie (zadanie 3 pierwszej wersji, W3); zmiana 2026-10-30 nie zmienia schematu. Etykiety: „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%”, przy braku pól „Zmiana profilu (szczegóły nieznane)”.
 
 **Kryteria akceptacji:**
 
@@ -313,8 +321,8 @@ Nazwy profili, numer, procent, PIN, kod i treść SMS nie trafiają do logów, w
 ## Bezpieczeństwo
 
 - **Kod tylko na zgodną prośbę:** prośba AAPS musi być prośbą o zmianę profilu (nie o `CARBS`, `BOLUS` ani inne polecenie) z procentem identycznym z wysłanym (PROF-08, PROF-09); sesja sprawdza procent niezależnie od parsera (PROF-12). Niezgodny procent, nierozpoznana treść, inny nadawca, wiadomość sprzed wysłania – stop bez kodu (Spec 004, 005).
-- **Ryzyko: nazwa profilu nie jest sprawdzana** (decyzja użytkownika, 2026-10-30). Aplikacja nie zna nazwy profilu 1, więc odeśle kod także wtedy, gdy profil 1 w AAPS jest innym profilem, niż użytkownik zakłada (np. po zmianie kolejności profili w AAPS). Skutek: AAPS przełączy na profil 1 z wybranym procentem. Ograniczenia ryzyka: procent tylko 50–200 (P3), tekst podsumowania mówi, że nazwy nie sprawdza, nazwa z prośby AAPS jest widoczna w treści SMS wyniku i w historii, a `PROFILE STATUS` pozwala sprawdzić aktualny profil przed i po zmianie. Wcześniejsza ochrona (porównanie nazwy z pobranej listy) jest usuwana razem z PROF-14.
-- **Procent nieograniczany przez AAPS (R5):** aplikacja przyjmuje tylko 50–200% (P3); 0 i wartości ujemne nigdy nie są wysyłane.
+- **Ryzyko zaakceptowane przez użytkownika 2026-10-30: nazwa profilu nie jest sprawdzana.** Aplikacja zawsze wysyła profil 1, porównuje tylko procent i nie zna ani nie sprawdza nazwy profilu (brak pola z nazwą w Ustawieniach). Kod zostanie odesłany na każdą prośbę AAPS o zmianę profilu ze zgodnym procentem. Realne scenariusze: (a) zmiana kolejności profili w AAPS, (b) dodanie lub usunięcie profilu w AAPS, (c) każda inna prośba o zmianę profilu z tym samym procentem – np. pozostała po ręcznym `PROFILE 2 100`, jeśli AAPS wyśle ją także do numeru aplikacji (do sprawdzenia w W2); 100% to najczęstszy procent, więc kolizja jest najbardziej prawdopodobna przy powrocie na 100%. Skutek dla zdrowia: AAPS przełączy na inny profil z 50–200%, co zmienia bazę, ISF i IC, czyli dawkowanie insuliny. Ograniczenia ryzyka działają dopiero po wysłaniu kodu (wykrywają, nie zapobiegają): procent tylko 50–200 (P3), nazwa z prośby AAPS widoczna w treści SMS wyniku i w historii, `PROFILE STATUS` do sprawdzenia aktualnego profilu po zmianie; tekst podsumowania mówi, że nazwy nie sprawdza, ale nazwa jest znana dopiero po wysłaniu. Rozważane i odrzucone przez użytkownika: porównanie z nazwą z `PROFILE STATUS` albo z ustawieniem oraz potwierdzenie treści prośby przed kodem. Wcześniejsza ochrona (porównanie nazwy z pobranej listy) jest usuwana razem z PROF-14.
+- **Zakres procentu poza 0 nie jest ograniczany przez AAPS (R5):** aplikacja przyjmuje tylko 50–200% (P3); 0 i wartości ujemne nigdy nie są wysyłane.
 - **Bez ponawiania:** najwyżej 1 SMS polecenia i 1 kod na sesję; aplikacja nie zmienia profilu sama.
 - **PIN i kod:** zasady Spec 004 i 009; fokus pola PIN nie zapisuje PIN-u (CMDUI-28); `FLAG_SECURE` na formularzu, podsumowaniu, przebiegu i wyniku (PROF-15, CMDUI-23).
 - **`PROFILE STATUS` bez kodu** nadpisuje w AAPS oczekującą prośbę o kod (A6), ale aplikacja nie wyśle go w trakcie własnego polecenia (SESSION-22).
@@ -331,13 +339,20 @@ Nazwy profili, numer, procent, PIN, kod i treść SMS nie trafiają do logów, w
 | Nr | Co sprawdzić | Wymagania |
 | --- | --- | --- |
 | W1 | „Aktualny profil”: treść odpowiedzi, `FLAG_SECURE` wyniku; „Zmień profil” otwiera formularz z `100` bez wysłania SMS-a; brak przycisku `PROFILE LIST` | PROF-11, PROF-13 |
-| W2 | Zmiana profilu 1 na 90% (wirtualna pompa): formularz, podsumowanie, kod, wynik z treścią prośby (nazwa profilu); potem powrót na 100% – zanotować, że wyszło `PROFILE 1 100` i AAPS poprosił o kod dla `100%`; zanotować treść odpowiedzi po kodzie (dane do P4); zły PIN → zanotować | PROF-04, PROF-12, PROF-15, PROF-16 |
-| W3 | Aktualizacja z bazy w wersji 2: wpisy zachowane, nowe wpisy profilu w Historii („Zmiana profilu 1, 90%”) | PROF-17 |
+| W2 | **Warunek scalenia zadania 2** (wynik w opisie PR). Zmiana profilu 1 na 90% (wirtualna pompa): formularz, podsumowanie, kod, wynik z treścią prośby (nazwa profilu); potem powrót na 100% – zanotować, że wyszło `PROFILE 1 100` i AAPS poprosił o kod dla `100%` (O1; jeśli nie – plan awaryjny w PROF-04); zanotować treść odpowiedzi po kodzie (O2) i po złym PIN-ie (O3); sprawdzić, czy prośba o kod wysłana na polecenie z innego numeru trafia też do numeru aplikacji | PROF-04, PROF-12, PROF-15, PROF-16 |
+| W3 | Historia po zadaniu 2: nowy wpis „Zmiana profilu 1, 90%”, wcześniejsze wpisy zachowane (migracja 2 → 3 sprawdzona w pierwszej wersji) | PROF-17 |
 | W4 | Przejście na Ustawienia z otwartym formularzem → po powrocie panel; „Zmień profil” → tekst `100` | PROF-15 |
 
 ## Otwarte pytania
 
-Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
+Otwarte do weryfikacji na telefonie (W2; nie są potwierdzonym kontraktem AAPS i nie wymagają decyzji użytkownika):
+
+- [ ] **O1. `PROFILE 1 100`.** Czy AAPS przy jawnym `100` prosi o kod dla `100%` (dowody R3 dotyczą `PROFILE 1` bez procentu). Plan awaryjny: PROF-04. Warunek scalenia zadania 2.
+- [ ] **O2. Odpowiedź po poprawnym kodzie zmiany profilu.** Dziś `Unknown(UNRECOGNIZED_REPLY)` z treścią (P4); wzorzec potwierdzenia po zebraniu SMS-a (zmiana tej spec).
+- [ ] **O3. „Zly kod” dla profilu.** Przyjęto `Failed(WRONG_CODE)` jak dla `CARBS` (A2); do potwierdzenia.
+- [ ] **O4. Pusta lista profili.** Odpowiedź na `PROFILE LIST` bez profili nieznana; nie wpływa na UI (brak przycisku), W2 jej nie obejmuje.
+
+Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
 
 - [x] **Literówka w `PROFILE STATUS`.** Rozstrzygnięte (użytkownik): treść to `LocalProfile1 (115%)`; „LocalPofile1” było literówką.
 - [x] **P1. Podział linii w `PROFILE LIST`.** Potwierdzona jest tylko lista numerowana „N. nazwa”. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – każda pozycja w osobnej linii (LF/CR/CRLF, PARSER-02); inny układ → nierozpoznana (treść pokazana, bez wyboru). Do sprawdzenia: czy jest dodatkowy nagłówek lub końcowy tekst, co przy pustej liście.
@@ -352,7 +367,7 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (2026-10-28):
 Decyzje użytkownika z 2026-10-30 (uproszczenie zmiany profilu):
 
 - [x] **P9. Zmiana tylko profilu 1, bez listy.** „Zmień profil” otwiera formularz procentu (50–200, domyślnie 100); SMS zawsze `PROFILE 1 <procent>`; bez `PROFILE LIST`, wyniku listy z przyciskami i `ProfileSelection` (PROF-02, PROF-04, PROF-13 – PROF-15). „Aktualny profil” bez zmian.
-- [x] **P10. Kod tylko po zgodnym procencie.** Kod jest odsyłany wyłącznie na prośbę o zmianę profilu z procentem równym wysłanemu; nazwa z prośby jest tylko pokazywana (PROF-08, PROF-09, PROF-12, ryzyko w „Bezpieczeństwie”). Historia: numer 1 i procent (PROF-17).
+- [x] **P10. Kod tylko po zgodnym procencie.** Kod jest odsyłany wyłącznie na prośbę o zmianę profilu z procentem równym wysłanemu; nazwa z prośby jest tylko pokazywana (PROF-08, PROF-09, PROF-12, ryzyko zaakceptowane przez użytkownika 2026-10-30, opisane w „Bezpieczeństwie”). Historia: numer 1 i procent (PROF-17).
 
 Propozycje specyfikatora przyjęte w tej zmianie (scalenie PR `Spec: …` = akceptacja):
 
@@ -367,6 +382,7 @@ Propozycje specyfikatora przyjęte w tej zmianie (scalenie PR `Spec: …` = akce
 
 ## Historia zmian
 
-- **2026-10-30 – uproszczenie zmiany profilu (decyzje użytkownika P9, P10).** Zmiana profilu dotyczy zawsze profilu 1: przycisk „Zmień profil” otwiera formularz procentu, SMS `PROFILE 1 <procent>` (także dla 100), kod tylko po prośbie o zmianę profilu ze zgodnym procentem – nazwa profilu nie jest porównywana (ryzyko opisane w „Bezpieczeństwie”). PROF-14 wycofane. Zmienione: PROF-01 (parametr), PROF-02 (bez wyboru, numer 1), PROF-04 (zawsze z procentem), PROF-05 (kontekst tylko z procentem), PROF-07 (bez użycia w UI, bez kryterium sesji z nazwą), PROF-08, PROF-09 (porównanie tylko procentu), PROF-11 (`PROFILE LIST` bez przycisku), PROF-12 (kryteria: inna nazwa przy zgodnym procencie → kod; inny procent → bez kodu; inny nadawca, wiadomość sprzed wysłania), PROF-13 („Zmień profil” otwiera formularz), PROF-15 (tytuł, teksty podsumowania, fokus PIN – CMDUI-28), PROF-16 (nagłówek, teksty niezgodności, wynik listy bez pozycji), PROF-17 (numer 1, stare wpisy), PROF-18. Planowane zmiany treści w Spec 002 (PARSER-01), 003 (CMD-01, CMD-07 – CMD-09) i 007 (DATA-07) – wpisy w ich „Historii zmian”. Design: nowe interfejsy, decyzje i zadania zmiany 2026-10-30 (1 – 4; zadania 1 – 6 pierwszej wersji są scalone).
+- **2026-10-30 – poprawki po recenzji PR #255.** Ryzyko „nazwa nie jest sprawdzana” rozbudowane i zapisane jako zaakceptowane przez użytkownika; PROF-08 i PROF-12: kryteria nazwa z liczbą, sesja `CARBS`/`BOLUS` z prośbą o profil, druga linia obrony z podstawionym parserem, osobne kryterium „inny nadawca”; R5 bez sprzeczności z R4; plan awaryjny dla `PROFILE 1 100` (PROF-04), W2 warunkiem scalenia zadania 2; punkty niezweryfikowane jako otwarte (O1 – O4); wynik `PROFILE LIST` bez „Wybierz profil”. Planowany wpis także w Spec 004 (SESSION-11, „Bezpieczeństwo”).
+- **2026-10-30 – uproszczenie zmiany profilu (decyzje użytkownika P9, P10).** Zmiana profilu dotyczy zawsze profilu 1: przycisk „Zmień profil” otwiera formularz procentu, SMS `PROFILE 1 <procent>` (także dla 100), kod tylko po prośbie o zmianę profilu ze zgodnym procentem – nazwa profilu nie jest porównywana (ryzyko opisane w „Bezpieczeństwie”). PROF-14 wycofane. Zmienione: PROF-01 (parametr), PROF-02 (bez wyboru, numer 1), PROF-04 (zawsze z procentem), PROF-05 (kontekst tylko z procentem), PROF-07 (bez użycia w UI, bez kryterium sesji z nazwą), PROF-08, PROF-09 (porównanie tylko procentu), PROF-11 (`PROFILE LIST` bez przycisku), PROF-12 (kryteria: inna nazwa przy zgodnym procencie → kod; inny procent → bez kodu; inny nadawca, wiadomość sprzed wysłania), PROF-13 („Zmień profil” otwiera formularz), PROF-15 (tytuł, teksty podsumowania, fokus PIN – CMDUI-28), PROF-16 (nagłówek, teksty niezgodności, wynik listy bez pozycji), PROF-17 (numer 1, stare wpisy), PROF-18. Planowane zmiany treści w Spec 002 (PARSER-01), 003 (CMD-01, CMD-07 – CMD-09), 004 (SESSION-11, „Bezpieczeństwo”) i 007 (DATA-07) – wpisy w ich „Historii zmian”. Design: nowe interfejsy, decyzje i zadania zmiany 2026-10-30 (1 – 4; zadania 1 – 6 pierwszej wersji są scalone).
 - **2026-10-28 – poprawki po recenzji PR #221 i zatwierdzenie.** PROF-07: nazwa = cała reszta linii, lista w jednej linii daje jedną pozycję i kończy się niezgodnością nazwy (stop), ograniczenie 2000 znaków; PROF-11: kryteria odpowiedzi innego rodzaju; PROF-12: odwołanie do BOL-19; PROF-17: jedno `addMigrations`, ścieżka 1 → 3, W3 warunkiem scalenia; „Przyszłe zmiany”. Design: pełna lista plików zadania 1 (dodaje `PROFILE_*` do `CommandId`), zadanie końcowe scalenia wpisów planowanych w spec 002–010. Pytania P1–P8 zamknięte, status `zatwierdzona`.
 - **2026-10-28 – pierwsza wersja (szkic).** Zmienia CMD-01 (Spec 003: 7 wpisów, słowa kluczowe ze spacją), PARSER-01 (Spec 002), SESSION-06, SESSION-08, SESSION-11, SESSION-13 (Spec 004), DATA-07, DATA-09, DATA-14 (Spec 007), CMDUI-01, CMDUI-06, CMDUI-16, CMDUI-17, CMDUI-19, CMDUI-21, CMDUI-23 (Spec 009), HISTUI-03 (Spec 010).

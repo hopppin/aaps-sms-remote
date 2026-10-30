@@ -194,7 +194,7 @@ Gdy poprawne polecenie `CARBS` ma `requiresExtraConfirmation(limity)` = `true` (
 
 ### CMDUI-10: Podsumowanie z PIN-em
 
-Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje dla `CARBS`: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.” (dla `BOLUS` teksty z BOL-15, dla zmiany profilu – z PROF-15), pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”; po pokazaniu podsumowania pole PIN-u ma fokus i klawiatura jest widoczna (CMDUI-28). Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
+Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje dla `CARBS`: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla X g.” (dla `BOLUS` teksty z BOL-15, dla zmiany profilu – z PROF-15), pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”; po pokazaniu podsumowania pole PIN-u ma fokus i klawiatura jest widoczna (CMDUI-28). Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
 
 **Kryteria akceptacji:**
 
@@ -379,7 +379,7 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Completed` (`BG`) | sukces → „Gotowe” | „Odpowiedź AAPS na BG” |
 | `Completed` (`PUMP`) | sukces → „Gotowe” | „Odpowiedź AAPS na PUMP” |
 | `Completed` (`PROFILE STATUS`) | sukces → „Gotowe” | „Odpowiedź AAPS na PROFILE STATUS” |
-| `Completed` (`PROFILE LIST`; nieosiągalny z UI, PROF-13) | sukces → „Gotowe” | „Lista profili z AAPS. Wybierz profil, aby go zmienić.” (bez pozycji do wyboru, PROF-14 wycofane) |
+| `Completed` (`PROFILE LIST`; nieosiągalny z UI, PROF-13) | sukces → „Gotowe” | „Lista profili z AAPS.” (bez pozycji do wyboru, PROF-14 wycofane) |
 | `Completed` (`CARBS`, `BOLUS`, zmiana profilu; nie występuje – Spec 004 kończy je innym wynikiem) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
 | `CarbsConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził wprowadzenie X g” |
 | `BolusConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził podanie X j.” (X z wyniku, BOL-16) |
