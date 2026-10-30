@@ -195,8 +195,8 @@
     <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>
     <string name="result_profile_status_reply">Odpowiedź AAPS na PROFILE STATUS</string>
     <string name="result_profile_list_reply">Lista profili z AAPS.</string>
-    <string name="result_profile_amount_mismatch">AAPS podał inny profil lub procent niż wybrany. Pobierz listę ponownie.</string>
-    <string name="result_profile_unknown_amount_mismatch">Po wysłaniu kodu AAPS podał inny profil lub procent.</string>
+    <string name="result_profile_amount_mismatch">AAPS poprosił o kod dla innego procentu niż wysłany.</string>
+    <string name="result_profile_unknown_amount_mismatch">Po wysłaniu kodu AAPS podał inny procent.</string>
     <string name="result_profile_unknown_unrecognized_reply">Po wysłaniu kodu przyszła odpowiedź AAPS, której aplikacja nie rozpoznaje. Przeczytaj treść SMS i sprawdź w AAPS.</string>
     <string name="commands_profile_title">Profil</string>
     <string name="commands_profile_status">Aktualny profil</string>
