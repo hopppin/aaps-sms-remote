@@ -7,15 +7,15 @@
 
 ## Cel
 
-Użytkownik wysyła z zakładki Polecenia `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` jednym dotknięciem, a `CARBS`, `BOLUS` i zmianę profilu po wpisaniu ilości (procentu) i PIN-u AAPS, i na jednym ekranie widzi przebieg polecenia na żywo oraz jednoznaczny wynik. Ta specyfikacja opisuje ekran Polecenia (zastępuje zaślepkę ze Spec 008), ekran podsumowania z PIN-em, ekran przebiegu i wyniku oraz uruchamianie sesji w zakresie korutyn aplikacji z zapisem do historii.
+Użytkownik wysyła z zakładki Polecenia `BG`, `PUMP` i `PROFILE STATUS` jednym dotknięciem, a `CARBS`, `BOLUS` i zmianę profilu 1 po wpisaniu ilości (procentu) i PIN-u AAPS, i na jednym ekranie widzi przebieg polecenia na żywo oraz jednoznaczny wynik. Ta specyfikacja opisuje ekran Polecenia (zastępuje zaślepkę ze Spec 008), ekran podsumowania z PIN-em, ekran przebiegu i wyniku oraz uruchamianie sesji w zakresie korutyn aplikacji z zapisem do historii.
 
 ## Zakres
 
-- Zakładka Polecenia: przyciski `BG`, `PUMP`, sekcja `CARBS` (pole ilości, szybkie wartości 10/20/30 g ograniczone do progu, przycisk „Dalej”), sekcja „Bolus” (BOL-13), sekcja „Profil” z przyciskami „Aktualny profil” i „Zmień profil…” (PROF-13), banery gotowości (numer AAPS, uprawnienia SMS, sekret TOTP, limity poleceń) z przejściem do Ustawień.
+- Zakładka Polecenia (kolejność od góry – CMDUI-01): sekcja „Bolus” (BOL-13), sekcja „Profil” z przyciskami „Aktualny profil” i „Zmień profil” (PROF-13), sekcja `CARBS` (pole ilości, szybkie wartości 10/20/30 g ograniczone do progu, przycisk „Dalej”), przyciski `BG`, `PUMP`; banery gotowości (numer AAPS, uprawnienia SMS, sekret TOTP, limity poleceń) z przejściem do Ustawień.
 - Dostępność przycisków: polecenie w toku, uruchamianie polecenia, stan numeru AAPS, uprawnienia SMS, stan sekretu (dla poleceń z kodem), stan limitów (dla `CARBS` i `BOLUS`, LIM-05).
 - Dodatkowe pytanie „Na pewno X?” powyżej progu: `CARBS` > 80% limitu (LIM-07), `BOLUS` > połowy limitu (BOL-04).
-- Formularz procentu zmiany profilu i wybór profilu z wyniku `PROFILE LIST` (PROF-14, PROF-15).
-- Podsumowanie polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu) z polem PIN-u AAPS (maskowane), PIN tylko w pamięci; `FLAG_SECURE` na oknie „Na pewno X?”, formularzu profilu, podsumowaniu oraz od startu polecenia do zamknięcia wyniku (na każdej zakładce).
+- Formularz procentu zmiany profilu 1 (PROF-13, PROF-15); bez pobierania listy profili (PROF-14 wycofane).
+- Podsumowanie polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu) z polem PIN-u AAPS (maskowane, z fokusem i klawiaturą od razu po pokazaniu – CMDUI-28), PIN tylko w pamięci; `FLAG_SECURE` na oknie „Na pewno X?”, formularzu profilu, podsumowaniu oraz od startu polecenia do zamknięcia wyniku (na każdej zakładce).
 - Ponowne sprawdzenie limitów i odstępu między bolusami tuż przed startem (LIM-09, BOL-12), odczyt sekretu (`TotpSecretProvider.load`) tuż przed startem polecenia z kodem i komunikaty tych wyników.
 - Start przez `SessionCoordinator` w zakresie korutyn aplikacji (moduł Hilt), `SessionHistoryRecorder.track` zaraz po starcie.
 - Ekran przebiegu: kroki według fazy sesji, anulowanie (przed kodem i po kodzie), wynik z komunikatem dla każdego `SessionOutcome`, treść odpowiedzi AAPS, liczba wiadomości nieoczekiwanych, zamknięcie wyniku.
@@ -36,7 +36,7 @@ Użytkownik wysyła z zakładki Polecenia `BG`, `PUMP`, `PROFILE STATUS` i `PROF
 ## Założenia i zależności
 
 - **Spec 008 zaimplementowana przed 009** (co najmniej zadania 1, 2, 3, 8 i 10 z design 008): nawigacja (`AppScaffold`, `AppDestination`), `SessionModule` (jeden `SessionCoordinator`), `SmsPermissionsViewModel` i `SmsPermissionsSection`, `SecureWindowEffect`, `MainDispatcherExtension`, `SessionDoubles`. 009 zastępuje `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` (UI-03 ze Spec 008 przewiduje to zastąpienie).
-- **Polecenia i walidacja ilości:** jedynym źródłem poleceń jest `commands` (`Command.Bg`, `Command.Pump`, `Command.Carbs.parse`/`of` z `CommandLimits`, `Command.Bolus.parse`/`of`, `Command.ProfileSwitch.parsePercent`/`of`, `Command.ProfileStatus`, `Command.ProfileList`, `requiresExtraConfirmation(limits)`, `CommandLimits.carbsQuickValues`, `definition.requiresCode`); `ui` nie powtarza reguł zakresu ilości ani progów.
+- **Polecenia i walidacja ilości:** jedynym źródłem poleceń jest `commands` (`Command.Bg`, `Command.Pump`, `Command.Carbs.parse`/`of` z `CommandLimits`, `Command.Bolus.parse`/`of`, `Command.ProfileSwitch.parsePercent`/`of`, `Command.ProfileStatus`, `requiresExtraConfirmation(limits)`, `CommandLimits.carbsQuickValues`, `definition.requiresCode`); `ui` nie powtarza reguł zakresu ilości ani progów.
 - **Sesja:** `ui` uruchamia polecenia wyłącznie przez `SessionCoordinator.start` (SESSION-22, UI-19) i nie zmienia `session`. Reguły anulowania i wyników – Spec 004 (SESSION-14, SESSION-17).
 - **Sekret:** `TotpSecretProvider.load()` nie rzuca poza `CancellationException` (SECRET-06); zwrócony `TotpSecret` należy do wywołującego i trafia do `CodeCredentials`. `TotpSecret` nie ma metody czyszczenia („Przyszłe zmiany” w Spec 006); tablica wewnątrz zostaje do odśmiecenia.
 - **Numer:** `AapsNumberSettingsStore.state` (DATA-02). Zmiana numeru w trakcie polecenia jest zablokowana w Ustawieniach (UI-15).
@@ -45,11 +45,11 @@ Użytkownik wysyła z zakładki Polecenia `BG`, `PUMP`, `PROFILE STATUS` i `PROF
 
 ## Pojęcia
 
-- **Panel poleceń** – zawartość zakładki Polecenia, gdy nie jest pokazany przebieg, wynik, podsumowanie ani formularz profilu: banery gotowości, `BG`, `PUMP`, sekcje `CARBS`, „Bolus” i „Profil”.
+- **Panel poleceń** – zawartość zakładki Polecenia, gdy nie jest pokazany przebieg, wynik, podsumowanie ani formularz profilu: banery gotowości, sekcje „Bolus”, „Profil” i `CARBS`, przyciski `BG` i `PUMP`.
 - **Podsumowanie** – tryb zakładki Polecenia (bez osobnej trasy nawigacji) z pytaniem „Wysłać CARBS X g do AAPS?” (dla `BOLUS` i zmiany profilu – teksty z BOL-15 i PROF-15), polem PIN-u i przyciskami „Wyślij”/„Anuluj”.
-- **Formularz profilu** – tryb zakładki Polecenia z polem procentu dla profilu wybranego z wyniku `PROFILE LIST` (PROF-15).
+- **Formularz profilu** – tryb zakładki Polecenia z polem procentu zmiany profilu 1, otwierany przyciskiem „Zmień profil” (PROF-13, PROF-15).
 - **Polecenie w toku** – `SessionCoordinator.activeSession.value != null`.
-- **Uruchamianie** – czas od dotknięcia `BG`/`PUMP`/`PROFILE STATUS`/`PROFILE LIST`/„Wyślij” do wyniku `CommandLauncher.launch` (sprawdzenia, odczyt sekretu, start).
+- **Uruchamianie** – czas od dotknięcia `BG`/`PUMP`/„Aktualny profil”/„Wyślij” do wyniku `CommandLauncher.launch` (sprawdzenia, odczyt sekretu, start).
 - **Przebieg** – widok sesji w fazie innej niż `FINISHED`; **wynik** – widok zakończonej sesji, aż użytkownik go zamknie.
 - **Fazy przed kodem / po kodzie** – jak w Spec 004 (`NOT_STARTED` … `PREPARING_CODE` / `SENDING_CODE`, `AWAITING_CONFIRMATION`).
 - **Komunikat** – jednorazowa informacja (Snackbar) jako wartość wyliczeniowa w stanie ViewModelu, kasowana po pokazaniu (jak w Spec 008).
@@ -63,17 +63,18 @@ Wspólne dane kryteriów (o ile kryterium nie mówi inaczej): numer AAPS w stani
 
 ### CMDUI-01: Ekran Polecenia zamiast zaślepki
 
-Zakładka Polecenia pokazuje (od góry): banery gotowości (CMDUI-02 – CMDUI-04), duże przyciski „BG” i „PUMP” (pełna szerokość), sekcję „CARBS” z polem ilości, przyciskami szybkich wartości (LIM-08) i przyciskiem „Dalej”, sekcję „Bolus” z polem „Insulina (j.)” i przyciskiem „Dalej” (BOL-13) oraz sekcję „Profil” z przyciskami „Aktualny profil” i „Zmień profil…” (PROF-13). Banery gotowości to kolejno: numer, uprawnienia SMS, sekret TOTP, limity poleceń (LIM-05). Gdy jest przebieg albo wynik (CMDUI-16), zakładka pokazuje go zamiast panelu; gdy otwarty jest formularz profilu (PROF-15) – formularz; gdy otwarte jest podsumowanie – podsumowanie. Stan zakładki należy do `CommandsViewModel` i `CommandRunViewModel` tworzonych w zakresie `Activity` (nie wpisu nawigacji), więc przełączenie zakładek i obrót ekranu nie gubią stanu poza wyjątkami z CMDUI-11. `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` są usuwane.
+Zakładka Polecenia pokazuje (od góry; kolejność sekcji – decyzja użytkownika 2026-10-30, P14): banery gotowości (CMDUI-02 – CMDUI-04), wskaźnik uruchamiania (gdy trwa uruchamianie), sekcję „Bolus” z polem „Insulina (j.)” i przyciskiem „Dalej” (BOL-13), sekcję „Profil” z przyciskami „Aktualny profil” i „Zmień profil” (PROF-13), sekcję „CARBS” z polem ilości, przyciskami szybkich wartości (LIM-08) i przyciskiem „Dalej” oraz duże przyciski „BG” i „PUMP” (pełna szerokość, w tej kolejności). Banery gotowości to kolejno: numer, uprawnienia SMS, sekret TOTP, limity poleceń (LIM-05). Gdy jest przebieg albo wynik (CMDUI-16), zakładka pokazuje go zamiast panelu; gdy otwarty jest formularz profilu (PROF-15) – formularz; gdy otwarte jest podsumowanie – podsumowanie. Stan zakładki należy do `CommandsViewModel` i `CommandRunViewModel` tworzonych w zakresie `Activity` (nie wpisu nawigacji), więc przełączenie zakładek i obrót ekranu nie gubią stanu poza wyjątkami z CMDUI-11. `CommandsPlaceholderScreen` i klucz `placeholder_commands_text` są usuwane.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** źródła `ui/`, **gdy** test JVM je przeczytał, **wtedy** nie ma pliku `CommandsPlaceholderScreen.kt`, a `strings.xml` nie zawiera klucza `placeholder_commands_text`.
 - **Zakładając** `CommandsViewModel` z panelem w stanie spoczynku, **gdy** odczytano stan, **wtedy** podsumowanie jest zamknięte, formularz profilu zamknięty, okno „Na pewno” zamknięte, tekst pola ilości `CARBS` i `BOLUS` = `""`, a uruchamianie = `false`.
-- **Zakładając** telefon (W1), **gdy** uruchomiono aplikację, **wtedy** zakładka Polecenia pokazuje przyciski „BG”, „PUMP” i sekcje „CARBS”, „Bolus” i „Profil”; po przejściu na Ustawienia i powrót tekst pola ilości jest zachowany.
+- **Zakładając** źródło `ui/commands/CommandsPanel.kt`, **gdy** test JVM je przeczytał, **wtedy** pierwsze wystąpienia `R.string.commands_bolus_title`, `R.string.commands_profile_title`, `R.string.commands_carbs_title`, `R.string.commands_bg` i `R.string.commands_pump` są w tej kolejności, a ostatnie wywołanie `bannerRes()` jest przed nimi.
+- **Zakładając** telefon (W1), **gdy** uruchomiono aplikację, **wtedy** zakładka Polecenia pokazuje od góry sekcje „Bolus”, „Profil”, „CARBS” i przyciski „BG”, „PUMP”; po przejściu na Ustawienia i powrót tekst pola ilości jest zachowany.
 
 ### CMDUI-02: Gotowość – numer AAPS
 
-Panel pokazuje stan numeru z `AapsNumberSettingsStore.state` i od niego zależy dostępność wszystkich przycisków poleceń (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`, szybkie wartości, „Dalej” `CARBS` i `BOLUS`):
+Panel pokazuje stan numeru z `AapsNumberSettingsStore.state` i od niego zależy dostępność wszystkich przycisków poleceń (`BG`, `PUMP`, „Aktualny profil”, „Zmień profil”, szybkie wartości, „Dalej” `CARBS` i `BOLUS`):
 
 | Stan numeru | Baner | Przycisk banera | Przyciski poleceń |
 | --- | --- | --- | --- |
@@ -104,7 +105,7 @@ Gdy brakuje `SEND_SMS` albo `RECEIVE_SMS`, panel pokazuje sekcję uprawnień SMS
 
 ### CMDUI-04: Gotowość – sekret TOTP dla poleceń z kodem
 
-Przy utworzeniu `CommandsViewModel` wywołuje `TotpSecretStore.refreshState()` dokładnie raz i dalej obserwuje `TotpSecretStore.state`. Stan sekretu wpływa na każde polecenie z kodem: `CARBS` (szybkie wartości i „Dalej”), `BOLUS` („Dalej”) i zmianę profilu („Dalej” formularza oraz wybór pozycji z wyniku `PROFILE LIST`, PROF-14, gdzie `CommandRunViewModel` obserwuje `TotpSecretStore.state`, ale go nie odczytuje). `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` nie zależą od sekretu.
+Przy utworzeniu `CommandsViewModel` wywołuje `TotpSecretStore.refreshState()` dokładnie raz i dalej obserwuje `TotpSecretStore.state`. Stan sekretu wpływa na każde polecenie z kodem: `CARBS` (szybkie wartości i „Dalej”), `BOLUS` („Dalej”) i zmianę profilu (przycisk „Zmień profil” i „Dalej” formularza, PROF-13). `BG`, `PUMP` i `PROFILE STATUS` nie zależą od sekretu; `CommandRunViewModel` nie obserwuje stanu sekretu.
 
 | `SecretState` | Baner | Przycisk banera | Polecenia z kodem |
 | --- | --- | --- | --- |
@@ -117,12 +118,12 @@ Przy utworzeniu `CommandsViewModel` wywołuje `TotpSecretStore.refreshState()` d
 **Kryteria akceptacji:**
 
 - **Zakładając** atrapę magazynu w stanie `UNKNOWN`, **gdy** utworzono ViewModel i wykonano zadania dyspozytora, **wtedy** `refreshState()` wywołano dokładnie raz, a `load()` – ani razu.
-- **Zakładając** magazyn, którego stan zmienia się kolejno na `ABSENT`, `INVALIDATED`, `PRESENT`, `UNKNOWN` (Turbine), **gdy** ViewModel zbiera stan, **wtedy** `CARBS`, `BOLUS` i „Dalej” formularza profilu są kolejno: niedostępne, niedostępne, dostępne, dostępne, a `BG`, `PUMP`, `PROFILE STATUS` i `PROFILE LIST` są dostępne we wszystkich czterech stanach.
-- **Zakładając** stan sekretu `ABSENT` (osobno `INVALIDATED`) i wynik `PROFILE LIST` z pozycjami, **gdy** wywołano wybór pozycji, **wtedy** formularz nie jest otwierany (PROF-14).
+- **Zakładając** magazyn, którego stan zmienia się kolejno na `ABSENT`, `INVALIDATED`, `PRESENT`, `UNKNOWN` (Turbine), **gdy** ViewModel zbiera stan, **wtedy** `CARBS`, `BOLUS`, „Zmień profil” i „Dalej” formularza profilu są kolejno: niedostępne, niedostępne, dostępne, dostępne, a `BG`, `PUMP` i „Aktualny profil” są dostępne we wszystkich czterech stanach.
+- **Zakładając** stan sekretu `ABSENT` (osobno `INVALIDATED`), **gdy** wywołano `onProfileSwitchClicked()`, **wtedy** formularz nie jest otwierany (PROF-13).
 
 ### CMDUI-05: Blokada w trakcie polecenia i uruchamiania
 
-Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń (w tym „Dalej” `BOLUS`, przyciski sekcji „Profil”) są niedostępne, a ich wywołanie jest ignorowane (podwójne dotknięcie nie uruchamia drugiego polecenia). Każda akcja startu (`BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST`, „Wyślij”) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” (klucz `msg_command_active` ze Spec 008), brak wywołania `CommandLauncher` i – przy „Wyślij” – PIN wyczyszczony (CMDUI-11). Gdy mimo to koordynator zwróci `Busy` (wyścig), wynik jest taki sam (CMDUI-13). Po zakończeniu polecenia dostępność wraca według CMDUI-02 – CMDUI-04.
+Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń (w tym „Dalej” `BOLUS`, przyciski sekcji „Profil”) są niedostępne, a ich wywołanie jest ignorowane (podwójne dotknięcie nie uruchamia drugiego polecenia). Każda akcja startu (`BG`, `PUMP`, „Aktualny profil”, „Wyślij”) sprawdza `activeSession.value` w chwili wywołania: polecenie w toku → komunikat „Trwa polecenie – spróbuj po jego zakończeniu.” (klucz `msg_command_active` ze Spec 008), brak wywołania `CommandLauncher` i – przy „Wyślij” – PIN wyczyszczony (CMDUI-11). Gdy mimo to koordynator zwróci `Busy` (wyścig), wynik jest taki sam (CMDUI-13). Po zakończeniu polecenia dostępność wraca według CMDUI-02 – CMDUI-04.
 
 **Kryteria akceptacji:**
 
@@ -134,15 +135,15 @@ Gdy polecenie jest w toku albo trwa uruchamianie, wszystkie przyciski poleceń (
 
 ### Polecenia bez kodu
 
-### CMDUI-06: BG, PUMP, PROFILE STATUS i PROFILE LIST jednym dotknięciem
+### CMDUI-06: BG, PUMP i PROFILE STATUS jednym dotknięciem
 
-Dotknięcie „BG”, „PUMP”, „Aktualny profil” albo „Zmień profil…” (gdy dostępne) od razu uruchamia polecenie `Command.Bg` / `Command.Pump` / `Command.ProfileStatus` / `Command.ProfileList` (PROF-13) przez `CommandLauncher.launch(command, pin = null)` – bez okna potwierdzenia i bez PIN-u (CMD-02). Po wyniku `Started` zakładka pokazuje przebieg (CMDUI-16); po odrzuceniu – komunikat z CMDUI-12/CMDUI-13, panel bez zmian.
+Dotknięcie „BG”, „PUMP” albo „Aktualny profil” (gdy dostępne) od razu uruchamia polecenie `Command.Bg` / `Command.Pump` / `Command.ProfileStatus` (PROF-13) przez `CommandLauncher.launch(command, pin = null)` – bez okna potwierdzenia i bez PIN-u (CMD-02). Po wyniku `Started` zakładka pokazuje przebieg (CMDUI-16); po odrzuceniu – komunikat z CMDUI-12/CMDUI-13, panel bez zmian.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** wspólne dane, **gdy** wywołano `onBgClicked()` i wykonano zadania, **wtedy** `FakeSmsSender` dostał dokładnie jeden SMS `BG`, `activeSession.value` jest sesją polecenia `Command.Bg`, a `TotpSecretProvider.load()` nie był wywołany.
 - **Zakładając** wspólne dane, **gdy** wywołano `onPumpClicked()`, **wtedy** atrapa dostała dokładnie jeden SMS `PUMP`.
-- **Zakładając** wspólne dane, **gdy** wywołano `onProfileStatusClicked()` (osobno `onProfileListClicked()`), **wtedy** `FakeSmsSender` dostał dokładnie `PROFILE STATUS` (`PROFILE LIST`), a `load()` sekretu nie był wywołany (PROF-13).
+- **Zakładając** wspólne dane, **gdy** wywołano `onProfileStatusClicked()`, **wtedy** `FakeSmsSender` dostał dokładnie `PROFILE STATUS`, a `load()` sekretu nie był wywołany (PROF-13). Panel nie ma przycisku `PROFILE LIST` (PROF-13).
 - **Zakładając** telefon z AAPS (W4), **gdy** dotknięto „BG”, **wtedy** bez dodatkowych dotknięć wychodzi SMS `BG` na numer AAPS, a po odpowiedzi widać jej treść.
 
 ### Polecenie CARBS
@@ -193,7 +194,7 @@ Gdy poprawne polecenie `CARBS` ma `requiresExtraConfirmation(limity)` = `true` (
 
 ### CMDUI-10: Podsumowanie z PIN-em
 
-Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje dla `CARBS`: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.” (dla `BOLUS` teksty z BOL-15, dla zmiany profilu – z PROF-15), pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”. Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
+Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) zajmuje całą treść zakładki Polecenia (bez osobnej trasy nawigacji) i pokazuje dla `CARBS`: „Wysłać CARBS X g do AAPS?”, wyjaśnienie „Aplikacja wyśle CARBS X g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X g.” (dla `BOLUS` teksty z BOL-15, dla zmiany profilu – z PROF-15), pole „PIN AAPS” (jedna linia, znaki maskowane, klawiatura `KeyboardType.NumberPassword`, bez autokorekty i podpowiedzi) oraz przyciski „Wyślij” i „Anuluj”; po pokazaniu podsumowania pole PIN-u ma fokus i klawiatura jest widoczna (CMDUI-28). Przycisk Wstecz działa jak „Anuluj”. Pole przyjmuje tylko cyfry: zmiana na tekst z innym znakiem jest odrzucana (tekst pola bez zmian); długość najwyżej 12 znaków – dłuższy tekst jest odrzucany (decyzja użytkownika, P2). „Wyślij” jest dostępne, gdy pole jest niepuste i nie trwa uruchamianie. „Anuluj” zamyka podsumowanie, czyści pole PIN-u i nie wywołuje `CommandLauncher`; tekst pola ilości zostaje.
 
 **Kryteria akceptacji:**
 
@@ -206,7 +207,7 @@ Podsumowanie (wspólne dla poleceń z kodem: `CARBS`, `BOLUS`, zmiana profilu) z
 
 ### CMDUI-11: PIN AAPS tylko w pamięci
 
-Dotyczy każdego polecenia z kodem (BOL-15, PROF-15). Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w `SavedStateHandle`, nie w `rememberSaveable`, nie w argumentach nawigacji). Jest czyszczony (`""`): przy „Wyślij” – przed wywołaniem `CommandLauncher` (znaki są kopiowane do tablicy, z niej powstaje `AapsPin.fromChars`, który zeruje tablicę), przy „Anuluj”/Wstecz, gdy zakładka Polecenia jest zatrzymywana (`ON_STOP`: przejście w tło, obrót ekranu) albo opuszcza kompozycję (zmiana zakładki, w tym akcja „Ustawienia” w Snackbarze) – w obu przypadkach `CommandsScreen` woła `onStop()`, a podsumowanie, okno „Na pewno” i formularz profilu są zamykane, a niezużyty wybór profilu (`ProfileSelection`) porzucany (PROF-15) – oraz gdy polecenie jest w toku w chwili „Wyślij” (CMDUI-05). `AapsPin` przekazany do `CommandLauncher` jest czyszczony na każdej ścieżce bez startu sesji (CMDUI-12, CMDUI-13); po starcie czyści go sesja (SESSION-19). Ograniczenie: obiekty `String` tekstu pola (Compose, ViewModel) nie dają się wyzerować w JVM i zostają w pamięci do odśmiecenia (jak UI-14).
+Dotyczy każdego polecenia z kodem (BOL-15, PROF-15). Tekst PIN-u istnieje wyłącznie w stanie `CommandsViewModel` w pamięci (nie w `SavedStateHandle`, nie w `rememberSaveable`, nie w argumentach nawigacji). Jest czyszczony (`""`): przy „Wyślij” – przed wywołaniem `CommandLauncher` (znaki są kopiowane do tablicy, z niej powstaje `AapsPin.fromChars`, który zeruje tablicę), przy „Anuluj”/Wstecz, gdy zakładka Polecenia jest zatrzymywana (`ON_STOP`: przejście w tło, obrót ekranu) albo opuszcza kompozycję (zmiana zakładki, w tym akcja „Ustawienia” w Snackbarze) – w obu przypadkach `CommandsScreen` woła `onStop()`, a podsumowanie, okno „Na pewno” i formularz profilu są zamykane (PROF-15) – oraz gdy polecenie jest w toku w chwili „Wyślij” (CMDUI-05). `AapsPin` przekazany do `CommandLauncher` jest czyszczony na każdej ścieżce bez startu sesji (CMDUI-12, CMDUI-13); po starcie czyści go sesja (SESSION-19). Ograniczenie: obiekty `String` tekstu pola (Compose, ViewModel) nie dają się wyzerować w JVM i zostają w pamięci do odśmiecenia (jak UI-14).
 
 **Kryteria akceptacji:**
 
@@ -378,7 +379,7 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Completed` (`BG`) | sukces → „Gotowe” | „Odpowiedź AAPS na BG” |
 | `Completed` (`PUMP`) | sukces → „Gotowe” | „Odpowiedź AAPS na PUMP” |
 | `Completed` (`PROFILE STATUS`) | sukces → „Gotowe” | „Odpowiedź AAPS na PROFILE STATUS” |
-| `Completed` (`PROFILE LIST`) | sukces → „Gotowe” | „Lista profili z AAPS. Wybierz profil, aby go zmienić.” (+ pozycje do wyboru, PROF-14) |
+| `Completed` (`PROFILE LIST`; nieosiągalny z UI, PROF-13) | sukces → „Gotowe” | „Lista profili z AAPS. Wybierz profil, aby go zmienić.” (bez pozycji do wyboru, PROF-14 wycofane) |
 | `Completed` (`CARBS`, `BOLUS`, zmiana profilu; nie występuje – Spec 004 kończy je innym wynikiem) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
 | `CarbsConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził wprowadzenie X g” |
 | `BolusConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził podanie X j.” (X z wyniku, BOL-16) |
@@ -431,7 +432,7 @@ Wynik pokazuje treść SMS z AAPS pod etykietą „Treść SMS z AAPS:”, gdy w
 
 ### CMDUI-21: Zamknięcie wyniku i brak referencji do sesji
 
-Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Stan ekranu `CommandRunViewModel` (`RunUiState`) po fazie `FINISHED` zawiera tylko dane wyniku (polecenie, ilość bolusa, nazwa i procent profilu, rodzaj, komunikat, treść, liczby oraz pary (numer, nazwa) z wyniku `PROFILE LIST`, PROF-14) – bez `StateFlow`, bez `CommandSession` i bez `CodeCredentials` (sesja trzyma `CodeCredentials` z sekretem). `CommandRunViewModel` nie ma pola typu `CommandSession`. `CurrentRun` (singleton) trzyma polecenie i `StateFlow<SessionState>` sesji aż do zamknięcia wyniku; jest to dozwolone, bo ten `StateFlow` nie wskazuje na `CommandSession` ani na `CodeCredentials` (w Spec 004 `CommandSession.state` to samodzielny `MutableStateFlow` ze stanem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął – także po „Wyjdź” (CMDUI-24) i ponownym otwarciu aplikacji; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Gdy wynik jest pokazany, panel poleceń jest niewidoczny, więc nowe polecenie można uruchomić dopiero po zamknięciu wyniku.
+Wynik zostaje na ekranie, aż użytkownik dotknie „Zamknij” (albo Wstecz, CMDUI-24); wtedy zakładka wraca do panelu poleceń. Stan ekranu `CommandRunViewModel` (`RunUiState`) po fazie `FINISHED` zawiera tylko dane wyniku (polecenie, ilość bolusa, numer i procent profilu, rodzaj, komunikat, treść, liczby) – bez `StateFlow`, bez `CommandSession` i bez `CodeCredentials` (sesja trzyma `CodeCredentials` z sekretem). `CommandRunViewModel` nie ma pola typu `CommandSession`. `CurrentRun` (singleton) trzyma polecenie i `StateFlow<SessionState>` sesji aż do zamknięcia wyniku; jest to dozwolone, bo ten `StateFlow` nie wskazuje na `CommandSession` ani na `CodeCredentials` (w Spec 004 `CommandSession.state` to samodzielny `MutableStateFlow` ze stanem). Zamknięcie wyniku czyści `CurrentRun`. Wynik jest pokazywany, dopóki żyje proces aplikacji i użytkownik go nie zamknął – także po „Wyjdź” (CMDUI-24) i ponownym otwarciu aplikacji; po nowym uruchomieniu procesu (np. `Activity` zamknięte i proces zabity) nie jest pokazywany – jest tylko w Historii (spec 010; decyzja użytkownika, P7). Gdy wynik jest pokazany, panel poleceń jest niewidoczny, więc nowe polecenie można uruchomić dopiero po zamknięciu wyniku.
 
 **Kryteria akceptacji:**
 
@@ -491,7 +492,7 @@ Na zakładce Polecenia przycisk Wstecz:
 | Sytuacja | Działanie |
 | --- | --- |
 | okno „Na pewno” otwarte | zamyka okno („Nie”) |
-| formularz profilu otwarty | zamyka formularz („Anuluj”, wybór profilu porzucony) |
+| formularz profilu otwarty | zamyka formularz („Anuluj”) |
 | podsumowanie otwarte | „Anuluj” podsumowania (CMDUI-10) |
 | wynik na ekranie | „Zamknij” (CMDUI-21) |
 | polecenie w toku | okno „Trwa polecenie” z tekstem „Wyjście z aplikacji może przerwać odbiór odpowiedzi AAPS. Polecenie nie zostanie anulowane.” i przyciskami „Zostań” i „Wyjdź”; „Wyjdź” zamyka `Activity` (sesja trwa dalej w zakresie aplikacji, CMDUI-13; `CurrentRun` nie jest czyszczony), „Zostań” zamyka okno |
@@ -540,6 +541,17 @@ Moduł Hilt `ui.platform.CommandsModule` (`SingletonComponent`) dostarcza dokła
 - **Zakładając** klasę `CurrentRun`, **gdy** test JVM sprawdził ją refleksją, **wtedy** ma adnotację `@Singleton` i jedyny konstruktor bez parametrów z `@Inject`; konstruktory `CommandLauncher`, `CommandsViewModel` i `CommandRunViewModel` mają parametr typu `CurrentRun`.
 - **Zakładając** zbudowaną aplikację (`assembleDebug`), **gdy** Hilt wygenerował graf, **wtedy** `CommandsViewModel`, `CommandRunViewModel`, `AapsNumberViewModel` i `TotpSecretViewModel` dostają ten sam `SessionCoordinator`, a `CommandLauncher`, `CommandsViewModel` i `CommandRunViewModel` – ten sam `CurrentRun`.
 
+### CMDUI-28: Fokus pola PIN w podsumowaniu
+
+Gdy podsumowanie z PIN-em (`CARBS`, `BOLUS`, zmiana profilu – CMDUI-10) jest pokazane, a okno `Activity` ma fokus, pole „PIN AAPS” dostaje fokus i aplikacja prosi system o pokazanie klawiatury (numerycznej, CMDUI-10), więc użytkownik wpisuje PIN bez dotykania pola (decyzja użytkownika 2026-10-30, P15). Żądanie fokusu i klawiatury jest ponawiane za każdym razem, gdy okno `Activity` odzyskuje fokus przy pokazanym podsumowaniu – w szczególności po zamknięciu okna „Na pewno X g?” / „Na pewno X j.?” przyciskiem „Tak” (dialog jest osobnym oknem i do zamknięcia trzyma fokus, CMDUI-09) oraz po szybkiej wartości `CARBS` (CMDUI-08). Fokus nie zmienia stanu `CommandsViewModel` ani tekstu PIN-u: obiekt żądania fokusu jest trzymany przez `remember` (nie `rememberSaveable`), PIN istnieje dalej tylko w stanie ViewModelu (CMDUI-11), a pole ma te same opcje klawiatury (maskowanie, `KeyboardType.NumberPassword`, bez autokorekty). Gdy trwa uruchamianie, podsumowanie nie żąda fokusu ponownie.
+
+**Kryteria akceptacji:**
+
+- **Zakładając** źródło `ui/commands/CommandSummary.kt` bez komentarzy, **gdy** test JVM je przeczytał, **wtedy** zawiera `FocusRequester()` w `remember`, `.focusRequester(` na polu PIN-u, `requestFocus()`, `isWindowFocused` jako klucz efektu (`LaunchedEffect`) oraz `LocalSoftwareKeyboardController` z wywołaniem `show()`, a nie zawiera `rememberSaveable` ani `SavedStateHandle`.
+- **Zakładając** `CommandsViewModel` z podsumowaniem dla 20 g, **gdy** odczytano stan, **wtedy** tekst PIN-u = `""` (fokus nie wpisuje znaków), a stan nie ma pola dotyczącego fokusu.
+- **Zakładając** telefon z Gboard (W14), **gdy** otwarto podsumowanie `CARBS` 20 g („Dalej”), `BOLUS` 0,10 j. i zmiany profilu 1 na 90%, **wtedy** w każdym klawiatura numeryczna jest widoczna, a pierwsza wpisana cyfra trafia do pola PIN bez dotykania pola.
+- **Zakładając** telefon (W14), **gdy** wpisano 45 g, „Dalej”, a w oknie „Na pewno 45 g?” wybrano „Tak”, **wtedy** po zamknięciu okna pole PIN ma fokus i klawiatura jest widoczna.
+
 ## Przypadki błędów
 
 | Sytuacja | Oczekiwane zachowanie | Wymaganie |
@@ -567,7 +579,7 @@ Ograniczenie: `onDispose` odpala się dopiero po animacji wyjścia z `NavHost`, 
 Zasady z [AGENTS.md](../../../AGENTS.md#bezpieczeństwo) i sposób ich spełnienia:
 
 - **Nigdy nie logujemy sekretu, kodów ani PIN-u.** `ui` nie wywołuje API logowania; `toString()` stanów nie zawiera PIN-u, ilości ani treści SMS (CMDUI-26). Komunikaty są stałymi wartościami wyliczeniowymi (CMDUI-12, CMDUI-25).
-- **PIN AAPS nigdy nie jest zapisywany.** Tekst PIN-u jest tylko w stanie ViewModelu w pamięci, bez `SavedStateHandle` i `rememberSaveable`, więc nie trafia do stanu instancji zapisywanego przez system; jest czyszczony przy „Wyślij” (przed odczytem sekretu), „Anuluj”, Wstecz, `ON_STOP` i opuszczenie zakładki Polecenia (CMDUI-11). `AapsPin` powstaje z tablicy, którą `fromChars` zeruje; na każdej ścieżce bez startu czyści go `CommandLauncher` albo koordynator, po starcie – sesja (CMDUI-12, CMDUI-13, SESSION-19). Pole jest maskowane, z klawiaturą typu hasło (CMDUI-10), a okno „Na pewno X g?”, podsumowanie oraz przebieg i wynik (na każdej zakładce, od startu do zamknięcia wyniku) mają `FLAG_SECURE` (CMDUI-23). Ograniczenie: `String` tekstu pola nie da się wyzerować w JVM. Wyjątek poza kontrolą aplikacji: system zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (Spec 005, W7 ze Spec 005 w W5 tej spec).
+- **PIN AAPS nigdy nie jest zapisywany.** Tekst PIN-u jest tylko w stanie ViewModelu w pamięci, bez `SavedStateHandle` i `rememberSaveable`, więc nie trafia do stanu instancji zapisywanego przez system; jest czyszczony przy „Wyślij” (przed odczytem sekretu), „Anuluj”, Wstecz, `ON_STOP` i opuszczenie zakładki Polecenia (CMDUI-11). `AapsPin` powstaje z tablicy, którą `fromChars` zeruje; na każdej ścieżce bez startu czyści go `CommandLauncher` albo koordynator, po starcie – sesja (CMDUI-12, CMDUI-13, SESSION-19). Pole jest maskowane, z klawiaturą typu hasło (CMDUI-10); automatyczny fokus pola (CMDUI-28) nie przenosi PIN-u poza stan ViewModelu. Okno „Na pewno X g?”, podsumowanie oraz przebieg i wynik (na każdej zakładce, od startu do zamknięcia wyniku) mają `FLAG_SECURE` (CMDUI-23). Ograniczenie: `String` tekstu pola nie da się wyzerować w JVM. Wyjątek poza kontrolą aplikacji: system zapisuje wysłany SMS `<kod><PIN>` w skrzynce wysłanych (Spec 005, W7 ze Spec 005 w W5 tej spec).
 - **Sekret tylko do zbudowania `CodeCredentials`.** Odczyt tuż przed startem polecenia z kodem, po wszystkich innych sprawdzeniach; sekret jest zmienną lokalną `launch`, `CommandLauncher` i ViewModele nie mają pól z sekretem (CMDUI-12, CMDUI-15, SECRET-14). `CommandRunViewModel` i jego stan nie trzymają referencji do sesji, która przechowuje `CodeCredentials`; `CurrentRun` trzyma do zamknięcia wyniku tylko polecenie i `StateFlow` stanu sesji, który nie wskazuje na sesję ani na `CodeCredentials` (CMDUI-21). Ograniczenie: `TotpSecret` nie ma czyszczenia („Przyszłe zmiany” w Spec 006).
 - **Kod tylko po zgodnej odpowiedzi AAPS** – decyduje `session` (Spec 004); `ui` nie ma ścieżki wysłania kodu. Ilość jest zatwierdzana przez użytkownika dwa razy dla > 40 g (CMDUI-09) i widoczna w podsumowaniu (CMDUI-10).
 - **Bez automatycznego ponawiania.** `ui` nie ponawia startu ani polecenia po żadnym wyniku (CMDUI-13); wynik „nieznany” ma ostrzeżenie przed ponowieniem bez sprawdzenia AAPS (CMDUI-19), bo powtórzone `CARBS` mogłoby wprowadzić węglowodany dwa razy.
@@ -604,6 +616,7 @@ Kompozycje, okna, `FLAG_SECURE`, utrzymanie ekranu, nawigacja i Hilt nie mają t
 | W11 | Wstecz: w podsumowaniu zamyka je; na wyniku zamyka wynik; w trakcie `BG` okno „Trwa polecenie”, „Wyjdź” → aplikacja zamknięta, po odpowiedzi AAPS i ponownym otwarciu (bez zabijania procesu) wynik `BG`, po „Zamknij” panel, w Historii wpis; brak polecenia → Wstecz zamyka aplikację | CMDUI-21, CMDUI-24 |
 | W12 | Brak zasięgu (tryb samolotowy) przy `BG` → „Nie udało się wysłać SMS…”; AAPS wyłączony / numer spoza listy AAPS → po 3 min „AAPS nie odpowiada” | CMDUI-19 |
 | W13 | TalkBack w trakcie `CARBS 1` (czekanie na prośbę o kod) i `BG` (czekanie na odpowiedź): każdy krok czytany jako jeden element – nazwa i „wykonany” / „w toku” / „oczekuje”; status czytany raz; ikona nie ma osobnego fokusu; przy kroku bieżącym brak dodatkowego opisu postępu ze wskaźnika (`CircularProgressIndicator`, np. „w toku” dwa razy albo „ładowanie”) | CMDUI-17 |
+| W14 | Fokus PIN (Gboard): podsumowanie `CARBS` 20 g, szybka wartość 10 g, `BOLUS` 0,10 j. i zmiana profilu 1 – klawiatura numeryczna widoczna od razu, cyfry trafiają do pola PIN bez dotykania pola; 45 g → „Tak” w oknie „Na pewno” → fokus i klawiatura po zamknięciu okna; podsumowanie → inna aplikacja → powrót: podsumowanie zamknięte (CMDUI-11), pole puste po ponownym otwarciu; kolejność panelu: Bolus, Profil, CARBS, BG, PUMP | CMDUI-01, CMDUI-28 |
 
 **Punkty weryfikacji z wcześniejszych specyfikacji** (podział P3 ze Spec 008):
 
@@ -629,6 +642,8 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 - [x] **P11. `FLAG_SECURE` przy zmianie zakładki i w oknie „Na pewno”** (2026-10-28, po przeglądzie jakości UI). Rozstrzygnięte: ochrona trwa od startu polecenia do zamknięcia wyniku także po przejściu na inną zakładkę (wcześniej chroniona była tylko zakładka Polecenia); okno „Na pewno X g?” pokazuje ilość `CARBS`, więc też ma `FLAG_SECURE` na czas otwarcia (CMDUI-09, CMDUI-23).
 - [x] **P12. Status kroków dla czytnika ekranu** (2026-10-28, po przeglądzie jakości UI). Rozstrzygnięte: każdy krok ma `stateDescription` „wykonany” / „w toku” / „oczekuje”, żeby status nie był przekazywany samą ikoną (CMDUI-17).
 - [x] **P13. PIN przy zmianie zakładki** (2026-10-28, po przeglądzie kodu). Rozstrzygnięte: nie ma gwarancji, że `ON_STOP` dotrze przy zmianie zakładki, a `CommandsViewModel` żyje w zakresie `Activity`, więc PIN wpisany w podsumowaniu zostawał w pamięci (i podsumowanie otwarte) po przejściu na inną zakładkę. `CommandsScreen` woła `onStop()` także przy opuszczeniu kompozycji, jak `SettingsScreen` dla pola URI TOTP (design 008, UI-14); trwający przebieg, wynik i `FLAG_SECURE` (CMDUI-23) bez zmian (CMDUI-11).
+- [x] **P14. Kolejność sekcji panelu** (2026-10-30, decyzja użytkownika). Od góry: Bolus, Profil, CARBS, potem `BG` i `PUMP` w dotychczasowej kolejności. Banery gotowości i wskaźnik uruchamiania zostają nad sekcjami (propozycja specyfikatora; scalenie PR = akceptacja) (CMDUI-01).
+- [x] **P15. Fokus pola PIN** (2026-10-30, decyzja użytkownika). Pole PIN dostaje fokus, a klawiatura pokazuje się od razu po pokazaniu podsumowania (`CARBS`, `BOLUS`, zmiana profilu) i ponownie po odzyskaniu fokusu okna, np. po zamknięciu okna „Na pewno”; bez zapisu PIN-u (CMDUI-28).
 
 ## Przyszłe zmiany (nie blokują)
 
@@ -640,6 +655,13 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
+- **2026-10-30 – zmiana profilu bez listy, kolejność panelu i fokus PIN (P14, P15; Spec 013 P9, P10).**
+  - CMDUI-01: kolejność od góry – banery, Bolus, Profil, CARBS, `BG`, `PUMP`; kryterium źródłowe kolejności.
+  - CMDUI-02, CMDUI-04 – CMDUI-06: przycisk „Zmień profil” otwiera formularz zmiany profilu 1 (zależy od sekretu, PROF-13); brak przycisku `PROFILE LIST`; `CommandRunViewModel` nie obserwuje sekretu (PROF-14 wycofane). CMDUI-06 obejmuje tylko `BG`, `PUMP`, `PROFILE STATUS`.
+  - CMDUI-10, CMDUI-11: odwołanie do fokusu PIN; `onStop()` nie porzuca już wyboru profilu (brak `ProfileSelection`).
+  - CMDUI-19, CMDUI-21, CMDUI-24: wynik `PROFILE LIST` bez pozycji, stan wyniku z numerem i procentem profilu (bez nazwy i par z listy), Wstecz w formularzu bez wyboru.
+  - Nowe CMDUI-28: fokus pola PIN i klawiatura po pokazaniu podsumowania i po odzyskaniu fokusu okna; W14.
+  - Design: „Fokus pola PIN”, panel, mapowanie testów; zadania w design 013 (zadania 1 – 3 zmiany 2026-10-30).
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - CMDUI-01: panel ma też sekcje „Bolus” (BOL-13) i „Profil” (PROF-13) oraz baner limitów (LIM-05); formularz profilu jako tryb zakładki (PROF-15).
   - CMDUI-04: sekret wymagany dla każdego polecenia z kodem (`CARBS`, `BOLUS`, zmiana profilu); `CommandRunViewModel` obserwuje stan sekretu (wybór profilu, PROF-14). CMDUI-05 obejmuje nowe przyciski. Tekst banera sekretu bez zmian („CARBS wymaga…”).

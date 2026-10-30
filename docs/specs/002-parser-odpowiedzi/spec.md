@@ -264,4 +264,6 @@ Warianty oznaczone w kryteriach jako „syntetyczne” to modyfikacje tych wiado
 
 ## Historia zmian
 
+- **Planowane zmiany (Spec 013, 2026-10-30).** PARSER-01: kontekst „zmiana profilu” ma tylko procent ≥ 1 (bez nazwy); kryterium „pusta nazwa, nazwa z LF” odpada, zostaje „procent 0” ([PROF-05](../013-profil/spec.md#prof-05-kontekst-parsera-i-brak-ujawniania), PROF-08, PROF-09). Treść wymagania zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013.
+
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).** PARSER-01: konteksty `BOLUS`, stan profilu, lista profili i zmiana profilu z nowymi rodzajami wyników (opisanymi w BOL-06 – BOL-09 i PROF-05 – PROF-10); wspólne nadtypy znacznikowe wyników (prośba o kod, niezgodność, potwierdzenie) zgodnie z kodem; wyjątek przy tworzeniu kontekstu dla nowych poleceń. Wyniki dla `BG`, `PUMP` i `CARBS` bez zmian. Zakres i „Poza zakresem” doprecyzowane (bolus i profile opisują Spec 012 i 013). Design 002 bez zmian (interfejsy opisuje [design 012](../012-bolus/design.md#interfejsy)).

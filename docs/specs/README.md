@@ -61,4 +61,4 @@ Drobne poprawki redakcyjne (literówki, formatowanie) nie wymagają osobnego PR.
 | 010 | [UI – historia poleceń](010-ui-historia/spec.md) | `HISTUI` | zatwierdzona |
 | 011 | [Limity poleceń w ustawieniach](011-limity-polecen/spec.md) | `LIM` | zatwierdzona |
 | 012 | [Polecenie BOLUS](012-bolus/spec.md) | `BOL` | zatwierdzona |
-| 013 | [Profil – stan, lista i zmiana profilu](013-profil/spec.md) | `PROF` | zatwierdzona |
+| 013 | [Profil – stan i zmiana profilu](013-profil/spec.md) | `PROF` | zatwierdzona |

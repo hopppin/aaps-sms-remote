@@ -236,6 +236,8 @@ Fikcyjne ilości i teksty z kryteriów akceptacji (CMD-03 – CMD-09). Brak plik
 
 ## Historia zmian
 
+- **Planowane zmiany (Spec 013, 2026-10-30).** CMD-01: parametr `PROFILE_SWITCH` = procent, numer zawsze 1 (bez nazwy z listy); 7 wpisów bez zmian (`PROFILE_LIST` zostaje). CMD-07: zmiana profilu zawsze `PROFILE 1 <p>` (np. `PROFILE 1 100`, `PROFILE 1 115`). CMD-08: kontekst zmiany profilu tylko z procentem. CMD-09: `toString()` bez procentu (nazwy już nie ma). Źródło: [PROF-02](../013-profil/spec.md#prof-02-polecenie-zmiany-profilu) – PROF-05. Treść wymagań zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013.
+
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - CMD-01, CMD-02: katalog ma 7 wpisów (`BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH`); słowo kluczowe może mieć pojedyncze spacje między słowami (BOL-01, PROF-01); polecenia z kodem mają zatwierdzenie „podsumowanie z PIN-em”.
   - CMD-03, CMD-04: górna granica `CARBS` = `carbsMaxGrams` z `CommandLimits`, domyślnie 50 g (LIM-06); walidacja przyjmuje limity jako argument; więcej niż 3 cyfry znaczące = „powyżej maksimum”. CMD-05: próg = 80% limitu zaokrąglone w dół, przy 50 g nadal 40 g (LIM-07). CMD-06: szybkie wartości tylko ≤ progowi (LIM-08). Przy limitach domyślnych zachowanie bez zmian.
