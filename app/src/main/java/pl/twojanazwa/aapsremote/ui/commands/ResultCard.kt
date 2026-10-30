@@ -41,7 +41,7 @@ fun ResultCard(
         Text(
             commandTitle(
                 result.commandId, result.commandGrams, result.commandCentiUnits,
-                result.profileName, result.profilePercent,
+                result.profileNumber, result.profilePercent,
             ),
             style = MaterialTheme.typography.headlineSmall,
         )

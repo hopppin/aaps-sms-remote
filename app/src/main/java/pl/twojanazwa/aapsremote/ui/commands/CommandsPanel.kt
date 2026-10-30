@@ -32,7 +32,6 @@ fun CommandsPanel(
     onBgClicked: () -> Unit,
     onPumpClicked: () -> Unit,
     onProfileStatusClicked: () -> Unit,
-    onProfileListClicked: () -> Unit,
     onCarbsInputChanged: (String) -> Unit,
     onQuickValueClicked: (Int) -> Unit,
     onCarbsNextClicked: () -> Unit,
@@ -161,11 +160,6 @@ fun CommandsPanel(
                     enabled = state.canSendNoCode,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.commands_profile_status)) }
-                FilledTonalButton(
-                    onClick = onProfileListClicked,
-                    enabled = state.canSendNoCode,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.commands_profile_list)) }
             }
         }
     }

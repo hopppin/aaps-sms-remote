@@ -16,7 +16,7 @@ import pl.twojanazwa.aapsremote.session.UnknownReason
 class ResultMapperProfileTest {
     private val listText = "1. LocalProfile1\n2. LocalProfile2"
     private val switch =
-        (Command.ProfileSwitch.of(ProfileChoice(2, "LocalProfile2"), 115) as ProfileSwitchValidation.Valid).command
+        (Command.ProfileSwitch.of(115) as ProfileSwitchValidation.Valid).command
 
     private fun result(command: Command, outcome: SessionOutcome) = SessionResult(
         command = command,
@@ -79,7 +79,7 @@ class ResultMapperProfileTest {
         assertEquals(ResultKind.FAILURE, view.kind)
         assertEquals(ResultMessage.PROFILE_AMOUNT_MISMATCH, view.message)
         assertEquals("Tresc", view.replyText)
-        assertEquals("LocalProfile2", view.profileName)
+        assertEquals(1, view.profileNumber)
         assertEquals(115, view.profilePercent)
     }
 
@@ -100,7 +100,7 @@ class ResultMapperProfileTest {
     fun `PROF-16 inne polecenia nie dostaja tekstow profilu`() {
         val bg = ResultMapper.map(result(Command.Bg, SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, "x")))
         assertEquals(ResultMessage.AMOUNT_MISMATCH, bg.message)
-        assertNull(bg.profileName)
+        assertNull(bg.profileNumber)
     }
 
     @Test

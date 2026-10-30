@@ -11,8 +11,11 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import pl.twojanazwa.aapsremote.commands.CarbsValidation
+import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
+import pl.twojanazwa.aapsremote.commands.CommandLimits
+import pl.twojanazwa.aapsremote.commands.smsText
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
@@ -25,8 +28,8 @@ class CommandSessionProfileFlowTest {
     private val sender = FakeSmsSender()
     private val source = FakeIncomingSmsSource()
 
-    private fun switch(number: Int, name: String, percent: Int): Command =
-        (Command.ProfileSwitch.of(ProfileChoice(number, name), percent) as ProfileSwitchValidation.Valid).command
+    private fun switch(percent: Int): Command =
+        (Command.ProfileSwitch.of(percent) as ProfileSwitchValidation.Valid).command
 
     private fun TestScope.start(
         command: Command,
@@ -49,7 +52,7 @@ class CommandSessionProfileFlowTest {
     private suspend fun TestScope.deliver(millis: Long, body: String) = deliverAt(source, millis, body)
 
     private fun credentialsFor(command: Command) =
-        if (command is Command.ProfileSwitch) SessionTestFixtures.credentials() else null
+        if (command.requiresExtraConfirmation(CommandLimits.DEFAULT) || command.smsText().let { it.startsWith("PROFILE 1") || it.startsWith("CARBS") || it.startsWith("BOLUS") }) SessionTestFixtures.credentials() else null
 
     private fun assertNoCode() = assertEquals(emptyList<String>(), sender.sentCodeCopies)
 
@@ -57,7 +60,7 @@ class CommandSessionProfileFlowTest {
     private val requestOther = request.replace("LocalProfile1", "LocalProfile2")
     private val request115 = request.replace("100%", "115%")
 
-    private val local1 get() = switch(1, "LocalProfile1", 100)
+    private val local1 get() = switch(100)
 
     @Test
     fun `PROF-11 PROFILE LIST z lista dwoch pozycji konczy sie Completed`() = runTest {
@@ -135,7 +138,7 @@ class CommandSessionProfileFlowTest {
     @Test
     fun `PROF-12 zgodna prosba o kod w chwili 60000 wysyla PROFILE 1 i kod`() = runTest {
         val (session, _) = start(local1)
-        assertEquals(listOf("PROFILE 1"), sender.sentCommands)
+        assertEquals(listOf("PROFILE 1 100"), sender.sentCommands)
         deliver(60_000, request)
         assertEquals(listOf("0504714321"), sender.sentCodeCopies)
         assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
@@ -144,11 +147,42 @@ class CommandSessionProfileFlowTest {
     }
 
     @Test
-    fun `PROF-12 inna nazwa profilu w prosbie konczy sie AMOUNT_MISMATCH bez kodu`() = runTest {
-        val (_, run) = start(local1)
+    fun `PROF-12 inna nazwa profilu przy zgodnym procencie daje kod`() = runTest {
+        val (session, _) = start(local1)
         deliver(60_000, requestOther)
-        assertEquals(SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, requestOther), run.await().outcome)
+        assertEquals(listOf("0504714321"), sender.sentCodeCopies)
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        session.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `PROF-12 nazwa z liczba nie myli procentu - decyduje procent sesji`() = runTest {
+        val zima = request.replace("LocalProfile1", "Zima 200")
+        val (_, run) = start(switch(200))
+        deliver(60_000, zima)
+        assertEquals(SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, zima), run.await().outcome)
+    }
+
+    @Test
+    fun `PROF-12 nazwa z liczba przy zgodnym procencie 100 daje kod`() = runTest {
+        val zima = request.replace("LocalProfile1", "Zima 200")
+        val (session, _) = start(local1)
+        deliver(60_000, zima)
+        assertEquals(listOf("0504714321"), sender.sentCodeCopies)
+        session.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `PROF-12 prosba sprzed wyslania polecenia jest pominieta i nie daje kodu`() = runTest {
+        val (session, _) = start(local1)
+        source.emit(IncomingSms(request, SessionTestFixtures.T0 - 1_000))
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CODE_REQUEST, session.state.value.phase)
         assertNoCode()
+        session.cancel()
+        runCurrent()
     }
 
     @Test
@@ -157,7 +191,7 @@ class CommandSessionProfileFlowTest {
         deliver(60_000, request115)
         assertEquals(SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, request115), run.await().outcome)
 
-        val (_, bad) = start(switch(1, "LocalProfile1", 115))
+        val (_, bad) = start(switch(115))
         deliver(120_000, AapsSamples.profileBadFormat)
         assertEquals(
             SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, AapsSamples.profileBadFormat),
@@ -167,12 +201,12 @@ class CommandSessionProfileFlowTest {
     }
 
     @Test
-    fun `PROF-12 druga linia obrony - wstrzykniete prosby z inna nazwa lub procentem nie wysylaja kodu`() = runTest {
-        val bodies = listOf(requestOther, request115, request.replace("LocalProfile1", "localprofile1"))
+    fun `PROF-12 druga linia obrony - wstrzykniete prosby z innym procentem nie wysylaja kodu`() = runTest {
+        val bodies = listOf(request115, request.replace("100%", "1000%"))
         for ((i, body) in bodies.withIndex()) {
             val (_, run) = start(local1) { b, _ -> AapsReply.ProfileCodeRequest(b) }
             deliver(60_000L * (i + 1), body)
-            assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
+            assertEquals(SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, body), run.await().outcome)
         }
         assertNoCode()
     }
@@ -210,8 +244,8 @@ class CommandSessionProfileFlowTest {
     fun `PROF-12 po kodzie niezgodny profil to Unknown AMOUNT_MISMATCH`() = runTest {
         val (_, run) = start(local1)
         deliver(60_000, request)
-        deliver(65_000, requestOther)
-        assertEquals(SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, requestOther), run.await().outcome)
+        deliver(65_000, request115)
+        assertEquals(SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, request115), run.await().outcome)
         assertEquals(1, sender.sentCodeCopies.size)
     }
 
@@ -244,12 +278,16 @@ class CommandSessionProfileFlowTest {
             assertNoCode()
         }
 
+
     @Test
-    fun `PROF-07 nazwa z kropka i liczba nie daje kodu gdy prosba dotyczy skroconej nazwy`() = runTest {
-        val body = "Aby przelaczyc profil na A 100% odpowiedz kodem z aplikacji Authenticator dla: Jan, z doklejonym PIN-em"
-        val (_, run) = start(switch(1, "A 2. B", 100))
-        deliver(60_000, body)
-        assertEquals(SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, body), run.await().outcome)
+    fun `PROF-12 sesje CARBS i BOLUS z prosba o zmiane profilu to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val carbs = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
+        val bolus = (Command.Bolus.of(10, CommandLimits.DEFAULT) as BolusValidation.Valid).command
+        for ((i, c) in listOf(carbs, bolus).withIndex()) {
+            val (_, run) = start(c)
+            deliver(60_000L * (i + 1), request)
+            assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, request), run.await().outcome)
+        }
         assertNoCode()
     }
 }

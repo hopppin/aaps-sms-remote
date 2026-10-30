@@ -8,7 +8,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
@@ -21,7 +20,7 @@ class CommandSessionProfileTest {
     private val BODY = "dowolna tresc"
 
     private val switch: Command =
-        (Command.ProfileSwitch.of(ProfileChoice(1, "LocalProfile1"), 100) as ProfileSwitchValidation.Valid).command
+        (Command.ProfileSwitch.of(100) as ProfileSwitchValidation.Valid).command
 
     private suspend fun TestScope.codeNeverSent(command: Command, reply: (String) -> AapsReply) {
         val clock = virtualClock()

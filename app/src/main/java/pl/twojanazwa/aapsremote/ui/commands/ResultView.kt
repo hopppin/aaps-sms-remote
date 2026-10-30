@@ -28,8 +28,8 @@ data class ResultView(
     val commandGrams: Int?,
     /** Ilość z polecenia BOLUS w setnych (nagłówek „Polecenie BOLUS X j.”), inaczej null. */
     val commandCentiUnits: Int? = null,
-    /** Nazwa i procent z polecenia zmiany profilu (nagłówek PROF-16), inaczej null. */
-    val profileName: String? = null,
+    /** Numer i procent z polecenia zmiany profilu (nagłówek PROF-16), inaczej null. */
+    val profileNumber: Int? = null,
     val profilePercent: Int? = null,
     /** Pozycje do wyboru, tylko `Completed` dla PROFILE_LIST (PROF-14); inaczej null. */
     val profileItems: List<ProfileChoice>? = null,

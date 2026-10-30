@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation
 import pl.twojanazwa.aapsremote.data.platform.HistoryEntity
 import pl.twojanazwa.aapsremote.session.SessionOutcome
@@ -28,17 +27,17 @@ class HistoryCodecProfileTest {
     @Test
     fun `PROF-17 wynik zmiany profilu Unknown daje wpis PROFILE_SWITCH z numerem i procentem bez nazwy`() {
         val command =
-            (Command.ProfileSwitch.of(ProfileChoice(2, "LocalProfile2"), 115) as ProfileSwitchValidation.Valid).command
+            (Command.ProfileSwitch.of(115) as ProfileSwitchValidation.Valid).command
         val row = HistoryCodec.toRow(
             result(command, SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, "Profil zmieniony")),
         )
         assertEquals("PROFILE_SWITCH", row.command)
-        assertEquals(2, row.profileNumber)
+        assertEquals(1, row.profileNumber)
         assertEquals(115, row.profilePercent)
         assertEquals("Profil zmieniony", row.replyText)
         val entry = HistoryCodec.toEntry(row)
         assertEquals(HistoryCommand.PROFILE_SWITCH, entry.command)
-        assertEquals(2, entry.profileNumber)
+        assertEquals(1, entry.profileNumber)
         assertEquals(115, entry.profilePercent)
         val entity = HistoryEntity.fromRow(row)
         for (text in listOf(row.toString(), entry.toString(), entity.toString())) {
@@ -74,5 +73,14 @@ class HistoryCodecProfileTest {
             HistoryRow(1, "CARBS", 20, "CANCELLED", null, t0, t0, null, t0, null, 0, null, 3, 120),
         )
         assertNull(carbs.profileNumber)
+    }
+
+    @Test
+    fun `PROF-17 stary wiersz PROFILE_SWITCH z numerem 2 i procentem 115 dekoduje sie bez bledu i bez walidacji zakresu`() {
+        val row = HistoryRow(1, "PROFILE_SWITCH", null, "COMPLETED", null, t0, t0, null, t0, null, 0, null, 2, 115)
+        val entry = HistoryCodec.toEntry(row)
+        assertEquals(HistoryCommand.PROFILE_SWITCH, entry.command)
+        assertEquals(2, entry.profileNumber)
+        assertEquals(115, entry.profilePercent)
     }
 }

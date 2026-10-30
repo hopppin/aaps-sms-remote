@@ -91,7 +91,7 @@ object ResultMapper {
             commandId = command.id,
             commandGrams = (command as? Command.Carbs)?.grams,
             commandCentiUnits = (command as? Command.Bolus)?.centiUnits,
-            profileName = (command as? Command.ProfileSwitch)?.profileName,
+            profileNumber = (command as? Command.ProfileSwitch)?.number,
             profilePercent = (command as? Command.ProfileSwitch)?.percent,
             profileItems = items,
             kind = kind,

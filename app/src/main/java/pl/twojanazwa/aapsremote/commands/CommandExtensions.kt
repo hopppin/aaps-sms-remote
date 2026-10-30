@@ -14,12 +14,7 @@ fun Command.smsText(): String = when (this) {
     is Command.Bolus -> "${definition.keyword} ${BolusAmountText.toSms(centiUnits)}"
     Command.ProfileStatus -> definition.keyword
     Command.ProfileList -> definition.keyword
-    is Command.ProfileSwitch ->
-        if (percent == Command.ProfileSwitch.DEFAULT_PERCENT) {
-            "${definition.keyword} $number"
-        } else {
-            "${definition.keyword} $number $percent"
-        }
+    is Command.ProfileSwitch -> "${definition.keyword} $number $percent" // PROF-04: jawny procent także dla 100
 }
 
 /** CMD-08: kontekst parsera wyliczany z tego samego polecenia co treść SMS. */
@@ -30,5 +25,5 @@ fun Command.toExpectedCommand(): ExpectedCommand = when (this) {
     is Command.Bolus -> ExpectedCommand.Bolus(centiUnits)
     Command.ProfileStatus -> ExpectedCommand.ProfileStatus
     Command.ProfileList -> ExpectedCommand.ProfileList
-    is Command.ProfileSwitch -> ExpectedCommand.ProfileSwitch(profileName, percent)
+    is Command.ProfileSwitch -> ExpectedCommand.ProfileSwitch(percent)
 }

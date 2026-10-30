@@ -295,6 +295,12 @@ class CommandSession(
     /** BOL-19: prośba o kod / potwierdzenie innego rodzaju niż polecenie sesji = Unrecognized. */
     private fun parseMatching(sms: IncomingSms): AapsReply {
         val reply = parse(sms.body, command.toExpectedCommand())
+        // PROF-12: prośba o kod z innym procentem niż wysłany (np. błąd parsera) to niezgodny profil, nigdy kod.
+        if (reply is AapsReply.ProfileCodeRequest && command is Command.ProfileSwitch &&
+            !profileRequestMatches(reply.text, command)
+        ) {
+            return AapsReply.ProfileSwitchMismatch(sms.body)
+        }
         val matches = when (reply) {
             is AapsReply.MatchingCodeRequest -> ReplyMatch.isCodeRequestFor(command.id, reply)
             is AapsReply.MatchingDone -> ReplyMatch.isDoneFor(command.id, reply)
@@ -324,11 +330,11 @@ class CommandSession(
         }
     }
 
-    /** PROF-12: niezależne od parsera porównanie nazwy i procentu (wielkość liter znacząca) z treścią prośby. */
+    /** PROF-12: niezależne od parsera porównanie samego procentu z treścią prośby (nazwy nie porównujemy). */
     private fun profileRequestMatches(text: String, sent: Command.ProfileSwitch): Boolean {
         val n = ReplyNormalizer.normalize(text) ?: return false
         val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues ?: return false
-        return g[1] == sent.profileName && g[2].toIntOrNull() == sent.percent
+        return g[2].toIntOrNull() == sent.percent
     }
 
     /** Tylko dla odpowiedzi zgodnej z poleceniem (po [parseMatching]). */

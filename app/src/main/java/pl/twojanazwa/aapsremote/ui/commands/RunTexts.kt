@@ -86,10 +86,10 @@ fun commandTitle(
     id: CommandId,
     grams: Int?,
     centiUnits: Int?,
-    profileName: String? = null,
+    profileNumber: Int? = null,
     profilePercent: Int? = null,
 ): String = when {
-    profileName != null && profilePercent != null -> stringResource(id.titleRes(), profileName, profilePercent)
+    profileNumber != null && profilePercent != null -> stringResource(id.titleRes(), profileNumber, profilePercent)
     grams != null -> stringResource(id.titleRes(), grams)
     centiUnits != null -> stringResource(id.titleRes(), formatCentiUnits(centiUnits))
     else -> stringResource(id.titleRes())

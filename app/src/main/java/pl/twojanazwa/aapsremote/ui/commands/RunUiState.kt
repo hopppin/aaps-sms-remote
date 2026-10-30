@@ -7,7 +7,7 @@ sealed interface RunView {
     val commandId: CommandId
     val commandGrams: Int?
     val commandCentiUnits: Int?
-    val profileName: String?
+    val profileNumber: Int?
     val profilePercent: Int?
 
     data class Active(
@@ -17,7 +17,7 @@ sealed interface RunView {
         val steps: List<ProgressStep>,
         val cancelMode: CancelMode,
         val unexpectedCount: Int,
-        override val profileName: String? = null,
+        override val profileNumber: Int? = null,
         override val profilePercent: Int? = null,
     ) : RunView {
         /** CMDUI-26: bez ilości. */
@@ -28,7 +28,7 @@ sealed interface RunView {
         override val commandId: CommandId get() = result.commandId
         override val commandGrams: Int? get() = result.commandGrams
         override val commandCentiUnits: Int? get() = result.commandCentiUnits
-        override val profileName: String? get() = result.profileName
+        override val profileNumber: Int? get() = result.profileNumber
         override val profilePercent: Int? get() = result.profilePercent
     }
 }

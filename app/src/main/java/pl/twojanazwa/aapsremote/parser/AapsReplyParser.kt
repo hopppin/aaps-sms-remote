@@ -50,8 +50,8 @@ object AapsReplyParser {
     private fun parseProfileSwitch(n: String, body: String, expected: ExpectedCommand.ProfileSwitch): AapsReply? {
         if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
         val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues ?: return null
-        // Porównanie dokładne (wielkość liter); inaczej stop, nigdy kod (PROF-09).
-        return if (g[1] == expected.profileName && g[2].toInt() == expected.percent) {
+        // Tylko procent (nazwę podaje AAPS, nie porównujemy jej); inaczej stop, nigdy kod (PROF-09).
+        return if (g[2].toInt() == expected.percent) {
             AapsReply.ProfileCodeRequest(body)
         } else {
             AapsReply.ProfileSwitchMismatch(body)

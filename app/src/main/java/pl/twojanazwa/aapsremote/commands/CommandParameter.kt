@@ -10,7 +10,7 @@ sealed interface CommandParameter {
         val stepCentiUnits: Int,
     ) : CommandParameter
 
-    /** Numer i nazwa z listy profili oraz procent (PROF-01). */
+    /** Procent zmiany profilu; numer profilu jest stały i równy 1 (PROF-01). */
     data class ProfileAndPercent(
         val minPercent: Int,
         val maxPercent: Int,

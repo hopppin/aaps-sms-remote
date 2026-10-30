@@ -76,7 +76,7 @@ class CommandsViewModelProfileTest {
         s.next("115")
         assertNull(s.state().profile)
         val summary = checkNotNull(s.state().summary).command as Command.ProfileSwitch
-        assertEquals(Triple(1, "LocalProfile1", 115), Triple(summary.number, summary.profileName, summary.percent))
+        assertEquals(Pair(1, 115), Pair(summary.number, summary.percent))
         s.vm.onPinChanged("4321")
         s.vm.onSendClicked()
         settle()
@@ -85,7 +85,7 @@ class CommandsViewModelProfileTest {
         assertEquals("", s.vm.uiState.value.pinText)
         assertEquals(listOf("PROFILE 1 115"), s.env.sender.sentCommands)
         val launched = s.env.currentRun.state.value!!.command as Command.ProfileSwitch
-        assertEquals(Triple(1, "LocalProfile1", 115), Triple(launched.number, launched.profileName, launched.percent))
+        assertEquals(Pair(1, 115), Pair(launched.number, launched.percent))
         s.env.coordinator.activeSession.value?.cancel()
         settle()
     }

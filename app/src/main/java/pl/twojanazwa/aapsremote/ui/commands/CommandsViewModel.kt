@@ -190,7 +190,7 @@ class CommandsViewModel @Inject constructor(
     fun onProfileNextClicked() {
         val form = local.value.profile ?: return
         if (!compose().canStartProfile) return
-        when (val result = Command.ProfileSwitch.parsePercent(form.choice, form.percentText)) {
+        when (val result = Command.ProfileSwitch.parsePercent(form.percentText)) {
             is ProfileSwitchValidation.Invalid ->
                 local.update { it.copy(profile = form.copy(error = result.error)) }
             // Jedna aktualizacja: nigdy nie ma chwili bez formularza i bez podsumowania (secureWindow).
