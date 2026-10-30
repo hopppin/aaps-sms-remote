@@ -38,7 +38,6 @@ class CommandsViewModel @Inject constructor(
     private val secrets: TotpSecretStore,
     private val permissions: SmsPermissions,
     private val limitsStore: CommandLimitsStore,
-    private val profileSelection: ProfileSelection,
 ) : ViewModel() {
     /** Część stanu własna ViewModelu (początkowy odczyt uprawnień, CMDUI-03); gotowość dokłada `combine`. */
     private val local = MutableStateFlow(CommandsUiState(smsGranted = readPermissions()))
@@ -72,16 +71,6 @@ class CommandsViewModel @Inject constructor(
                 if (run == null && currentRun.state.value == null) local.update { it.copy(runHandoff = false) }
             }
         }
-        // PROF-14: wybór z wyniku listy otwiera formularz (procent 100) i jest od razu zużywany.
-        viewModelScope.launch {
-            profileSelection.choice.collect { choice ->
-                if (choice == null) return@collect
-                local.update {
-                    it.copy(profile = ProfileFormState(choice, Command.ProfileSwitch.DEFAULT_PERCENT.toString()))
-                }
-                profileSelection.clear()
-            }
-        }
     }
 
     /** ON_RESUME zakładki i po wyniku prośby o uprawnienia (CMDUI-03). */
@@ -101,7 +90,11 @@ class CommandsViewModel @Inject constructor(
     /** PROF-13: jak `BG`, bez sekretu i limitów. */
     fun onProfileStatusClicked() = startNoCode(Command.ProfileStatus)
 
-    fun onProfileListClicked() = startNoCode(Command.ProfileList)
+    /** PROF-13: otwiera formularz procentu profilu 1 (domyślnie 100); bez SMS-a i bez czytania sekretu. */
+    fun onProfileSwitchClicked() {
+        if (local.value.launching || !compose().canStartProfile) return
+        local.update { it.copy(profile = ProfileFormState(Command.ProfileSwitch.DEFAULT_PERCENT.toString())) }
+    }
 
     fun onCarbsInputChanged(text: String) {
         local.update { it.copy(carbsInput = text, carbsError = null) }
@@ -203,7 +196,7 @@ class CommandsViewModel @Inject constructor(
         }
     }
 
-    /** „Anuluj” formularza: wybór jest już zużyty, więc wystarczy zamknąć formularz. */
+    /** „Anuluj” formularza. */
     fun onProfileFormCancelled() {
         if (local.value.launching) return
         local.update { it.copy(profile = null) }
@@ -269,8 +262,6 @@ class CommandsViewModel @Inject constructor(
 
     /** Aplikacja schodzi z ekranu albo zmiana zakładki: PIN i okna znikają, tekst ilości zostaje (CMDUI-11). */
     fun onStop() {
-        // PROF-15: wybór profilu też jest porzucany (lista mogła się zestarzeć).
-        profileSelection.clear()
         local.update {
             it.copy(pinText = "", summary = null, confirming = null, extraConfirmed = false, profile = null)
         }

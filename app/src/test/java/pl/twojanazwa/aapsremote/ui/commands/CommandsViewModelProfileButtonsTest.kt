@@ -5,6 +5,7 @@ import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
@@ -22,7 +23,7 @@ class CommandsViewModelProfileButtonsTest {
     private fun TestScope.setup(): Pair<CommandTestEnv, CommandsViewModel> {
         val env = CommandTestEnv(this)
         val vm = CommandsViewModel(
-            env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits, ProfileSelection(),
+            env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits,
         )
         main.dispatcher.scheduler.runCurrent()
         return env to vm
@@ -43,15 +44,15 @@ class CommandsViewModelProfileButtonsTest {
     }
 
     @Test
-    fun `PROF-13 onProfileListClicked wysyla PROFILE LIST bez czytania sekretu`() = runTest(main.dispatcher) {
-        val (env, vm) = setup()
-        vm.onProfileListClicked()
-        settle()
-        assertEquals(listOf("PROFILE LIST"), env.sender.sentCommands)
-        assertEquals(Command.ProfileList, checkNotNull(env.coordinator.activeSession.value).command)
-        assertEquals(0, env.secrets.loadCount)
-        env.coordinator.activeSession.value?.cancel()
-        settle()
+    fun `PROF-13 zrodla ui commands nie zawieraja przycisku PROFILE LIST`() {
+        val dir = java.io.File("src/main/java/pl/twojanazwa/aapsremote/ui/commands")
+        val sources = dir.listFiles { f -> f.extension == "kt" }!!.joinToString(" ") { it.readText() }
+        assertFalse("onProfileListClicked" in sources)
+        assertFalse("startNoCode(Command.ProfileList)" in sources)
+        for (removed in listOf("ProfileSelection", "ProfileChoice", "onProfileChosen", "profileItems")) {
+            assertFalse(removed in sources, removed)
+        }
+        assertFalse("commands_profile_list" in java.io.File("src/main/res/values/strings.xml").readText())
     }
 
     @Test
@@ -72,9 +73,10 @@ class CommandsViewModelProfileButtonsTest {
         vm.onBgClicked()
         settle()
         assertFalse(vm.uiState.value.canSendNoCode)
-        vm.onProfileListClicked()
+        vm.onProfileSwitchClicked()
         settle()
         assertEquals(listOf("BG"), env.sender.sentCommands)
+        assertNull(vm.uiState.value.profile)
         env.coordinator.activeSession.value?.cancel()
         settle()
     }

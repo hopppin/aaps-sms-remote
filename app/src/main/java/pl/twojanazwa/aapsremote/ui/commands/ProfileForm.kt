@@ -19,8 +19,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import pl.twojanazwa.aapsremote.R
+import pl.twojanazwa.aapsremote.commands.ProfileLimits
 
-/** PROF-15: formularz procentu dla wybranego profilu; wartość pola wyłącznie z [ProfileFormState]. */
+/** PROF-15: formularz procentu dla profilu 1; wartość pola wyłącznie z [ProfileFormState]. */
 @Composable
 fun ProfileForm(
     form: ProfileFormState,
@@ -35,7 +36,7 @@ fun ProfileForm(
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         Text(
-            stringResource(R.string.commands_profile_form_title, form.choice.number, form.choice.name),
+            stringResource(R.string.commands_profile_form_title, ProfileLimits.PROFILE_NUMBER),
             style = MaterialTheme.typography.headlineSmall,
         )
         OutlinedTextField(

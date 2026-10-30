@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.security.TotpSecretStore
 import pl.twojanazwa.aapsremote.session.SessionCoordinator
 import pl.twojanazwa.aapsremote.session.SessionPhase
 import javax.inject.Inject
@@ -25,8 +24,6 @@ import javax.inject.Inject
 class CommandRunViewModel @Inject constructor(
     private val currentRun: CurrentRun,
     private val coordinator: SessionCoordinator,
-    private val profileSelection: ProfileSelection,
-    private val secrets: TotpSecretStore,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(RunUiState())
     val uiState: StateFlow<RunUiState> = mutableState.asStateFlow()
@@ -41,11 +38,6 @@ class CommandRunViewModel @Inject constructor(
                 } else {
                     observe(run)
                 }
-            }
-        }
-        viewModelScope.launch {
-            secrets.state.collect { secret ->
-                mutableState.update { it.copy(secret = secret.toReadiness()) }
             }
         }
         viewModelScope.launch {
@@ -92,16 +84,6 @@ class CommandRunViewModel @Inject constructor(
             currentRun.clear()
             mutableState.update { it.copy(view = null) }
         }
-    }
-
-    /** PROF-14: wybór pozycji listy zamyka wynik i przekazuje wybór do panelu; nieaktywny przy ABSENT / INVALIDATED. */
-    fun onProfileChosen(number: Int) {
-        // Bieżący stan sekretu, nie kolektor (ten może jeszcze nie zdążyć zaktualizować uiState).
-        val secret = secrets.state.value.toReadiness()
-        if (secret == SecretReadiness.ABSENT || secret == SecretReadiness.INVALIDATED) return
-        val item = (mutableState.value.view as? RunView.Finished)?.result?.profileItems?.firstOrNull { it.number == number } ?: return
-        profileSelection.select(item)
-        onResultDismissed()
     }
 
     /** Przebieg, dla którego otwarto okno „Przestać czekać?”; potwierdzenie anuluje tylko jego sesję. */

@@ -23,8 +23,6 @@ import pl.twojanazwa.aapsremote.commands.CommandId
 @Composable
 fun ResultCard(
     result: ResultView,
-    secret: SecretReadiness,
-    onProfileChosen: (Int) -> Unit,
     onResultDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -62,18 +60,6 @@ fun ResultCard(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-            }
-        }
-        result.profileItems?.takeIf { it.isNotEmpty() }?.let { items ->
-            // PROF-14: pozycje nieaktywne przy braku sekretu, z banerem.
-            val enabled = secret != SecretReadiness.ABSENT && secret != SecretReadiness.INVALIDATED
-            secret.bannerRes()?.let { Card { Text(stringResource(it), Modifier.padding(16.dp)) } }
-            items.forEach { item ->
-                OutlinedButton(
-                    onClick = { onProfileChosen(item.number) },
-                    enabled = enabled,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.result_profile_item, item.number, item.name)) }
             }
         }
         Button(onClick = onResultDismissed, modifier = Modifier.fillMaxWidth()) {

@@ -85,15 +85,15 @@
     <string name="commands_large_dismiss">Nie</string>
     <string name="commands_summary_title">Wysłać CARBS %1$d g do AAPS?</string>
     <string name="commands_summary_text">Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g.</string>
-    <string name="commands_profile_form_title">Profil: %1$d. %2$s</string>
+    <string name="commands_profile_form_title">Zmiana profilu %1$d</string>
     <string name="commands_profile_percent_label" formatted="false">Procent (%)</string>
     <string name="commands_profile_next">Dalej</string>
     <string name="commands_profile_error_empty">Podaj procent (%1$d–%2$d).</string>
     <string name="commands_profile_error_invalid_characters">Tylko cyfry.</string>
     <string name="commands_profile_error_below_min">Najmniejszy procent to %1$d.</string>
     <string name="commands_profile_error_above_max">Największy procent to %1$d.</string>
-    <string name="commands_profile_summary_title">Zmienić profil na %1$s (%2$d%%)?</string>
-    <string name="commands_profile_summary_text">Aplikacja wyśle %1$s, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %2$s %3$d%%.</string>
+    <string name="commands_profile_summary_title">Zmienić profil %1$d na %2$d%%?</string>
+    <string name="commands_profile_summary_text">Aplikacja wyśle %1$s, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla zmiany profilu na %2$d%%. Nazwę profilu podaje AAPS – aplikacja jej nie sprawdza.</string>
     <string name="history_command_profile_status">PROFILE STATUS</string>
     <string name="history_command_profile_list">PROFILE LIST</string>
     <string name="history_command_profile_switch">Zmiana profilu %1$d, %2$d%%</string>
@@ -194,14 +194,13 @@
     <string name="history_command_bolus">BOLUS %1$s j.</string>
     <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>
     <string name="result_profile_status_reply">Odpowiedź AAPS na PROFILE STATUS</string>
-    <string name="result_profile_list_reply">Lista profili z AAPS. Wybierz profil, aby go zmienić.</string>
+    <string name="result_profile_list_reply">Lista profili z AAPS.</string>
     <string name="result_profile_amount_mismatch">AAPS podał inny profil lub procent niż wybrany. Pobierz listę ponownie.</string>
     <string name="result_profile_unknown_amount_mismatch">Po wysłaniu kodu AAPS podał inny profil lub procent.</string>
     <string name="result_profile_unknown_unrecognized_reply">Po wysłaniu kodu przyszła odpowiedź AAPS, której aplikacja nie rozpoznaje. Przeczytaj treść SMS i sprawdź w AAPS.</string>
-    <string name="result_profile_item">%1$d. %2$s</string>
     <string name="commands_profile_title">Profil</string>
     <string name="commands_profile_status">Aktualny profil</string>
-    <string name="commands_profile_list">Zmień profil…</string>
+    <string name="commands_profile_switch">Zmień profil</string>
     <string name="result_details_missing">Brak szczegółów wyniku.</string>
     <string name="result_send_failed">Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.</string>
     <string name="result_unrecognized_reply">Nierozpoznana odpowiedź AAPS.</string>

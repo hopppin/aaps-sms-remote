@@ -1,7 +1,6 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import pl.twojanazwa.aapsremote.commands.CommandId
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 
 enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
 
@@ -31,8 +30,6 @@ data class ResultView(
     /** Numer i procent z polecenia zmiany profilu (nagłówek PROF-16), inaczej null. */
     val profileNumber: Int? = null,
     val profilePercent: Int? = null,
-    /** Pozycje do wyboru, tylko `Completed` dla PROFILE_LIST (PROF-14); inaczej null. */
-    val profileItems: List<ProfileChoice>? = null,
     val kind: ResultKind,
     val message: ResultMessage,
     /** Argument komunikatu: gramy (CARBS_CONFIRMED) albo minuty (NO_RESPONSE, SEND_TIMEOUT, UNKNOWN_CONFIRMATION_TIMEOUT). */

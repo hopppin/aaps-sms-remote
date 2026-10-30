@@ -4,7 +4,6 @@ import pl.twojanazwa.aapsremote.commands.BolusAmountError
 import pl.twojanazwa.aapsremote.commands.CarbsAmountError
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandLimits
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchError
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 
@@ -17,16 +16,8 @@ class SummaryState(val command: Command) {
     override fun toString(): String = "SummaryState(***)"
 }
 
-/** Formularz procentu dla wybranego profilu (PROF-15); `toString()` bez nazwy i procentu. */
-class ProfileFormState(val choice: ProfileChoice, val percentText: String, val error: ProfileSwitchError? = null) {
-    fun copy(percentText: String = this.percentText, error: ProfileSwitchError? = this.error) =
-        ProfileFormState(choice, percentText, error)
-
-    override fun equals(other: Any?): Boolean =
-        other is ProfileFormState && other.choice == choice && other.percentText == percentText && other.error == error
-
-    override fun hashCode(): Int = 31 * (31 * choice.hashCode() + percentText.hashCode()) + (error?.hashCode() ?: 0)
-
+/** Formularz zmiany profilu 1 (PROF-15); `toString()` bez procentu. */
+data class ProfileFormState(val percentText: String, val error: ProfileSwitchError? = null) {
     override fun toString(): String = "ProfileFormState(***)"
 }
 

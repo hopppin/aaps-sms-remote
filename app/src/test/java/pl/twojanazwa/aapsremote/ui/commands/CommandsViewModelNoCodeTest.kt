@@ -32,7 +32,7 @@ class CommandsViewModelNoCodeTest {
 
     private fun kotlinx.coroutines.test.TestScope.setup(): TestEnvScope {
         val env = CommandTestEnv(this)
-        val vm = CommandsViewModel(env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits, ProfileSelection())
+        val vm = CommandsViewModel(env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits)
         return TestEnvScope(env, vm).also { it.settle() }
     }
 
@@ -104,7 +104,7 @@ class CommandsViewModelNoCodeTest {
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    CommandsViewModel(env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits, ProfileSelection()) as T
+                    CommandsViewModel(env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets, env.permissions, env.limits) as T
             },
         )[CommandsViewModel::class.java]
         main.dispatcher.scheduler.runCurrent()

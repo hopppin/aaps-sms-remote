@@ -2,7 +2,6 @@ package pl.twojanazwa.aapsremote.ui.commands
 
 import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandCatalog
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionOutcome
@@ -22,7 +21,6 @@ object ResultMapper {
         val command = result.command
         val outcome = result.outcome
 
-        var items: List<ProfileChoice>? = null
         val kind: ResultKind
         val message: ResultMessage
         var arg: Int? = null
@@ -41,10 +39,6 @@ object ResultMapper {
                     is Command.ProfileSwitch -> ResultMessage.DETAILS_MISSING
                 }
                 text = outcome.text
-                val reply = outcome.reply
-                if (command is Command.ProfileList && reply is AapsReply.ProfileListReport) {
-                    items = reply.items.map { ProfileChoice(it.number, it.name) }
-                }
             }
             is SessionOutcome.CarbsConfirmed -> {
                 kind = ResultKind.SUCCESS
@@ -93,7 +87,6 @@ object ResultMapper {
             commandCentiUnits = (command as? Command.Bolus)?.centiUnits,
             profileNumber = (command as? Command.ProfileSwitch)?.number,
             profilePercent = (command as? Command.ProfileSwitch)?.percent,
-            profileItems = items,
             kind = kind,
             message = message,
             messageArg = arg,

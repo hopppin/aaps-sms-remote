@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchValidation
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.session.FailureReason
@@ -37,27 +36,26 @@ class ResultMapperProfileTest {
     )
 
     @Test
-    fun `PROF-14 wynik PROFILE LIST ma pozycje komunikat i tresc SMS`() {
+    fun `PROF-16 wynik PROFILE LIST ma komunikat i tresc SMS, bez pozycji`() {
         val view = ResultMapper.map(result(Command.ProfileList, listCompleted()))
-        assertEquals(listOf(ProfileChoice(1, "LocalProfile1"), ProfileChoice(2, "LocalProfile2")), view.profileItems)
         assertEquals(ResultKind.SUCCESS, view.kind)
         assertEquals(ResultMessage.PROFILE_LIST_REPLY, view.message)
         assertEquals(listText, view.replyText)
     }
 
     @Test
-    fun `PROF-14 wynik PROFILE STATUS i Failed dla PROFILE LIST nie maja pozycji`() {
+    fun `PROF-16 wynik PROFILE STATUS i Failed dla PROFILE LIST maja tresc i kind`() {
         val status = ResultMapper.map(
             result(
                 Command.ProfileStatus,
                 SessionOutcome.Completed(AapsReply.ProfileStatusReport("LocalProfile1 (100%)"), "LocalProfile1 (100%)"),
             ),
         )
-        assertNull(status.profileItems)
+        assertEquals(ResultKind.SUCCESS, status.kind)
         val failed = ResultMapper.map(
             result(Command.ProfileList, SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, "x")),
         )
-        assertNull(failed.profileItems)
+        assertEquals(ResultKind.FAILURE, failed.kind)
     }
 
     @Test

@@ -38,7 +38,7 @@ class CommandsViewModelSummaryTest {
     private fun TestScope.env() = CommandTestEnv(this).also { it.secrets.setState(SecretState.PRESENT) }
 
     private fun CommandTestEnv.viewModel(launcher: CommandLauncher = launcher()) =
-        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions, FakeCommandLimitsStore(), ProfileSelection()).also { settle() }
+        CommandsViewModel(launcher, coordinator, currentRun, numbers, secrets, permissions, FakeCommandLimitsStore()).also { settle() }
 
     private fun CommandsViewModel.openSummary(grams: String = "20") {
         onCarbsInputChanged(grams)
@@ -250,7 +250,7 @@ class CommandsViewModelSummaryTest {
         runTest(main.dispatcher) {
             val env = env()
             val vm = env.viewModel()
-            val run = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
+            val run = CommandRunViewModel(env.currentRun, env.coordinator)
             fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
             vm.onBgClicked()
             settle()
@@ -272,7 +272,7 @@ class CommandsViewModelSummaryTest {
         val env = env()
         env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
         val vm = env.viewModel()
-        val run = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
+        val run = CommandRunViewModel(env.currentRun, env.coordinator)
         fun secure() = vm.uiState.value.secureWindow || run.uiState.value.secureWindow
         vm.openSummary("1")
         vm.onPinChanged("4321")

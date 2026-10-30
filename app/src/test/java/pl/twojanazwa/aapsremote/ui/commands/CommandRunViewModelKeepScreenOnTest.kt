@@ -26,7 +26,7 @@ class CommandRunViewModelKeepScreenOnTest {
     @Test
     fun `CMDUI-22 znacznik ekran wlaczony false true false a stan koncowy to wynik`() = runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
-        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
+        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
         val seen = mutableListOf<Boolean>()
         val job = launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect { seen += it.keepScreenOn }
@@ -47,7 +47,7 @@ class CommandRunViewModelKeepScreenOnTest {
     @Test
     fun `CMDUI-23 znacznik ekran chroniony false true true false i zgodny z widokiem`() = runTest(main.dispatcher) {
         val env = CommandTestEnv(this)
-        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator, ProfileSelection(), env.secrets)
+        val viewModel = CommandRunViewModel(env.currentRun, env.coordinator)
         val seen = mutableListOf<Boolean>()
         fun record() {
             val s = viewModel.uiState.value

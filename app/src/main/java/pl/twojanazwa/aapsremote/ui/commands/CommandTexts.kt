@@ -116,6 +116,6 @@ fun summaryText(command: Command): String = when (command) {
     is Command.Carbs -> stringResource(R.string.commands_summary_text, command.grams)
     is Command.Bolus -> stringResource(R.string.commands_bolus_summary_text, formatCentiUnits(command.centiUnits))
     is Command.ProfileSwitch ->
-        stringResource(R.string.commands_profile_summary_text, command.smsText(), command.number, command.percent)
+        stringResource(R.string.commands_profile_summary_text, command.smsText(), command.percent)
     Command.Bg, Command.Pump, Command.ProfileStatus, Command.ProfileList -> ""
 }

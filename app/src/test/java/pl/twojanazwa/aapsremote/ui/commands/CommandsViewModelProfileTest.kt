@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import pl.twojanazwa.aapsremote.commands.Command
-import pl.twojanazwa.aapsremote.commands.ProfileChoice
 import pl.twojanazwa.aapsremote.commands.ProfileSwitchError
 import pl.twojanazwa.aapsremote.data.CommandLimitsState
 import pl.twojanazwa.aapsremote.security.LoadResult
@@ -28,17 +27,16 @@ class CommandsViewModelProfileTest {
 
     private fun settle() = main.dispatcher.scheduler.advanceUntilIdle()
 
-    private class Setup(val env: CommandTestEnv, val selection: ProfileSelection, val vm: CommandsViewModel)
+    private class Setup(val env: CommandTestEnv, val vm: CommandsViewModel)
 
     private fun TestScope.setup(): Setup {
         val env = CommandTestEnv(this).also { it.secrets.setState(SecretState.PRESENT) }
-        val selection = ProfileSelection()
         val vm = CommandsViewModel(
             env.launcher(), env.coordinator, env.currentRun, env.numbers, env.secrets,
-            env.permissions, env.limits, selection,
+            env.permissions, env.limits,
         )
         settle()
-        return Setup(env, selection, vm)
+        return Setup(env, vm)
     }
 
     private fun Setup.state(): CommandsUiState {
@@ -46,8 +44,8 @@ class CommandsViewModelProfileTest {
         return vm.uiState.value
     }
 
-    private fun Setup.choose(number: Int = 1, name: String = "LocalProfile1") {
-        selection.select(ProfileChoice(number, name))
+    private fun Setup.choose() {
+        vm.onProfileSwitchClicked()
         settle()
     }
 
@@ -58,21 +56,39 @@ class CommandsViewModelProfileTest {
     }
 
     @Test
-    fun `PROF-14 wybor z ProfileSelection otwiera formularz z tekstem 100 i jest czyszczony`() = runTest(main.dispatcher) {
-        val s = setup()
-        s.choose(2, "LocalProfile2")
-        val form = checkNotNull(s.state().profile)
-        assertEquals(ProfileChoice(2, "LocalProfile2"), form.choice)
-        assertEquals("100", form.percentText)
-        assertNull(form.error)
-        assertNull(s.selection.choice.value)
+    fun `PROF-13 onProfileSwitchClicked otwiera formularz z tekstem 100 bez SMS-a i bez czytania sekretu`() =
+        runTest(main.dispatcher) {
+            val s = setup()
+            s.choose()
+            val form = checkNotNull(s.state().profile)
+            assertEquals("100", form.percentText)
+            assertNull(form.error)
+            assertEquals(0, s.env.sender.sendCount)
+            assertEquals(0, s.env.secrets.loadCount)
+        }
+
+    @Test
+    fun `PROF-13 sekret ABSENT i INVALIDATED blokuje Zmien profil, PRESENT i UNKNOWN nie`() = runTest(main.dispatcher) {
+        for (secret in listOf(SecretState.ABSENT, SecretState.INVALIDATED)) {
+            val s = setup()
+            s.env.secrets.setState(secret)
+            s.choose()
+            assertFalse(s.state().canStartProfile, secret.toString())
+            assertNull(s.state().profile, secret.toString())
+        }
+        for (secret in listOf(SecretState.PRESENT, SecretState.UNKNOWN)) {
+            val s = setup()
+            s.env.secrets.setState(secret)
+            s.choose()
+            assertNotNull(s.state().profile, secret.toString())
+        }
     }
 
     @Test
     fun `PROF-15 Dalej i Wyslij z PIN-em 4321 wysyla zmiane 1 115 i czysci PIN`() = runTest(main.dispatcher) {
         val s = setup()
         s.env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
-        s.choose(1, "LocalProfile1")
+        s.choose()
         s.next("115")
         assertNull(s.state().profile)
         val summary = checkNotNull(s.state().summary).command as Command.ProfileSwitch
@@ -96,7 +112,7 @@ class CommandsViewModelProfileTest {
             val s = setup()
             s.env.limits.setState(limits)
             s.env.secrets.loadResults.add(LoadResult.Loaded(SessionTestFixtures.secret()))
-            s.choose(1, "LocalProfile1")
+            s.choose()
             s.next("115")
             checkNotNull(s.state().summary)
             s.vm.onPinChanged("4321")
@@ -132,7 +148,7 @@ class CommandsViewModelProfileTest {
     }
 
     @Test
-    fun `PROF-15 onStop z podsumowaniem i PIN-em czysci PIN, zamyka formularz i podsumowanie, wyboru brak`() =
+    fun `PROF-15 onStop z podsumowaniem i PIN-em czysci PIN, zamyka formularz i podsumowanie, potem formularz znowu z 100`() =
         runTest(main.dispatcher) {
             val s = setup()
             s.choose()
@@ -143,7 +159,8 @@ class CommandsViewModelProfileTest {
             assertEquals("", state.pinText)
             assertNull(state.summary)
             assertNull(state.profile)
-            assertNull(s.selection.choice.value)
+            s.choose()
+            assertEquals("100", s.state().profile?.percentText)
         }
 
     @Test
@@ -188,20 +205,20 @@ class CommandsViewModelProfileTest {
     }
 
     @Test
-    fun `PROF-18 toString stanu z formularzem 115 i PIN-em 4321 nie zawiera nazwy, procentu ani PIN-u`() =
+    fun `PROF-18 toString stanu z formularzem 115 i PIN-em 4321 nie zawiera procentu ani PIN-u`() =
         runTest(main.dispatcher) {
             val s = setup()
-            s.choose(2, "LocalProfile2")
+            s.choose()
             s.vm.onProfilePercentChanged("115")
             val formState = s.state()
-            for (secret in listOf("LocalProfile", "115", "4321")) {
+            for (secret in listOf("115", "4321")) {
                 assertFalse(secret in formState.toString(), secret)
                 assertFalse(secret in checkNotNull(formState.profile).toString(), secret)
             }
             s.next("115")
             s.vm.onPinChanged("4321")
             val summaryText = s.state().toString()
-            for (secret in listOf("LocalProfile", "115", "4321")) assertFalse(secret in summaryText, secret)
+            for (secret in listOf("115", "4321")) assertFalse(secret in summaryText, secret)
         }
 
     @Test
@@ -209,14 +226,18 @@ class CommandsViewModelProfileTest {
         val strings = File("src/main/res/values/strings.xml").readText()
         for (
             expected in listOf(
-                "Profil: %1\$d. %2\$s", "Procent (%)","Podaj procent (%1\$d–%2\$d).", "Tylko cyfry.",
+                "Zmiana profilu %1\$d", "Procent (%)", "Podaj procent (%1\$d–%2\$d).", "Tylko cyfry.",
                 "Najmniejszy procent to %1\$d.", "Największy procent to %1\$d.",
-                "Zmienić profil na %1\$s (%2\$d%%)?",
-                "Aplikacja wyśle %1\$s, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %2\$s %3\$d%%.",
+                "Zmienić profil %1\$d na %2\$d%%?",
+                "Aplikacja wyśle %1\$s, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla zmiany profilu " +
+                    "na %2\$d%%. Nazwę profilu podaje AAPS – aplikacja jej nie sprawdza.",
+                "Zmień profil",
             )
         ) {
             assertTrue(expected in strings, expected)
         }
+        assertFalse("commands_profile_list" in strings)
+        assertFalse("result_profile_item" in strings)
         val form = File("src/main/java/pl/twojanazwa/aapsremote/ui/commands/ProfileForm.kt").readText()
         assertTrue("KeyboardType.Number" in form)
     }
