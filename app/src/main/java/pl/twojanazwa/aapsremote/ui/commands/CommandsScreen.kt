@@ -166,7 +166,6 @@ fun CommandsScreen(
                 onBgClicked = commandsViewModel::onBgClicked,
                 onPumpClicked = commandsViewModel::onPumpClicked,
                 onProfileStatusClicked = commandsViewModel::onProfileStatusClicked,
-                onProfileListClicked = commandsViewModel::onProfileListClicked,
                 onCarbsInputChanged = commandsViewModel::onCarbsInputChanged,
                 onQuickValueClicked = commandsViewModel::onQuickValueClicked,
                 onCarbsNextClicked = commandsViewModel::onCarbsNextClicked,

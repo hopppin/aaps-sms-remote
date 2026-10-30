@@ -36,17 +36,15 @@ sealed interface ExpectedCommand {
 
     data object ProfileList : ExpectedCommand
 
-    /** Rzuca IllegalArgumentException dla pustej nazwy, nazwy z LF albo percent < 1 (komunikaty bez danych). */
-    class ProfileSwitch(val profileName: String, val percent: Int) : ExpectedCommand {
+    /** Rzuca IllegalArgumentException dla percent < 1 (komunikat bez danych). Nazwy profilu nie porównujemy. */
+    class ProfileSwitch(val percent: Int) : ExpectedCommand {
         init {
-            require(profileName.isNotEmpty() && '\n' !in profileName) { "invalid profile name" }
             require(percent >= 1) { "percent must be >= 1" }
         }
 
-        override fun equals(other: Any?): Boolean =
-            other is ProfileSwitch && other.profileName == profileName && other.percent == percent
+        override fun equals(other: Any?): Boolean = other is ProfileSwitch && other.percent == percent
 
-        override fun hashCode(): Int = 31 * profileName.hashCode() + percent
+        override fun hashCode(): Int = percent
 
         override fun toString(): String = "ExpectedCommand.ProfileSwitch(***)"
     }

@@ -91,45 +91,38 @@ sealed interface Command {
         override fun requiresExtraConfirmation(limits: CommandLimits): Boolean = false
     }
 
-    /** Tylko przez of()/parsePercent() – konstruktor prywatny (PROF-02). toString() bez danych (PROF-05). */
-    class ProfileSwitch private constructor(
-        val number: Int,
-        val profileName: String,
-        val percent: Int,
-    ) : Command {
+    /** Tylko przez of()/parsePercent() – konstruktor prywatny (PROF-02). Numer profilu zawsze 1. toString() bez danych (PROF-05). */
+    class ProfileSwitch private constructor(val percent: Int) : Command {
         override val id: CommandId = CommandId.PROFILE_SWITCH
+        val number: Int get() = ProfileLimits.PROFILE_NUMBER
         override fun requiresExtraConfirmation(limits: CommandLimits): Boolean = false
 
-        override fun equals(other: Any?): Boolean =
-            other is ProfileSwitch && other.number == number && other.profileName == profileName &&
-                other.percent == percent
+        override fun equals(other: Any?): Boolean = other is ProfileSwitch && other.percent == percent
 
-        override fun hashCode(): Int = 31 * (31 * number + profileName.hashCode()) + percent
+        override fun hashCode(): Int = percent
 
         override fun toString(): String = "Command.ProfileSwitch(***)"
 
         companion object {
             const val DEFAULT_PERCENT = 100
 
-            /** PROF-02. Nigdy nie rzuca. Kolejność: wybór, minimum, maksimum. */
-            fun of(choice: ProfileChoice, percent: Int): ProfileSwitchValidation = when {
-                choice.number !in 1..ProfileLimits.MAX_NUMBER || choice.name.isEmpty() || '\n' in choice.name ->
-                    ProfileSwitchValidation.Invalid(ProfileSwitchError.INVALID_CHOICE)
+            /** PROF-02. Nigdy nie rzuca. Kolejność: minimum, maksimum. */
+            fun of(percent: Int): ProfileSwitchValidation = when {
                 percent < ProfileLimits.MIN_PERCENT -> ProfileSwitchValidation.Invalid(ProfileSwitchError.BELOW_MIN)
                 percent > ProfileLimits.MAX_PERCENT -> ProfileSwitchValidation.Invalid(ProfileSwitchError.ABOVE_MAX)
-                else -> ProfileSwitchValidation.Valid(ProfileSwitch(choice.number, choice.name, percent))
+                else -> ProfileSwitchValidation.Valid(ProfileSwitch(percent))
             }
 
             /** PROF-03. Nigdy nie rzuca. Bez trim(). */
-            fun parsePercent(choice: ProfileChoice, input: String): ProfileSwitchValidation {
+            fun parsePercent(input: String): ProfileSwitchValidation {
                 if (input.isEmpty()) return ProfileSwitchValidation.Invalid(ProfileSwitchError.EMPTY)
                 if (input.any { it !in '0'..'9' }) {
                     return ProfileSwitchValidation.Invalid(ProfileSwitchError.INVALID_CHARACTERS)
                 }
                 val significant = input.trimStart('0')
-                if (significant.isEmpty()) return of(choice, 0)
+                if (significant.isEmpty()) return of(0)
                 if (significant.length > 3) return ProfileSwitchValidation.Invalid(ProfileSwitchError.ABOVE_MAX)
-                return of(choice, significant.toInt())
+                return of(significant.toInt())
             }
         }
     }

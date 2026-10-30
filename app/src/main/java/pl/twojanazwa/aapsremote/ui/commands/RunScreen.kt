@@ -38,7 +38,7 @@ fun RunScreen(run: RunView.Active, onCancel: () -> Unit, modifier: Modifier = Mo
         Text(
             commandTitle(
                 run.commandId, run.commandGrams, run.commandCentiUnits,
-                run.profileName, run.profilePercent,
+                run.profileNumber, run.profilePercent,
             ),
             style = MaterialTheme.typography.headlineSmall,
         )

@@ -97,14 +97,14 @@ fun summaryTitle(command: Command): String = when (command) {
     is Command.Carbs -> stringResource(R.string.commands_summary_title, command.grams)
     is Command.Bolus -> stringResource(R.string.commands_bolus_summary_title, formatCentiUnits(command.centiUnits))
     is Command.ProfileSwitch ->
-        stringResource(R.string.commands_profile_summary_title, command.profileName, command.percent)
+        stringResource(R.string.commands_profile_summary_title, command.number, command.percent)
     Command.Bg, Command.Pump, Command.ProfileStatus, Command.ProfileList -> ""
 }
 
-/** PROF-15: błędy procentu; INVALID_CHOICE nie wynika z pola, więc dostaje komunikat o braku procentu. */
+/** PROF-15: błędy procentu. */
 @Composable
 fun profileErrorText(error: ProfileSwitchError): String = when (error) {
-    ProfileSwitchError.INVALID_CHOICE, ProfileSwitchError.EMPTY ->
+    ProfileSwitchError.EMPTY ->
         stringResource(R.string.commands_profile_error_empty, ProfileLimits.MIN_PERCENT, ProfileLimits.MAX_PERCENT)
     ProfileSwitchError.INVALID_CHARACTERS -> stringResource(R.string.commands_profile_error_invalid_characters)
     ProfileSwitchError.BELOW_MIN -> stringResource(R.string.commands_profile_error_below_min, ProfileLimits.MIN_PERCENT)
@@ -116,6 +116,6 @@ fun summaryText(command: Command): String = when (command) {
     is Command.Carbs -> stringResource(R.string.commands_summary_text, command.grams)
     is Command.Bolus -> stringResource(R.string.commands_bolus_summary_text, formatCentiUnits(command.centiUnits))
     is Command.ProfileSwitch ->
-        stringResource(R.string.commands_profile_summary_text, command.smsText(), command.profileName, command.percent)
+        stringResource(R.string.commands_profile_summary_text, command.smsText(), command.number, command.percent)
     Command.Bg, Command.Pump, Command.ProfileStatus, Command.ProfileList -> ""
 }

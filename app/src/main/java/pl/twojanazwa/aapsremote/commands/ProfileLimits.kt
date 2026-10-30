@@ -4,5 +4,6 @@ package pl.twojanazwa.aapsremote.commands
 object ProfileLimits {
     const val MIN_PERCENT = 50
     const val MAX_PERCENT = 200
-    const val MAX_NUMBER = 99
+    /** Zmiana profilu dotyczy zawsze profilu 1 (PROF-01). */
+    const val PROFILE_NUMBER = 1
 }

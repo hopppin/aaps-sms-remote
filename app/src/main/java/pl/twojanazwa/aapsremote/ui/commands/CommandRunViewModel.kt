@@ -75,7 +75,7 @@ class CommandRunViewModel @Inject constructor(
                     commandId = run.command.id,
                     commandGrams = (run.command as? Command.Carbs)?.grams,
                     commandCentiUnits = (run.command as? Command.Bolus)?.centiUnits,
-                    profileName = (run.command as? Command.ProfileSwitch)?.profileName,
+                    profileNumber = (run.command as? Command.ProfileSwitch)?.number,
                     profilePercent = (run.command as? Command.ProfileSwitch)?.percent,
                     steps = ProgressSteps.of(run.command.id, state.phase),
                     cancelMode = state.phase.cancelMode(),

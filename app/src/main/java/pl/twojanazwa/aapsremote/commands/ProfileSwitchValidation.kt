@@ -6,4 +6,4 @@ sealed interface ProfileSwitchValidation {
     data class Invalid(val error: ProfileSwitchError) : ProfileSwitchValidation
 }
 
-enum class ProfileSwitchError { INVALID_CHOICE, EMPTY, INVALID_CHARACTERS, BELOW_MIN, ABOVE_MAX }
+enum class ProfileSwitchError { EMPTY, INVALID_CHARACTERS, BELOW_MIN, ABOVE_MAX }
