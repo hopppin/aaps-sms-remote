@@ -392,12 +392,28 @@ fun CommandsScreen(
 - `exitRequested` → `LocalActivity.current?.finish()` i `onExitHandled()`.
 - `SnackbarHost`: `message` → tekst; `opensSettings` → akcja „Ustawienia” wołająca `onOpenSettings`; po pokazaniu `onMessageShown()`.
 - Pole ilości: `KeyboardOptions(keyboardType = KeyboardType.Number)`. Pole PIN-u: `singleLine = true`, `PasswordVisualTransformation()`, `KeyboardOptions(keyboardType = KeyboardType.NumberPassword, autoCorrectEnabled = false)`; wartość wyłącznie z `uiState.pinText`.
+- **Fokus pola PIN (CMDUI-28, zmiana 2026-10-30).** W `CommandSummary`:
+
+  ```kotlin
+  val focusRequester = remember { FocusRequester() }
+  val keyboard = LocalSoftwareKeyboardController.current
+  val windowFocused = LocalWindowInfo.current.isWindowFocused
+  LaunchedEffect(windowFocused) {
+      if (windowFocused && !launching) {
+          focusRequester.requestFocus()
+          keyboard?.show()
+      }
+  }
+  // OutlinedTextField(..., modifier = Modifier.fillMaxWidth().focusRequester(focusRequester))
+  ```
+
+  Klucz `isWindowFocused` ponawia żądanie po zamknięciu okna „Na pewno” (dialog trzyma fokus okna do zamknięcia; samo `LaunchedEffect(Unit)` przy pierwszym pokazaniu podsumowania mogłoby nie pokazać klawiatury). `CommandSummary` opuszcza kompozycję po zamknięciu podsumowania, więc każde ponowne otwarcie zaczyna od nowego `FocusRequester`. Bez zmian w `CommandsViewModel`.
 
 `AppScaffold` (zmiana zadania 6 i 7): `val commandsViewModel: CommandsViewModel = hiltViewModel()` i `val runViewModel: CommandRunViewModel = hiltViewModel()` wywołane przed `NavHost` (właściciel = `Activity`); trasa `COMMANDS` → `CommandsScreen(commandsViewModel, runViewModel, onOpenSettings = { navigateTo(SETTINGS) })` (ta sama funkcja nawigacji co pasek, UI-02); `KeepScreenOnEffect(runState.keepScreenOn)`; od zadania 9 także `SecureWindowEffect(commandsState.secureWindow || runState.secureWindow)`.
 
 ### Wygląd (Material 3, propozycja)
 
-- **Panel:** przewijana kolumna z odstępem 16 dp. Banery jako `Card` w kolorze `errorContainer` (numer, sekret) z tekstem i `TextButton` „Przejdź do Ustawień”; sekcja uprawnień SMS ze Spec 008 w `Card`. Przyciski „BG” i „PUMP” – `FilledTonalButton` pełnej szerokości, wysokość 72 dp, etykieta `titleLarge` i podpis `bodyMedium` („Glikemia”, „Stan pompy”). Sekcja „CARBS” w `OutlinedCard`: tytuł, `OutlinedTextField` z błędem w `supportingText`, rząd trzech `OutlinedButton` „10 g”, „20 g”, „30 g”, `Button` „Dalej” pełnej szerokości. W czasie uruchamiania – `LinearProgressIndicator` nad przyciskami.
+- **Panel:** przewijana kolumna z odstępem 16 dp; od 2026-10-30 kolejność: banery, `LinearProgressIndicator` (gdy uruchamianie), „Bolus”, „Profil”, „CARBS”, „BG”, „PUMP” (CMDUI-01, P14). Banery jako `Card` w kolorze `errorContainer` (numer, sekret) z tekstem i `TextButton` „Przejdź do Ustawień”; sekcja uprawnień SMS ze Spec 008 w `Card`. Przyciski „BG” i „PUMP” – `FilledTonalButton` pełnej szerokości, wysokość 72 dp, etykieta `titleLarge` i podpis `bodyMedium` („Glikemia”, „Stan pompy”). Sekcja „CARBS” w `OutlinedCard`: tytuł, `OutlinedTextField` z błędem w `supportingText`, rząd trzech `OutlinedButton` „10 g”, „20 g”, „30 g”, `Button` „Dalej” pełnej szerokości. W czasie uruchamiania – `LinearProgressIndicator` nad przyciskami.
 - **Okno „Na pewno”:** `AlertDialog` z tytułem „Na pewno X g?”, tekstem i przyciskami „Tak, X g” (confirm) i „Nie” (dismiss); `properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn)` (CMDUI-09, od zadania 9) – dialog jest osobnym oknem, którego `FLAG_SECURE` okna `Activity` nie obejmuje (jak `PasteUriDialog` w design 008).
 - **Podsumowanie:** kolumna wyśrodkowana w pionie: `headlineSmall` „Wysłać CARBS X g do AAPS?”, wyjaśnienie `bodyMedium`, `OutlinedTextField` „PIN AAPS”, rząd przycisków `TextButton` „Anuluj” i `Button` „Wyślij”.
 - **Przebieg:** nagłówek `headlineSmall` „Polecenie …”; lista kroków (`ListItem`: ikona – zaznaczenie dla wykonanego, `CircularProgressIndicator` 20 dp dla bieżącego, pusty okrąg dla oczekującego; ikony z `contentDescription = null`, `CircularProgressIndicator` kroku bieżącego z `Modifier.clearAndSetSemantics {}` (jego semantyka postępu nie trafia do scalonego elementu); cały `ListItem` z `Modifier.semantics(mergeDescendants = true) { stateDescription = statusDescription }` – CMDUI-17, wartość tekstu pobrana w kompozycji przed blokiem `semantics`); tekst o pierwszym planie w `Card` `secondaryContainer`; liczba wiadomości nieoczekiwanych (gdy > 0); `OutlinedButton` „Anuluj polecenie” / „Przestań czekać” na dole.
@@ -508,7 +524,7 @@ Klucze są wiążące; treści – jak w spec. Każde zadanie dodaje swój blok 
 | `commands_large_confirm` | Tak, %1$d g | d |
 | `commands_large_dismiss` | Nie | |
 | `commands_summary_title` | Wysłać CARBS %1$d g do AAPS? | d |
-| `commands_summary_text` | Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g. | d |
+| `commands_summary_text` | Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla %1$d g. | d |
 | `commands_pin_label` | PIN AAPS | |
 | `commands_send` | Wyślij | |
 | `commands_open_settings` | Przejdź do Ustawień | |
@@ -617,7 +633,7 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikat
 
 | Wymaganie | Test (klasa / rodzaj) |
 | --- | --- |
-| CMDUI-01 | `ui/commands/CommandsSourcesTest` – pliki i `strings.xml`; `CommandsViewModelReadinessTest` (stan początkowy); W1 |
+| CMDUI-01 | `ui/commands/CommandsSourcesTest` – pliki i `strings.xml`, kolejność sekcji w `CommandsPanel.kt` (od 2026-10-30); `CommandsViewModelReadinessTest` (stan początkowy); W1 |
 | CMDUI-02 | `ui/commands/CommandsViewModelReadinessTest` – ViewModel (Turbine); W2 |
 | CMDUI-03 | `CommandsViewModelReadinessTest` (uprawnienia, liczba odczytów); W3 |
 | CMDUI-04 | `CommandsViewModelReadinessTest` (sekret, `refreshState`); W2 |
@@ -644,6 +660,7 @@ Wszystkie testy JVM w `app/src/test/java/pl/twojanazwa/aapsremote/`. Identyfikat
 | CMDUI-25 | `ui/commands/CommandTextsTest`, `ui/commands/RunTextsTest` – odwzorowania i klucze w `strings.xml` |
 | CMDUI-26 | `UiNoLoggingTest` (Spec 008, obejmuje `ui/`), `ui/commands/CommandsRedactionTest`, `ui/commands/ResultRedactionTest` – `toString()` |
 | CMDUI-27 | `CommandsModuleTest` – refleksja zakresu; `ui/commands/CurrentRunBindingTest` – refleksja `CurrentRun` i konstruktorów; `assembleDebug` (graf) |
+| CMDUI-28 | `CommandsSourcesTest` (źródło `CommandSummary.kt`: `FocusRequester`, `focusRequester(`, `requestFocus()`, `isWindowFocused`, `show()`, bez `rememberSaveable`); `CommandsViewModelSummaryTest` (PIN `""` po otwarciu); W14 |
 
 ## Podział na zadania
 
@@ -674,3 +691,5 @@ Zadania po zmianie spec 2026-10-28 (P11, P12; zadania 1–8 są scalone, więc z
 Zadanie po zmianie spec 2026-10-28 (P13; zadania 1–10 są scalone):
 
 11. **Czyszczenie PIN-u przy zmianie zakładki** – etykiety `bezpieczenstwo` (PIN AAPS), `trudnosc:latwe`; wykonuje agent `wykonawca` (etykieta `bezpieczenstwo`), nie `wykonawca-lekki` ani Codex. Pliki: `ui/commands/CommandsScreen.kt` (`DisposableEffect(Unit) { onDispose { commandsViewModel.onStop() } }` obok `LifecycleEventEffect(ON_STOP)`, import `DisposableEffect`); `CommandsViewModel.kt` bez zmian (`onStop()` już spełnia kryteria; komentarz KDoc można uzupełnić o zmianę zakładki); testy: `CommandsViewModelPinRetentionTest` (dwukrotne `onStop()`), `CommandsViewModelSummaryTest` (`onStop()` w trakcie `CARBS 1`, obok testu „`onStop` w trakcie `BG`”), `CommandsSourcesTest` (oba wywołania w `CommandsScreen.kt`, `onDispose` bez `runViewModel`). Wymagania: CMDUI-11 (kryteria 3–5 testami JVM, kryterium 9 – W6). PR opisuje W6 (część: zmiana zakładki z podsumowaniem i w trakcie `CARBS 1`). Ok. 40–100 linii. Zależy od 9 (scalone).
+
+Zadania po zmianie spec 2026-10-30 (P14, P15; zadania 1–11 są scalone): kolejność sekcji panelu (CMDUI-01) i fokus pola PIN (CMDUI-28) realizuje **zadanie 3** z [design 013](../013-profil/design.md#zadania-zmiany-2026-10-30); zmiany profilu w CMDUI-02, CMDUI-04 – CMDUI-06, CMDUI-19, CMDUI-21, CMDUI-24 – zadania 1 i 2 tamże.

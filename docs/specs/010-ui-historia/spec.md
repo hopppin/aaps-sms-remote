@@ -107,7 +107,7 @@ Wynik wpisu jest wyliczany jedną czystą funkcją z wyczerpującym `when` po `H
 | Wynik wpisu | Rodzaj | Komunikat |
 | --- | --- | --- |
 | `Completed`, polecenie `BG` / `PUMP` / `PROFILE_STATUS` | sukces | jak CMDUI-19 („Odpowiedź AAPS na BG” / „… na PUMP” / „… na PROFILE STATUS”) |
-| `Completed`, polecenie `PROFILE_LIST` | sukces | „Odpowiedź AAPS na PROFILE LIST.” (inny tekst niż na ekranie wyniku, gdzie jest „Lista profili z AAPS. Wybierz profil, aby go zmienić.”, bo w historii nie ma przycisków wyboru; PROF-17) |
+| `Completed`, polecenie `PROFILE_LIST` | sukces | „Odpowiedź AAPS na PROFILE LIST.” (inny tekst niż na ekranie wyniku, gdzie jest „Lista profili z AAPS.”; PROF-17) |
 | `Completed`, polecenie `CARBS`, `BOLUS`, `PROFILE_SWITCH` albo `UNRECOGNIZED` | sukces | „Brak szczegółów wyniku (wpis z innej wersji aplikacji).” |
 | `CarbsConfirmed`, polecenie `CARBS` z ilością X | sukces | „AAPS potwierdził wprowadzenie X g” |
 | `CarbsConfirmed`, ilość `null` albo polecenie inne niż `CARBS` | sukces | „Brak szczegółów wyniku.” |

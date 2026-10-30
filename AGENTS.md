@@ -88,6 +88,7 @@ Najpierw zatwierdzona specyfikacja, potem kod. Szczegóły i szablon: [docs/spec
 - Żadnych prawdziwych sekretów, PIN-ów ani numerów telefonu w repo. W przykładach używaj fikcyjnych danych.
 - W testach TOTP używaj wyłącznie wektorów testowych z RFC 6238.
 - Aplikacja nigdy nie odsyła kodu, jeśli odpowiedź AAPS nie zgadza się z poleceniem (inny numer nadawcy, inna ilość, nierozpoznana treść, odpowiedź sprzed wysłania). W razie wątpliwości: stop i komunikat dla użytkownika.
+  - Jedyny wyjątek (decyzja użytkownika 2026-10-30, [spec 013](docs/specs/013-profil/spec.md#bezpieczeństwo)): przy zmianie profilu aplikacja porównuje tylko procent, bo nie zna nazwy profilu 1; reszta kontroli (nadawca, rodzaj prośby, procent, czas) obowiązuje bez zmian.
 - Bez automatycznego ponawiania poleceń i bez omijania limitów AAPS.
 - `allowBackup=false`; klucze podpisu (`*.jks`, `*.keystore`) i `local.properties` nie trafiają do repo.
 

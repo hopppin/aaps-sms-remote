@@ -491,6 +491,8 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
+- **Planowane zmiany (Spec 013, 2026-10-30).** SESSION-11 i sekcja „Bezpieczeństwo”: dla zmiany profilu sesja porównuje w treści prośby o kod tylko procent z wysłanym, bez nazwy profilu (aplikacja zawsze wysyła profil 1 i nie zna jego nazwy; [PROF-08](../013-profil/spec.md#prof-08-prośba-o-kod-zmiany-profilu), [PROF-12](../013-profil/spec.md#prof-12-zmiana-profilu--przed-kodem-i-po-kodzie)). Pozostałe reguły (rodzaj odpowiedzi zgodny z poleceniem, nadawca, wiadomość sprzed wysłania, nierozpoznana treść – stop bez kodu) bez zmian. Treść SESSION-11 i „Bezpieczeństwa” zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013.
+
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - SESSION-06: `AWAITING_REPLY` przyjmuje też odpowiedź na `PROFILE STATUS` i `PROFILE LIST` (PROF-11).
   - SESSION-08, SESSION-11 – SESSION-13: reguły dla `CARBS` obejmują każde polecenie z kodem – prośba o kod i niezgodność rozpoznawane po wspólnych typach parsera, zgodność rodzaju odpowiedzi z poleceniem sesji (BOL-19) oraz drugie, niezależne od parsera porównanie ilości (i nazwy z procentem dla profilu) w sesji; tabele dla `BOLUS` (BOL-10, BOL-11) i zmiany profilu (PROF-12). Nowy wynik `BolusConfirmed` (jak `CarbsConfirmed`). Fazy, limity czasu i A1 – A7 bez zmian.
