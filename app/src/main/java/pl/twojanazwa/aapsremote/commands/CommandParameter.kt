@@ -11,7 +11,7 @@ sealed interface CommandParameter {
     ) : CommandParameter
 
     /** Procent zmiany profilu; numer profilu jest stały i równy 1 (PROF-01). */
-    data class ProfileAndPercent(
+    data class Percent(
         val minPercent: Int,
         val maxPercent: Int,
         val defaultPercent: Int,
