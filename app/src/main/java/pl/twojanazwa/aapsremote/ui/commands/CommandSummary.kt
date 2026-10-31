@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -51,7 +53,8 @@ fun CommandSummary(
         }
     }
     Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        // Przewijanie: klawiatura (IME) skraca treść przez insety Scaffold, więc przyciski muszą dać się przewinąć.
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         Text(summaryTitle(command), style = MaterialTheme.typography.headlineSmall)

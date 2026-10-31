@@ -70,6 +70,11 @@ class CommandsViewModelSummaryTest {
         val vm = env().viewModel()
         vm.openSummary()
         assertEquals("", vm.state().pinText)
+        vm.onPinChanged("4321")
+        assertEquals("4321", vm.state().pinText)
+        vm.onSummaryDismissed()
+        vm.openSummary()
+        assertEquals("", vm.state().pinText)
         assertTrue(CommandsUiState::class.java.declaredFields.none { "focus" in it.name.lowercase() })
     }
 
