@@ -312,7 +312,7 @@ Gdy poprawne polecenie wymaga dodatkowego potwierdzenia (BOL-04), „Dalej” ot
 
 ### BOL-15: Podsumowanie z PIN-em
 
-Podsumowanie bolusa działa jak CMDUI-10 i CMDUI-11 (pole PIN-u, tylko cyfry, 1–12 znaków, maskowanie, czyszczenie PIN-u przy „Wyślij”, „Anuluj”, Wstecz, `onStop()`, `FLAG_SECURE`), z tekstami: „Podać bolus X j.?” i „Aplikacja wyśle BOLUS X j., a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla X j. Bolusa nie da się cofnąć.”. „Wyślij” wywołuje `CommandLauncher.launch(BOLUS x, AapsPin)`; odrzucenia – komunikaty CMDUI-12, LIM-09, BOL-12. Bolus nigdy nie jest wysyłany bez podsumowania z PIN-em.
+Podsumowanie bolusa działa jak CMDUI-10 i CMDUI-11 (pole PIN-u, tylko cyfry, 1–12 znaków, maskowanie, czyszczenie PIN-u przy „Wyślij”, „Anuluj”, Wstecz, `onStop()`, `FLAG_SECURE`), z tekstami: „Podać bolus X j.?” i „Aplikacja wyśle BOLUS X j., a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla X j. Bolusa nie da się cofnąć.”. „Wyślij” wywołuje `CommandLauncher.launch(BOLUS x, AapsPin)`; odrzucenia – komunikaty CMDUI-12, LIM-09, BOL-12. Bolus nigdy nie jest wysyłany bez podsumowania z PIN-em.
 
 **Kryteria akceptacji:**
 

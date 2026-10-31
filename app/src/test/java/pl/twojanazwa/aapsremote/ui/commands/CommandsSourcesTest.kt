@@ -1,6 +1,7 @@
 package pl.twojanazwa.aapsremote.ui.commands
 
 import java.io.File
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -59,7 +60,7 @@ class CommandsSourcesTest {
     @Test
     fun `BOL-13 sekcja Bolus nie ma szybkich wartosci i uzywa klawiatury dziesietnej`() {
         val panel = withoutComments(File(commandsDirectory, "CommandsPanel.kt").readText())
-        val section = panel.substringAfter("commands_bolus_title").substringBefore("@Composable")
+        val section = panel.substringAfter("commands_bolus_title").substringBefore("commands_profile_title")
         assertTrue("KeyboardType.Decimal" in section)
         assertFalse("QuickValue" in section)
     }
@@ -78,6 +79,30 @@ class CommandsSourcesTest {
         assertTrue("DisposableEffect(Unit) { onDispose { commandsViewModel.onStop() } }" in screen)
         val onDispose = screen.substringAfter("onDispose {").substringBefore("}")
         assertFalse("runViewModel" in onDispose)
+    }
+
+    @Test
+    fun `CMDUI-01 sekcje panelu w kolejnosci Bolus Profil CARBS BG PUMP po banerach`() {
+        val panel = withoutComments(File(commandsDirectory, "CommandsPanel.kt").readText())
+        val keys = listOf("commands_bolus_title", "commands_profile_title", "commands_carbs_title", "commands_bg", "commands_pump")
+            .map { panel.indexOf("R.string.$it") }
+        assertTrue(keys.all { it >= 0 })
+        assertEquals(keys.sorted(), keys)
+        assertTrue(panel.lastIndexOf("bannerRes()") < keys.first())
+    }
+
+    @Test
+    fun `CMDUI-28 podsumowanie ustawia fokus pola PIN i pokazuje klawiature bez stanu zapisywanego`() {
+        val summary = withoutComments(File(commandsDirectory, "CommandSummary.kt").readText())
+        assertTrue("remember { FocusRequester() }" in summary)
+        assertTrue(".focusRequester(" in summary)
+        assertTrue("LaunchedEffect(windowFocused)" in summary)
+        assertTrue("LocalWindowInfo.current.isWindowFocused" in summary)
+        assertTrue("requestFocus()" in summary)
+        assertTrue("LocalSoftwareKeyboardController.current" in summary)
+        assertTrue("keyboard?.show()" in summary)
+        assertFalse("rememberSaveable" in summary)
+        assertFalse("SavedStateHandle" in summary)
     }
 
     private fun withoutComments(source: String) =

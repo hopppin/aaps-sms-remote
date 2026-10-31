@@ -66,6 +66,19 @@ class CommandsViewModelSummaryTest {
         }
 
     @Test
+    fun `CMDUI-28 podsumowanie dla 20 g ma pusty PIN a stan nie ma pola fokusu`() = runTest(main.dispatcher) {
+        val vm = env().viewModel()
+        vm.openSummary()
+        assertEquals("", vm.state().pinText)
+        vm.onPinChanged("4321")
+        assertEquals("4321", vm.state().pinText)
+        vm.onSummaryDismissed()
+        vm.openSummary()
+        assertEquals("", vm.state().pinText)
+        assertTrue(CommandsUiState::class.java.declaredFields.none { "focus" in it.name.lowercase() })
+    }
+
+    @Test
     fun `CMDUI-10 Anuluj zamyka podsumowanie czysci PIN i nie wola launchera`() = runTest(main.dispatcher) {
         val launcher = mockk<CommandLauncher>(relaxed = true)
         val vm = env().viewModel(launcher)
