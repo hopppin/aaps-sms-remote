@@ -8,6 +8,8 @@ enum class ResultMessage {
     BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED, BOLUS_CONFIRMED,
     /** Bolus: osobne teksty niezgodnej ilości przed kodem i nierozpoznanej odpowiedzi po kodzie (BOL-16). */
     BOLUS_AMOUNT_MISMATCH, BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
+    /** Bolus (BOL-22): odmowy AAPS przed kodem i błąd bolusa po kodzie. */
+    AAPS_BOLUS_INTERVAL, AAPS_BOLUS_QUEUE, UNKNOWN_BOLUS_FAILED,
     /** Profil (PROF-16): odpowiedzi na PROFILE STATUS / LIST i niezgodność lub nierozpoznana odpowiedź zmiany profilu. */
     PROFILE_STATUS_REPLY, PROFILE_LIST_REPLY, PROFILE_AMOUNT_MISMATCH, PROFILE_UNKNOWN_AMOUNT_MISMATCH,
     PROFILE_UNKNOWN_UNRECOGNIZED_REPLY,

@@ -190,6 +190,9 @@
     <string name="result_bolus_confirmed">AAPS potwierdził podanie %1$s j.</string>
     <string name="result_bolus_amount_mismatch">AAPS poprosił o kod dla innej ilości niż wysłana (np. obciętej przez limit w AAPS). Kod nie został wysłany.</string>
     <string name="result_bolus_unknown_unrecognized_reply">Po wysłaniu kodu przyszła nierozpoznana odpowiedź AAPS. Przeczytaj treść SMS i sprawdź w AAPS.</string>
+    <string name="result_failed_aaps_bolus_interval">AAPS odmówił bolusa: od ostatniego zdalnego bolusa minęło za mało czasu (minimalny odstęp w AAPS).</string>
+    <string name="result_failed_aaps_bolus_queue">AAPS odmówił bolusa: w kolejce pompy czeka inny bolus.</string>
+    <string name="result_unknown_bolus_failed">AAPS zgłosił, że bolus się nie powiódł. Sprawdź w AAPS, ile insuliny podano.</string>
     <string name="result_unknown_warning_bolus">Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.</string>
     <string name="history_command_bolus">BOLUS %1$s j.</string>
     <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>

@@ -22,6 +22,7 @@ import pl.twojanazwa.aapsremote.otp.TotpCode
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsPl3426Patterns
 import pl.twojanazwa.aapsremote.parser.AapsReply
+import pl.twojanazwa.aapsremote.parser.BolusRefusal
 import pl.twojanazwa.aapsremote.parser.ReplyNormalizer
 import pl.twojanazwa.aapsremote.parser.AapsReplyParser
 import pl.twojanazwa.aapsremote.parser.ExpectedCommand
@@ -267,6 +268,14 @@ class CommandSession(
                     // Potwierdzenie sprzed prośby o kod nie wpływa na fazę ani limity (SESSION-11, SESSION-18).
                     is AapsReply.MatchingDone -> addUnexpected(sms)
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.UNEXPECTED_REPLY, sms.body)
+                    // BOL-20: odmowa AAPS przed kodem kończy sesję bez kodu.
+                    is AapsReply.BolusRefused -> SessionOutcome.Failed(
+                        when (reply.refusal) {
+                            BolusRefusal.INTERVAL -> FailureReason.AAPS_BOLUS_INTERVAL
+                            BolusRefusal.QUEUE -> FailureReason.AAPS_BOLUS_QUEUE
+                        },
+                        sms.body,
+                    )
                     // Unrecognized (także raporty BG/PUMP niezgodne z poleceniem, patrz amountMatches).
                     else -> SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, sms.body)
                 }
@@ -285,6 +294,13 @@ class CommandSession(
                     is AapsReply.CommandMismatch ->
                         SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, sms.body)
                     is AapsReply.MatchingCodeRequest -> SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, sms.body)
+                    // BOL-21: błąd bolusa po kodzie = nieznany stan (AAPS każe zweryfikować).
+                    is AapsReply.BolusFailed ->
+                        if (sms.receivedAtEpochMillis >= checkNotNull(codeSentAt)) {
+                            SessionOutcome.Unknown(UnknownReason.BOLUS_FAILED, sms.body)
+                        } else {
+                            addUnexpected(sms)
+                        }
                     else -> SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, sms.body)
                 }
             }

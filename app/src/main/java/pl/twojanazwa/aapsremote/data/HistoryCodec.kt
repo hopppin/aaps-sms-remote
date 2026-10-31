@@ -99,6 +99,8 @@ object HistoryCodec {
         "CODE_REQUEST_EXPIRED" to FailureReason.CODE_REQUEST_EXPIRED,
         "CODE_PREPARATION_TIMEOUT" to FailureReason.CODE_PREPARATION_TIMEOUT,
         "INTERNAL_ERROR" to FailureReason.INTERNAL_ERROR,
+        "AAPS_BOLUS_INTERVAL" to FailureReason.AAPS_BOLUS_INTERVAL,
+        "AAPS_BOLUS_QUEUE" to FailureReason.AAPS_BOLUS_QUEUE,
     )
 
     private val UNKNOWN_REASONS: Map<String, UnknownReason> = mapOf(
@@ -109,6 +111,7 @@ object HistoryCodec {
         "AMOUNT_MISMATCH" to UnknownReason.AMOUNT_MISMATCH,
         "UNEXPECTED_REPLY" to UnknownReason.UNEXPECTED_REPLY,
         "INTERNAL_ERROR" to UnknownReason.INTERNAL_ERROR,
+        "BOLUS_FAILED" to UnknownReason.BOLUS_FAILED,
     )
 
     private val PHASES: Map<String, SessionPhase> = mapOf(
@@ -141,6 +144,8 @@ object HistoryCodec {
         FailureReason.CODE_REQUEST_EXPIRED -> "CODE_REQUEST_EXPIRED"
         FailureReason.CODE_PREPARATION_TIMEOUT -> "CODE_PREPARATION_TIMEOUT"
         FailureReason.INTERNAL_ERROR -> "INTERNAL_ERROR"
+        FailureReason.AAPS_BOLUS_INTERVAL -> "AAPS_BOLUS_INTERVAL"
+        FailureReason.AAPS_BOLUS_QUEUE -> "AAPS_BOLUS_QUEUE"
     }
 
     private fun encode(reason: UnknownReason): String = when (reason) {
@@ -151,6 +156,7 @@ object HistoryCodec {
         UnknownReason.AMOUNT_MISMATCH -> "AMOUNT_MISMATCH"
         UnknownReason.UNEXPECTED_REPLY -> "UNEXPECTED_REPLY"
         UnknownReason.INTERNAL_ERROR -> "INTERNAL_ERROR"
+        UnknownReason.BOLUS_FAILED -> "BOLUS_FAILED"
     }
 
     private fun encode(phase: SessionPhase): String = when (phase) {

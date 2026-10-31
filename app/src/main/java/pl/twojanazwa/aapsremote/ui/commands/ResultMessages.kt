@@ -17,6 +17,8 @@ fun FailureReason.toResultMessage(): ResultMessage = when (this) {
     FailureReason.CODE_REQUEST_EXPIRED -> ResultMessage.CODE_REQUEST_EXPIRED
     FailureReason.CODE_PREPARATION_TIMEOUT -> ResultMessage.CODE_PREPARATION_TIMEOUT
     FailureReason.INTERNAL_ERROR -> ResultMessage.INTERNAL_ERROR
+    FailureReason.AAPS_BOLUS_INTERVAL -> ResultMessage.AAPS_BOLUS_INTERVAL
+    FailureReason.AAPS_BOLUS_QUEUE -> ResultMessage.AAPS_BOLUS_QUEUE
 }
 
 /** UNKNOWN_<nazwa>. Wyczerpujący when. */
@@ -28,6 +30,7 @@ fun UnknownReason.toResultMessage(): ResultMessage = when (this) {
     UnknownReason.AMOUNT_MISMATCH -> ResultMessage.UNKNOWN_AMOUNT_MISMATCH
     UnknownReason.UNEXPECTED_REPLY -> ResultMessage.UNKNOWN_UNEXPECTED_REPLY
     UnknownReason.INTERNAL_ERROR -> ResultMessage.UNKNOWN_INTERNAL_ERROR
+    UnknownReason.BOLUS_FAILED -> ResultMessage.UNKNOWN_BOLUS_FAILED
 }
 
 /** BOL-16: bolus ma osobne teksty niezgodnej ilości i nierozpoznanej odpowiedzi po kodzie. */
@@ -71,6 +74,9 @@ fun ResultMessage.minutesArg(timeouts: SessionTimeouts = SessionTimeouts()): Int
     ResultMessage.BOLUS_CONFIRMED,
     ResultMessage.BOLUS_AMOUNT_MISMATCH,
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
+    ResultMessage.AAPS_BOLUS_INTERVAL,
+    ResultMessage.AAPS_BOLUS_QUEUE,
+    ResultMessage.UNKNOWN_BOLUS_FAILED,
     ResultMessage.PROFILE_STATUS_REPLY,
     ResultMessage.PROFILE_LIST_REPLY,
     ResultMessage.PROFILE_AMOUNT_MISMATCH,

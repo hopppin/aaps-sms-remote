@@ -36,6 +36,9 @@ fun ResultMessage.textRes(): Int = when (this) {
     ResultMessage.BOLUS_CONFIRMED -> R.string.result_bolus_confirmed
     ResultMessage.BOLUS_AMOUNT_MISMATCH -> R.string.result_bolus_amount_mismatch
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY -> R.string.result_bolus_unknown_unrecognized_reply
+    ResultMessage.AAPS_BOLUS_INTERVAL -> R.string.result_failed_aaps_bolus_interval
+    ResultMessage.AAPS_BOLUS_QUEUE -> R.string.result_failed_aaps_bolus_queue
+    ResultMessage.UNKNOWN_BOLUS_FAILED -> R.string.result_unknown_bolus_failed
     ResultMessage.PROFILE_STATUS_REPLY -> R.string.result_profile_status_reply
     ResultMessage.PROFILE_LIST_REPLY -> R.string.result_profile_list_reply
     ResultMessage.PROFILE_AMOUNT_MISMATCH -> R.string.result_profile_amount_mismatch
