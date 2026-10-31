@@ -132,9 +132,7 @@ sealed interface SessionOutcome {
 
 // ReplyMatch.isDoneFor: CommandId.PROFILE_SWITCH -> reply is AapsReply.ProfileSwitchDone
 // CommandSession.amountMatches: is ProfileSwitchDone, is ProfileBaseUpdated -> sent is Command.ProfileSwitch
-// CommandSession.confirmed: is ProfileSwitchDone -> ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, "$codeRequestText
-
-$text")
+// CommandSession.confirmed: is ProfileSwitchDone -> ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, codeRequestText + "<pusta linia>" + text)
 //   (procent z polecenia sesji – treść AAPS go nie zawiera; treść prośby o kod z nazwą profilu zachowana w text, PROF-21)
 // processMessage, AWAITING_CONFIRMATION: is AapsReply.ProfileBaseUpdated -> addUnexpected(sms)
 //   (przed kodem – istniejąca gałąź else → Failed(UNRECOGNIZED_REPLY))
