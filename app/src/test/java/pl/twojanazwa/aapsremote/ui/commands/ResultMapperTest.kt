@@ -411,6 +411,7 @@ class ResultMapperTest {
             result(c, SessionOutcome.Completed(AapsReply.PumpStatus("p"), "p")),
             result(c, SessionOutcome.CarbsConfirmed(20, "t")),
             result(bolus(120), SessionOutcome.BolusConfirmed(120, "t")),
+            result(profileSwitch(), SessionOutcome.ProfileSwitchConfirmed(115, "t")),
             result(bolus(120), SessionOutcome.Failed(FailureReason.AMOUNT_MISMATCH, null)),
             result(bolus(120), SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, null)),
             result(Command.ProfileStatus, SessionOutcome.Completed(AapsReply.ProfileStatusReport("p"), "p")),
@@ -430,6 +431,7 @@ class ResultMapperTest {
         val MESSAGES_WITH_ARG = setOf(
             ResultMessage.CARBS_CONFIRMED,
             ResultMessage.BOLUS_CONFIRMED,
+            ResultMessage.PROFILE_SWITCH_CONFIRMED,
             ResultMessage.NO_RESPONSE,
             ResultMessage.SEND_TIMEOUT,
             ResultMessage.UNKNOWN_CONFIRMATION_TIMEOUT,

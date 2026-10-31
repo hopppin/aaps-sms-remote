@@ -364,9 +364,7 @@ class CommandSession(
         is AapsReply.BolusDone -> SessionOutcome.BolusConfirmed(reply.centiUnits, text)
         // PROF-19: zgodność z poleceniem gwarantuje ReplyMatch; treść = prośba o kod, pusta linia, potwierdzenie.
         is AapsReply.ProfileSwitchDone ->
-            SessionOutcome.ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, codeRequestText + "
-
-" + text)
+            SessionOutcome.ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, codeRequestText + "\n\n" + text)
     }
 
     /** Wiadomość nieoczekiwana (SESSION-18): trafia do wyniku, nie zmienia fazy ani limitów. Zawsze null. */

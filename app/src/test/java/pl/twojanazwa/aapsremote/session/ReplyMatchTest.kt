@@ -15,6 +15,7 @@ class ReplyMatchTest {
     private val dones = mapOf<AapsReply.MatchingDone, CommandId>(
         AapsReply.CarbsDone(1, "x") to CommandId.CARBS,
         AapsReply.BolusDone(10, "x") to CommandId.BOLUS,
+        AapsReply.ProfileSwitchDone("x") to CommandId.PROFILE_SWITCH,
     )
 
     @Test
@@ -31,17 +32,15 @@ class ReplyMatchTest {
         val profile = listOf(CommandId.PROFILE_STATUS, CommandId.PROFILE_LIST, CommandId.PROFILE_SWITCH)
         for (id in profile) {
             for (reply in codeRequests.keys.filter { it !is AapsReply.ProfileCodeRequest }) assertEquals(false, ReplyMatch.isCodeRequestFor(id, reply))
-            for (reply in dones.keys) assertEquals(false, ReplyMatch.isDoneFor(id, reply))
+            for (reply in dones.keys.filter { it !is AapsReply.ProfileSwitchDone }) assertEquals(false, ReplyMatch.isDoneFor(id, reply))
         }
     }
 
-    /**
-     * PROF-19. Przypiecie obecnego zachowania: ProfileSwitchDone nie jest zgodne z PROFILE_SWITCH.
-     * Zmiana na true wymaga zmiany CommandSession.confirmed (zadanie #266), nie samego ReplyMatch.
-     */
     @Test
-    fun `PROF-19 ProfileSwitchDone nie jest zgodne z PROFILE_SWITCH (zmiana na true wymaga zadania 266)`() {
-        assertEquals(false, ReplyMatch.isDoneFor(CommandId.PROFILE_SWITCH, AapsReply.ProfileSwitchDone("x")))
+    fun `PROF-19 ProfileSwitchDone jest zgodne wylacznie z PROFILE_SWITCH`() {
+        for (id in CommandId.entries) {
+            assertEquals(id == CommandId.PROFILE_SWITCH, ReplyMatch.isDoneFor(id, AapsReply.ProfileSwitchDone("x")), "$id")
+        }
     }
 
     @Test

@@ -83,4 +83,18 @@ class HistoryCodecProfileTest {
         assertEquals(2, entry.profileNumber)
         assertEquals(115, entry.profilePercent)
     }
+
+    @Test
+    fun `PROF-21 wynik ProfileSwitchConfirmed 90 daje wiersz PROFILE_SWITCH_CONFIRMED i wpis z procentem 90`() {
+        val command = (Command.ProfileSwitch.of(90) as ProfileSwitchValidation.Valid).command
+        val row = HistoryCodec.toRow(result(command, SessionOutcome.ProfileSwitchConfirmed(90, "t")))
+        assertEquals("PROFILE_SWITCH", row.command)
+        assertEquals(1, row.profileNumber)
+        assertEquals(90, row.profilePercent)
+        assertEquals("PROFILE_SWITCH_CONFIRMED", row.outcome)
+        assertNull(row.reason)
+        val entry = HistoryCodec.toEntry(row)
+        assertEquals(HistoryOutcome.ProfileSwitchConfirmed, entry.outcome)
+        assertEquals(90, entry.profilePercent)
+    }
 }

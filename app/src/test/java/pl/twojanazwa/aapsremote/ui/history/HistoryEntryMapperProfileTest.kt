@@ -74,4 +74,18 @@ class HistoryEntryMapperProfileTest {
         val shown = listOf(HistoryEntryMapper.item(entry).toString(), HistoryEntryMapper.details(entry).toString())
         shown.forEach { assertFalse("LocalProfile" in it) }
     }
+
+    @Test
+    fun `PROF-21 wpis ProfileSwitchConfirmed z procentem 90 to sukces z argumentem 90, bez procentu brak szczegolow`() {
+        val ok = HistoryEntryMapper.result(switch(HistoryOutcome.ProfileSwitchConfirmed, number = 1, percent = 90))
+        assertEquals(ResultKind.SUCCESS, ok.kind)
+        assertEquals(ResultMessage.PROFILE_SWITCH_CONFIRMED, ok.message)
+        assertEquals(90, ok.messageArg)
+        assertFalse(ok.unknownWarning)
+        val noPercent = HistoryEntryMapper.result(switch(HistoryOutcome.ProfileSwitchConfirmed, percent = null))
+        assertEquals(ResultKind.SUCCESS, noPercent.kind)
+        assertEquals(null, noPercent.message)
+        val carbs = historyEntry(HistoryOutcome.ProfileSwitchConfirmed, command = HistoryCommand.CARBS)
+        assertEquals(null, HistoryEntryMapper.result(carbs).message)
+    }
 }
