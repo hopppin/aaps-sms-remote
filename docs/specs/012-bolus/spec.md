@@ -381,7 +381,7 @@ Sesja odsyła kod tylko wtedy, gdy rodzaj prośby o kod odpowiada poleceniu sesj
 
 ### Odmowy i błąd bolusa (zmiana 2026-10-31)
 
-Wymagania BOL-20 – BOL-22 opierają się na treściach z kodu AAPS 3.4.2.6 (B4, B5), nie na SMS-ach z telefonu (sprawdzenie – W6). Rozpoznanie odmowy albo błędu **nigdy nie prowadzi do wysłania kodu ani drugiego `BOLUS`**: jedyną drogą do kodu zostaje „prośba o kod (bolus)” w `AWAITING_CODE_REQUEST` (BOL-10, SESSION-08); wyniki BOL-20 i BOL-21 nie są prośbą o kod ani potwierdzeniem (BOL-19). Zmiana PARSER-01 (Spec 002: nowe wyniki w kontekście `Bolus x`), SESSION-11, SESSION-13 (Spec 004), DATA-09 (Spec 007: nowe powody), CMDUI-19 (Spec 009) i HISTUI-04 (Spec 010) – scalenie w zadaniu 4 zmiany 2026-10-31 (design 013).
+Wymagania BOL-20 – BOL-22 opierają się na treściach z kodu AAPS 3.4.2.6 (B4, B5), nie na SMS-ach z telefonu (sprawdzenie – W6). Rozpoznanie odmowy albo błędu **nigdy nie prowadzi do wysłania kodu ani drugiego `BOLUS`**: jedyną drogą do kodu zostaje „prośba o kod (bolus)” w `AWAITING_CODE_REQUEST` (BOL-10, SESSION-08); wyniki BOL-20 i BOL-21 nie są prośbą o kod ani potwierdzeniem (BOL-19). Zmiana PARSER-01 (Spec 002: nowe wyniki w kontekście `Bolus x`), SESSION-11, SESSION-13 (Spec 004), DATA-09 (Spec 007: nowe powody), CMDUI-19 (Spec 009) i HISTUI-04 (Spec 010) – scalone 2026-10-31 (zadanie 4 zmiany 2026-10-31 w design 013).
 
 ### BOL-20: Odmowa AAPS przed kodem – odstęp i kolejka
 
@@ -525,6 +525,8 @@ Propozycje specyfikatora w zmianie 2026-10-31 (scalenie PR `Spec: …` = akcepta
 - Rozpoznawanie pozostałych odmów z kodu AAPS 3.4.2.6 (B4): `Pompa wstrzymana`, `Zdalne komendy nie sa dozwolone`, `Bledny format` przed kodem; `Przekroczono limit czasu oczekiwania na zakonczenie poprzedniej komunikacji z pompa` po kodzie (B6) – dziś „nierozpoznana”.
 
 ## Historia zmian
+
+- **2026-10-31 – scalenie planowanych zmian po BOL-20 – BOL-22 (po wdrożeniu).** Wykonano zadanie 4 zmiany 2026-10-31 (design 013): treść PARSER-01 (Spec 002), SESSION-11 – SESSION-13 (Spec 004), DATA-09 (Spec 007), CMDUI-19 (Spec 009) i HISTUI-04 (Spec 010) przepisana zgodnie z BOL-20 – BOL-22 i stanem kodu na `main`; wpisy „Planowane zmiany” w tych specyfikacjach zamienione na zwykłe wpisy historii. Wymagania Spec 012 bez zmian.
 
 - **2026-10-31 – dane z kodu AAPS 3.4.2.6 (nie z telefonu).** Fakty B4 – B6, B8 uzupełnione treściami z kodu, nowe B9, B10; akapit „Niezweryfikowane” zastąpiony. Nowe pliki `dane/`: `bolus-odmowa-odstep.txt`, `bolus-odmowa-kolejka.txt`, `bolus-blad.txt`. Zmienione: „Zakres”, „Poza zakresem”, BOL-10, BOL-11 (wiersze tabel), BOL-16 (wiersz z odwołaniem do BOL-22), „Przypadki błędów”, „Bezpieczeństwo”, „Dane testowe”, nowe W6, P10, „Przyszłe zmiany”. Nowe wymagania BOL-20 – BOL-22. Planowane zmiany treści PARSER-01 (Spec 002), SESSION-11, SESSION-13 (Spec 004), DATA-09 (Spec 007), CMDUI-19 (Spec 009), HISTUI-04 (Spec 010) – zadanie 4 zmiany 2026-10-31 w design 013 (po #259). Źródło: [raport z kodu AAPS](../013-profil/dane/aaps-kod-zrodlowy.md).
 

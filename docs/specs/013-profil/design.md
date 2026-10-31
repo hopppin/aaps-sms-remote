@@ -138,7 +138,7 @@ sealed interface SessionOutcome {
 //   (przed kodem – istniejąca gałąź else → Failed(UNRECOGNIZED_REPLY))
 ```
 
-`data`: `HistoryOutcome.ProfileSwitchConfirmed` (bez pól, jak `BolusConfirmed`), literał `PROFILE_SWITCH_CONFIRMED` w `HistoryCodec`. `ui`: `ResultMapper` (sukces, argument = `percent`), `HistoryEntryMapper` (argument = `profilePercent` wpisu, brak → „Brak szczegółów wyniku …”), klucze `result_profile_switch_confirmed`, `history_outcome_profile_switch_confirmed` w `strings.xml`.
+`data`: `HistoryOutcome.ProfileSwitchConfirmed` (bez pól, jak `BolusConfirmed`), literał `PROFILE_SWITCH_CONFIRMED` w `HistoryCodec`. `ui`: `ResultMapper` (sukces, argument = `percent`), `HistoryEntryMapper` (argument = `profilePercent` wpisu, brak → „Brak szczegółów wyniku …”), klucz `result_profile_switch_confirmed` w `strings.xml`; historia używa wspólnych kluczy `result_*` (jak bolus i `CARBS`, HISTUI-04), bez osobnego klucza `history_outcome_*` dla tego wyniku.
 
 ## Model danych i stany
 

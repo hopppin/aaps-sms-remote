@@ -383,6 +383,7 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Completed` (`CARBS`, `BOLUS`, zmiana profilu; nie występuje – Spec 004 kończy je innym wynikiem) | sukces → „Gotowe” | „Brak szczegółów wyniku.” |
 | `CarbsConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził wprowadzenie X g” |
 | `BolusConfirmed(X)` | sukces → „Gotowe” | „AAPS potwierdził podanie X j.” (X z wyniku, BOL-16) |
+| `ProfileSwitchConfirmed(P)` | sukces → „Gotowe” | „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).” (P z wyniku, PROF-21) |
 | `Failed(SEND_FAILED)` | błąd → „Błąd” | „Nie udało się wysłać SMS. Sprawdź zasięg, kartę SIM i uprawnienia SMS.” |
 | `Failed(UNRECOGNIZED_REPLY)` | błąd | „Nierozpoznana odpowiedź AAPS.” |
 | `Failed(AMOUNT_MISMATCH)` | błąd | „AAPS podał inną ilość niż wysłana (np. obciętą przez limit w AAPS).” (dla `BOLUS` i zmiany profilu teksty z BOL-16 i PROF-16) |
@@ -390,6 +391,8 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Failed(WRONG_CODE)` | błąd | „AAPS odrzucił kod. Sprawdź PIN i to, czy zegar telefonu ustawia się automatycznie.” |
 | `Failed(CODE_REQUEST_EXPIRED)` | błąd | „Prośba AAPS o kod jest zbyt stara.” |
 | `Failed(CODE_PREPARATION_TIMEOUT)` | błąd | „Nie udało się przygotować kodu na czas. Sprawdź zegar telefonu.” |
+| `Failed(AAPS_BOLUS_INTERVAL)` | błąd | „AAPS odmówił bolusa: od ostatniego zdalnego bolusa minęło za mało czasu (minimalny odstęp w AAPS).” (BOL-22) |
+| `Failed(AAPS_BOLUS_QUEUE)` | błąd | „AAPS odmówił bolusa: w kolejce pompy czeka inny bolus.” (BOL-22) |
 | `Failed(INTERNAL_ERROR)` | błąd | „Błąd wewnętrzny aplikacji.” |
 | `TimedOut(AWAITING_REPLY \| AWAITING_CODE_REQUEST)` | brak odpowiedzi → „AAPS nie odpowiada” | „Brak odpowiedzi AAPS w ciągu 3 min.” |
 | `TimedOut(SENDING_COMMAND)` | brak odpowiedzi | „Telefon nie potwierdził wysłania SMS w ciągu 3 min.” |
@@ -401,6 +404,7 @@ Wynik ma rodzaj (do wyglądu: ikona, kolor), nagłówek, komunikat i opcjonalne 
 | `Unknown(AMOUNT_MISMATCH)` | nieznany | „Po wysłaniu kodu AAPS podał inną ilość niż wysłana.” (zmiana profilu: PROF-16) |
 | `Unknown(UNEXPECTED_REPLY)` | nieznany | „Po wysłaniu kodu AAPS ponownie poprosił o kod. Kod nie został wysłany drugi raz.” |
 | `Unknown(INTERNAL_ERROR)` | nieznany | „Błąd wewnętrzny aplikacji po wysłaniu kodu.” |
+| `Unknown(BOLUS_FAILED)` | nieznany | „AAPS zgłosił, że bolus się nie powiódł. Sprawdź w AAPS, ile insuliny podano.” (BOL-22) |
 | `Cancelled` | anulowane → „Anulowano” | „Polecenie anulowane.” |
 
 Dodatki:
@@ -409,14 +413,14 @@ Dodatki:
 - **Ostrzeżenie** „Nie ponawiaj polecenia, zanim nie sprawdzisz w AAPS, czy zostało wykonane.” – dla każdego `Unknown` (dla `BOLUS`: „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.”, BOL-16).
 - Wynik sukcesu nie mówi, że wykonano polecenie z aplikacji, tylko co potwierdził AAPS (SESSION-12).
 
-Nowe teksty dla `BOLUS` i zmiany profilu: BOL-16 i PROF-16 (komunikaty pozostałych wyników – jak w tabeli). Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams` albo `BolusConfirmed.centiUnits` (nie z polecenia). Argument liczbowy mają tylko komunikaty z X albo z minutami. Wiersz `Completed` dla `CARBS` nie twierdzi, że AAPS potwierdził ilość, i ma ten sam rodzaj (sukces) i ten sam rodzaj komunikatu („brak szczegółów”, bez argumentu) co wpis historii z tym wynikiem (Spec 010, HISTUI-04); historia dodaje do tekstu wyjaśnienie o wpisie z innej wersji aplikacji.
+Nowe teksty dla `BOLUS` i zmiany profilu: BOL-16, BOL-22, PROF-16 i PROF-21 (komunikaty pozostałych wyników – jak w tabeli). Wiersze `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)` i `Unknown(BOLUS_FAILED)` dotyczą wyłącznie `BOLUS`; `ProfileSwitchConfirmed` – wyłącznie zmiany profilu (bez ostrzeżenia „nieznany”). Liczby minut (3, 6) pochodzą z domyślnych `SessionTimeouts`, ilość X z `CarbsConfirmed.grams` albo `BolusConfirmed.centiUnits`, a procent P z `ProfileSwitchConfirmed.percent` (nie z polecenia; numer profilu 1 w komunikacie to stała, PROF-21). Argument liczbowy mają tylko komunikaty z X albo z minutami. Wiersz `Completed` dla `CARBS` nie twierdzi, że AAPS potwierdził ilość, i ma ten sam rodzaj (sukces) i ten sam rodzaj komunikatu („brak szczegółów”, bez argumentu) co wpis historii z tym wynikiem (Spec 010, HISTUI-04); historia dodaje do tekstu wyjaśnienie o wpisie z innej wersji aplikacji.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 8 `FailureReason`, wszystkie 7 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST` i `CARBS 20`, `CarbsConfirmed(1)`, `BolusConfirmed(120)`, `Cancelled`; dla `BOLUS` i zmiany profilu także wiersze z BOL-16 i PROF-16), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1; dla `BolusConfirmed(120)` – argument ilości = 120; dla `Completed` z `CARBS 20` – sukces, „brak szczegółów”, argument pusty, bez wyjątku.
+- **Zakładając** `SessionResult` dla każdego wiersza tabeli (wszystkie 10 `FailureReason`, wszystkie 8 `UnknownReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, `Completed` dla `BG`, `PUMP`, `PROFILE STATUS`, `PROFILE LIST` i `CARBS 20`, `CarbsConfirmed(1)`, `BolusConfirmed(120)`, `ProfileSwitchConfirmed(90)`, `Cancelled`; dla `BOLUS` i zmiany profilu także wiersze z BOL-16, BOL-22, PROF-16 i PROF-21), **gdy** odwzorowano go, **wtedy** rodzaj i komunikat odpowiadają wierszowi, a dla `CarbsConfirmed(1)` argument ilości = 1; dla `BolusConfirmed(120)` – argument ilości = 120; dla `ProfileSwitchConfirmed(90)` – argument procentu = 90; dla `Completed` z `CARBS 20` – sukces, „brak szczegółów”, argument pusty, bez wyjątku.
 - **Zakładając** polecenie `CARBS 1` i syntetyczny wynik `CarbsConfirmed(37)`, **gdy** odwzorowano, **wtedy** argument ilości = 37 (z wyniku, nie z polecenia).
 - **Zakładając** każdy wynik z pierwszego kryterium, **gdy** odwzorowano, **wtedy** argument komunikatu jest niepusty dokładnie wtedy, gdy klucz komunikatu w tabeli tekstów design jest oznaczony jako tekst z argumentem (`d`).
-- **Zakładając** polecenie `CARBS 20` i każdy z 8 `FailureReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST` oraz `Cancelled`, **gdy** odwzorowano, **wtedy** dodatek „Kod nie został wysłany” = `true` dla wszystkich poza `Failed(WRONG_CODE)` (= `false`); dla każdego z 7 `UnknownReason`, dla `CarbsConfirmed` i dla `Completed` = `false`; dla `BG` z każdym wynikiem z pierwszego kryterium = `false`.
+- **Zakładając** polecenie `CARBS 20` i każdy z 10 `FailureReason`, `TimedOut` z fazami `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST` oraz `Cancelled`, **gdy** odwzorowano, **wtedy** dodatek „Kod nie został wysłany” = `true` dla wszystkich poza `Failed(WRONG_CODE)` (= `false`); dla każdego z 8 `UnknownReason`, dla `CarbsConfirmed`, `BolusConfirmed`, `ProfileSwitchConfirmed` i dla `Completed` = `false`; dla `BG` z każdym wynikiem z pierwszego kryterium = `false`.
 - **Zakładając** każdy `UnknownReason`, **gdy** odwzorowano, **wtedy** ostrzeżenie = `true`; dla wyników innych niż `Unknown` = `false`.
 - **Zakładając** telefon z AAPS (W4, W5), **gdy** `BG` i `CARBS 1` zakończyły się, **wtedy** widać nagłówek „Gotowe” i komunikaty z tabeli.
 
@@ -655,7 +659,7 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
-- **Planowane zmiany (Spec 012, 013, 2026-10-31).** CMDUI-19: wiersze `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` ([BOL-22](../012-bolus/spec.md#bol-22-teksty-wyniku-i-historia-odmów-i-błędu-bolusa)) i `ProfileSwitchConfirmed` ([PROF-21](../013-profil/spec.md#prof-21-wynik-i-historia-potwierdzenia-zmiany-profilu)); w kryterium 10 wartości `FailureReason` i 8 `UnknownReason`. Treść zostanie przepisana w zadaniu 4 zmiany 2026-10-31 (design 013); do tego czasu obowiązują Spec 012 i 013.
+- **2026-10-31 – scalenie zmian ze Spec 012 i 013 (po wdrożeniu).** CMDUI-19: nowe wiersze `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` (BOL-22) i `ProfileSwitchConfirmed(P)` (PROF-21); kryteria obejmują 10 wartości `FailureReason` i 8 `UnknownReason`, zgodnie z `SessionState.kt`. Dodatek „Kod nie został wysłany.” dotyczy też obu nowych `Failed`; ostrzeżenie „nieznany” (bolusowe) – `Unknown(BOLUS_FAILED)`, nie `ProfileSwitchConfirmed`. Identyfikatory wymagań bez zmian.
 
 - **2026-10-30 – zmiana profilu bez listy, kolejność panelu i fokus PIN (P14, P15; Spec 013 P9, P10).**
   - CMDUI-01: kolejność od góry – banery, Bolus, Profil, CARBS, `BG`, `PUMP`; kryterium źródłowe kolejności.

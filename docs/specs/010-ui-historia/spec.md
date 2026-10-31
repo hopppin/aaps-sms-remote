@@ -113,10 +113,12 @@ Wynik wpisu jest wyliczany jedną czystą funkcją z wyczerpującym `when` po `H
 | `CarbsConfirmed`, ilość `null` albo polecenie inne niż `CARBS` | sukces | „Brak szczegółów wyniku.” |
 | `BolusConfirmed`, polecenie `BOLUS` z ilością X | sukces | „AAPS potwierdził podanie X j.” (BOL-17) |
 | `BolusConfirmed`, ilość `null` albo polecenie inne niż `BOLUS` | sukces | „Brak szczegółów wyniku.” |
-| `Failed(r)` | błąd | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu teksty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16) |
+| `ProfileSwitchConfirmed`, polecenie `PROFILE_SWITCH` z procentem P | sukces | „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).” (PROF-21) |
+| `ProfileSwitchConfirmed`, procent `null` albo polecenie inne niż `PROFILE_SWITCH` | sukces | „Brak szczegółów wyniku.” |
+| `Failed(r)` | błąd | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu teksty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16; `AAPS_BOLUS_INTERVAL` i `AAPS_BOLUS_QUEUE` jak w BOL-22) |
 | `Failed(null)` | błąd | „Brak szczegółów wyniku.” |
 | `TimedOut(p)` (także `p = null`) | brak odpowiedzi | jak CMDUI-19 (`SENDING_COMMAND` → „Telefon nie potwierdził wysłania SMS w ciągu 3 min.”; inna faza i `null` → „Brak odpowiedzi AAPS w ciągu 3 min.”) |
-| `Unknown(r)` | nieznany | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu – jak w BOL-16 i PROF-16) |
+| `Unknown(r)` | nieznany | jak CMDUI-19 dla `r` (dla `BOLUS` i zmiany profilu – jak w BOL-16 i PROF-16; `BOLUS_FAILED` jak w BOL-22) |
 | `Unknown(null)` | nieznany | „Brak szczegółów wyniku.” |
 | `Cancelled` | anulowane | „Polecenie anulowane.” |
 | `Unrecognized` | nierozpoznany → nagłówek „Nierozpoznany wynik” | „Brak szczegółów wyniku.” |
@@ -130,9 +132,10 @@ Dodatki (w szczegółach, P5) – reguły jak w CMDUI-19, z ograniczeniem do dan
 
 **Kryteria akceptacji:**
 
-- **Zakładając** każdy `FailureReason` (8), każdy `UnknownReason` (7) i `TimedOut` z fazą `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, **gdy** odwzorowano wpis `CARBS 20` z tym wynikiem oraz `SessionResult` z tym samym wynikiem przez `ResultMapper` ze Spec 009, **wtedy** rodzaj, komunikat i argument są równe w obu odwzorowaniach.
+- **Zakładając** każdy `FailureReason` (10), każdy `UnknownReason` (8) i `TimedOut` z fazą `SENDING_COMMAND`, `AWAITING_REPLY`, `AWAITING_CODE_REQUEST`, **gdy** odwzorowano wpis `CARBS 20` z tym wynikiem oraz `SessionResult` z tym samym wynikiem przez `ResultMapper` ze Spec 009, **wtedy** rodzaj, komunikat i argument są równe w obu odwzorowaniach.
 - **Zakładając** wpisy `BOLUS` 120/`BolusConfirmed`, `BOLUS` bez ilości/`BolusConfirmed`, `PROFILE_STATUS`/`Completed`, `PROFILE_LIST`/`Completed`, `PROFILE_SWITCH`/`Completed`, **gdy** odwzorowano, **wtedy** odpowiednio: sukces/„AAPS potwierdził podanie 1,20 j.”, sukces/brak szczegółów („Brak szczegółów wyniku.”), sukces/„Odpowiedź AAPS na PROFILE STATUS”, sukces/„Odpowiedź AAPS na PROFILE LIST.” (bez wezwania do wyboru profilu), sukces/„Brak szczegółów wyniku (wpis z innej wersji aplikacji).”.
 - **Zakładając** wpisy `BOLUS` z `Failed(AMOUNT_MISMATCH)` i `Unknown(UNRECOGNIZED_REPLY)` oraz `PROFILE_SWITCH` z `Failed(AMOUNT_MISMATCH)`, `Unknown(AMOUNT_MISMATCH)` i `Unknown(UNRECOGNIZED_REPLY)`, **gdy** odwzorowano, **wtedy** komunikaty są takie jak w BOL-16 i PROF-16, „Kod nie został wysłany” = `true` tylko dla `Failed`, a ostrzeżenie bolusowe tylko dla `BOLUS`.
+- **Zakładając** wpisy `BOLUS`/`Failed(AAPS_BOLUS_INTERVAL)`, `BOLUS`/`Failed(AAPS_BOLUS_QUEUE)`, `BOLUS`/`Unknown(BOLUS_FAILED)`, `PROFILE_SWITCH` 90/`ProfileSwitchConfirmed`, `PROFILE_SWITCH` bez procentu/`ProfileSwitchConfirmed` i `CARBS`/`ProfileSwitchConfirmed` bez procentu, **gdy** odwzorowano, **wtedy** komunikaty to kolejno teksty z BOL-22 (błąd, błąd, nieznany z ostrzeżeniem bolusowym), „AAPS potwierdził zmianę profilu (polecenie: profil 1, 90%).” (sukces) i dwa razy „Brak szczegółów wyniku.” (sukces); „Kod nie został wysłany” = `true` dla obu `Failed`, a dla pozostałych = `false` (BOL-22, PROF-21).
 - **Zakładając** wpisy `BG`/`Completed`, `PUMP`/`Completed`, `CARBS 1`/`CarbsConfirmed`, `BG`/`Cancelled`, **gdy** odwzorowano, **wtedy** rodzaj i komunikat są jak w CMDUI-19, a dla `CarbsConfirmed` argument = 1.
 - **Zakładając** wpisy `Failed(null)`, `Unknown(null)`, `TimedOut(null)`, `Unrecognized`, `CARBS`/`Completed`, `CARBS` z ilością `null`/`CarbsConfirmed`, **gdy** odwzorowano, **wtedy** odpowiednio: błąd/brak szczegółów, nieznany/brak szczegółów, brak odpowiedzi/„Brak odpowiedzi AAPS” z argumentem 3, nierozpoznany/brak szczegółów, sukces/brak szczegółów, sukces/brak szczegółów – bez wyjątku.
 - **Zakładając** wpis `CARBS 20` z wynikami `Failed(AMOUNT_MISMATCH)`, `TimedOut(AWAITING_CODE_REQUEST)`, `Cancelled`, **gdy** odwzorowano, **wtedy** „Kod nie został wysłany” = `true`; dla `Failed(WRONG_CODE)`, `Failed(null)`, `CarbsConfirmed`, `Unknown(CONFIRMATION_TIMEOUT)` = `false`; dla `BG` z `Cancelled` = `false`.
@@ -318,7 +321,7 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 
 ## Historia zmian
 
-- **Planowane zmiany (Spec 012, 013, 2026-10-31).** HISTUI-04: teksty wyników wpisów `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` ([BOL-22](../012-bolus/spec.md#bol-22-teksty-wyniku-i-historia-odmów-i-błędu-bolusa)) i `PROFILE_SWITCH_CONFIRMED` ([PROF-21](../013-profil/spec.md#prof-21-wynik-i-historia-potwierdzenia-zmiany-profilu)). Treść zostanie przepisana w zadaniu 4 zmiany 2026-10-31 (design 013); do tego czasu obowiązują Spec 012 i 013.
+- **2026-10-31 – scalenie zmian ze Spec 012 i 013 (po wdrożeniu).** HISTUI-04: teksty wyników wpisów `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` (BOL-22) i `PROFILE_SWITCH_CONFIRMED` (PROF-21, w tym wpis bez procentu lub dla innego polecenia: „Brak szczegółów wyniku.”); kryteria obejmują 10 wartości `FailureReason` i 8 `UnknownReason`. Identyfikatory wymagań bez zmian.
 
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - HISTUI-03: etykiety „BOLUS X j.”, „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%” (BOL-17, PROF-17).
