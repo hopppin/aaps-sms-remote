@@ -310,6 +310,17 @@ class CommandSessionProfileFlowTest {
     }
 
     @Test
+    fun `PROF-20 profileBaseUpdated po wyslaniu kodu to Unknown UNRECOGNIZED_REPLY i dokladnie jeden kod`() = runTest {
+        val body = AapsSamples.profileBaseUpdated
+        val (_, run) = start(switch(100))
+        deliver(60_000, request)
+        deliver(65_000, body)
+        assertEquals(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
+        assertEquals(1, sender.sentCodeCopies.size)
+        assertEquals(listOf("PROFILE 1 100"), sender.sentCommands)
+    }
+
+    @Test
     fun `PROF-19 potwierdzenie po kodzie to Unknown UNRECOGNIZED_REPLY`() = runTest {
         val (_, run) = start(switch(100))
         deliver(60_000, request)

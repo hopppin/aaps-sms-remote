@@ -20,6 +20,7 @@ import pl.twojanazwa.aapsremote.commands.LimitsValidation
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsReply
 import pl.twojanazwa.aapsremote.parser.AapsSamples
+import pl.twojanazwa.aapsremote.parser.BolusRefusal
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import kotlin.time.Duration.Companion.minutes
 
@@ -268,6 +269,18 @@ class CommandSessionBolusTest {
         assertEquals(UnknownReason.UNRECOGNIZED_REPLY, (run.await().outcome as SessionOutcome.Unknown).reason)
         assertEquals(1, sender.sentCodeCopies.size)
     }
+
+    @Test
+    fun `BOL-20 podstawiony parser zwracajacy BolusRefused lub BolusFailed w sesji CARBS to UNRECOGNIZED_REPLY bez kodu`() =
+        runTest {
+            val replies = listOf(AapsReply.BolusRefused(BolusRefusal.INTERVAL, "x"), AapsReply.BolusFailed("x"))
+            for ((i, reply) in replies.withIndex()) {
+                val (_, run) = startWithParser(carbsCommand(1)) { _, _ -> reply }
+                deliver(60_000L * (i + 1), "dowolna tresc")
+                assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, "dowolna tresc"), run.await())
+            }
+            assertNoCode()
+        }
 
     @Test
     fun `BOL-10 limit przygotowania kodu 10 s - 9999 ms PREPARING_CODE a 10000 ms CODE_PREPARATION_TIMEOUT`() = runTest {
