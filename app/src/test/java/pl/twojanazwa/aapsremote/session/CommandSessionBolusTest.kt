@@ -460,4 +460,43 @@ class CommandSessionBolusTest {
         assertNoCode()
         assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
     }
+
+    @Test
+    fun `BOL-21 blad bolusa w PREPARING_CODE to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.bolusFailed
+        val (_, run) = preparing()
+        deliver(58_500, body)
+        assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertNoCode()
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+    }
+
+    @Test
+    fun `BOL-20 odmowa kolejka po wyslaniu kodu to Unknown UNRECOGNIZED_REPLY i dokladnie jeden kod`() = runTest {
+        val body = AapsSamples.bolusRefusedQueue
+        val (_, run) = confirming(10)
+        deliver(120_000, body)
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+    }
+
+    @Test
+    fun `BOL-20 odmowa odebrana w SENDING_CODE z chwila przed wyslaniem kodu to Unknown UNRECOGNIZED_REPLY i jeden kod`() =
+        runTest {
+            val body = AapsSamples.bolusRefusedQueue
+            sender.delayMillis = 3_000
+            val session = testSession(bolus(120), sender, source, SessionTestFixtures.credentials())
+            val run = async { session.run() }
+            runCurrent()
+            deliver(60_000, bolusRequestFor(120))
+            assertEquals(SessionPhase.SENDING_CODE, session.state.value.phase)
+            // Odmowa w chwili 62 000 < 63 000 (wysłanie kodu): po "wysłano" trafia do obsługi po kodzie, nie jest odrzucona.
+            deliver(62_000, body)
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
+            assertEquals(1, sender.sentCodeCopies.size)
+            assertEquals(listOf("BOLUS 1.2"), sender.sentCommands)
+        }
 }
