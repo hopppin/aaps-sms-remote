@@ -58,67 +58,6 @@ fun CommandsPanel(
         state.limits.bannerRes()?.let { Banner(it, onOpenSettings) }
 
         if (state.launching) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        FilledTonalButton(
-            onClick = onBgClicked,
-            enabled = state.canSendNoCode,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column {
-                Text(stringResource(R.string.commands_bg), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(R.string.commands_bg_hint), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        FilledTonalButton(
-            onClick = onPumpClicked,
-            enabled = state.canSendNoCode,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column {
-                Text(stringResource(R.string.commands_pump), style = MaterialTheme.typography.titleLarge)
-                Text(stringResource(R.string.commands_pump_hint), style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(stringResource(R.string.commands_carbs_title), style = MaterialTheme.typography.titleLarge)
-                OutlinedTextField(
-                    value = state.carbsInput,
-                    onValueChange = onCarbsInputChanged,
-                    enabled = state.canStartCarbs,
-                    label = { Text(stringResource(R.string.commands_carbs_label)) },
-                    isError = state.carbsError != null,
-                    supportingText = state.carbsError?.let { error ->
-                        state.loadedLimits?.let { limits ->
-                            { Text(stringResource(error.textRes(), *error.textArgs(limits).toTypedArray())) }
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (state.quickValues.isNotEmpty()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.quickValues.forEach { grams ->
-                            OutlinedButton(
-                                onClick = { onQuickValueClicked(grams) },
-                                enabled = state.canStartCarbs,
-                                modifier = Modifier.weight(1f),
-                            ) { Text(stringResource(R.string.commands_carbs_quick, grams)) }
-                        }
-                    }
-                }
-                Button(
-                    onClick = onCarbsNextClicked,
-                    enabled = state.canStartCarbs,
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.commands_carbs_next)) }
-            }
-        }
-
         // BOL-13: bez szybkich wartości.
         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Column(
@@ -167,6 +106,67 @@ fun CommandsPanel(
                     enabled = state.canStartProfile,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.commands_profile_switch)) }
+            }
+        }
+
+        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.commands_carbs_title), style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(
+                    value = state.carbsInput,
+                    onValueChange = onCarbsInputChanged,
+                    enabled = state.canStartCarbs,
+                    label = { Text(stringResource(R.string.commands_carbs_label)) },
+                    isError = state.carbsError != null,
+                    supportingText = state.carbsError?.let { error ->
+                        state.loadedLimits?.let { limits ->
+                            { Text(stringResource(error.textRes(), *error.textArgs(limits).toTypedArray())) }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (state.quickValues.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.quickValues.forEach { grams ->
+                            OutlinedButton(
+                                onClick = { onQuickValueClicked(grams) },
+                                enabled = state.canStartCarbs,
+                                modifier = Modifier.weight(1f),
+                            ) { Text(stringResource(R.string.commands_carbs_quick, grams)) }
+                        }
+                    }
+                }
+                Button(
+                    onClick = onCarbsNextClicked,
+                    enabled = state.canStartCarbs,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.commands_carbs_next)) }
+            }
+        }
+
+        FilledTonalButton(
+            onClick = onBgClicked,
+            enabled = state.canSendNoCode,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                Text(stringResource(R.string.commands_bg), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.commands_bg_hint), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        FilledTonalButton(
+            onClick = onPumpClicked,
+            enabled = state.canSendNoCode,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column {
+                Text(stringResource(R.string.commands_pump), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.commands_pump_hint), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

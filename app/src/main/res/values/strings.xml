@@ -84,7 +84,7 @@
     <string name="commands_large_confirm">Tak, %1$d g</string>
     <string name="commands_large_dismiss">Nie</string>
     <string name="commands_summary_title">Wysłać CARBS %1$d g do AAPS?</string>
-    <string name="commands_summary_text">Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$d g.</string>
+    <string name="commands_summary_text">Aplikacja wyśle CARBS %1$d g, a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla %1$d g.</string>
     <string name="commands_profile_form_title">Zmiana profilu %1$d</string>
     <string name="commands_profile_percent_label" formatted="false">Procent (%)</string>
     <string name="commands_profile_next">Dalej</string>
@@ -110,7 +110,7 @@
     <string name="commands_bolus_large_text">To więcej niż połowa limitu bolusa (%1$s j.). Sprawdź ilość, zanim wpiszesz PIN.</string>
     <string name="commands_bolus_large_confirm">Tak, %1$s j.</string>
     <string name="commands_bolus_summary_title">Podać bolus %1$s j.?</string>
-    <string name="commands_bolus_summary_text">Aplikacja wyśle BOLUS %1$s j., a kod z PIN-em odeśle dopiero, gdy AAPS poprosi o kod dla %1$s j. Bolusa nie da się cofnąć.</string>
+    <string name="commands_bolus_summary_text">Aplikacja wyśle BOLUS %1$s j., a kod z PIN-em odeśle, dopiero gdy AAPS poprosi o kod dla %1$s j. Bolusa nie da się cofnąć.</string>
     <string name="commands_pin_label">PIN AAPS</string>
     <string name="commands_send">Wyślij</string>
     <string name="commands_open_settings">Przejdź do Ustawień</string>
