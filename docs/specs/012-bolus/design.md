@@ -199,3 +199,62 @@ Każde zadanie to jeden PR, ok. 200–400 linii z testami. Warunek wstępny: zad
 6. **UI: sekcja Bolus, okno, podsumowanie z „Wyślij”** – `ui/commands/CommandsViewModel.kt`, `CommandsUiState.kt`, `CommandsPanel.kt`, `CommandDialogs.kt`, `CarbsSummary.kt` → uogólnione podsumowanie, `CommandTexts.kt`, `strings.xml`; testy `CommandsViewModelBolusTest`. Wymagania: BOL-13 – BOL-15, BOL-18 (część). Zależy od 5. Etykiety `bezpieczenstwo`, `trudnosc:trudne`. PR opisuje W1, W2, W4, W5.
 
 Zależności: 1 → 2 → 3 → 4 → 5 → 6.
+
+## Zmiana 2026-10-31: odmowy i błąd bolusa z kodu AAPS (BOL-20 – BOL-22)
+
+Zadania (wspólne z profilem) – [design 013, „Zadania zmiany 2026-10-31”](../013-profil/design.md#zadania-zmiany-2026-10-31).
+
+```kotlin
+package pl.twojanazwa.aapsremote.parser
+
+enum class BolusRefusal { INTERVAL, QUEUE }
+
+sealed interface AapsReply {
+    /** BOL-20. Nie jest MatchingCodeRequest ani MatchingDone – nigdy nie daje kodu. */
+    data class BolusRefused(val refusal: BolusRefusal, val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.BolusRefused(refusal=$refusal, ***)"
+    }
+    /** BOL-21. Nie jest MatchingDone – nigdy nie daje BolusConfirmed. */
+    data class BolusFailed(val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.BolusFailed(***)"
+    }
+}
+
+// AapsPl3426Patterns (matchEntire):
+val BOLUS_REFUSED_INTERVAL = Regex("""Bolus zdalny niedostepny\. Sprobuj ponownie pozniej\.""")       // cała treść
+val BOLUS_REFUSED_QUEUE = Regex("""W kolejce oczekuje inny bolus\. Sprobuj ponownie pozniej\.""")       // cała treść
+val BOLUS_FAILED_FIRST_LINE = Regex(
+    """Bolus nie powiodl sie\. Zweryfikuj prawdziwy stan przed wyslaniem kolejnej komendy!""",          // pierwsza linia
+)
+// parseBolus: WRONG_CODE → BOLUS_CODE_REQUEST → BOLUS_REFUSED_* (cała treść) → BOLUS_FAILED_FIRST_LINE → BOLUS_DONE_FIRST_LINE → null
+```
+
+```kotlin
+package pl.twojanazwa.aapsremote.session
+
+enum class FailureReason { /* dotychczasowe */ AAPS_BOLUS_INTERVAL, AAPS_BOLUS_QUEUE }   // dopisane na końcu
+enum class UnknownReason { /* dotychczasowe */ BOLUS_FAILED }                             // dopisane na końcu
+
+// CommandSession.amountMatches: is AapsReply.BolusRefused, is AapsReply.BolusFailed -> sent is Command.Bolus
+// processMessage, AWAITING_CODE_REQUEST/PREPARING_CODE:
+//   is AapsReply.BolusRefused -> Failed(INTERVAL → AAPS_BOLUS_INTERVAL, QUEUE → AAPS_BOLUS_QUEUE, sms.body)
+//   BolusFailed – istniejąca gałąź else → Failed(UNRECOGNIZED_REPLY)
+// processMessage, AWAITING_CONFIRMATION:
+//   is AapsReply.BolusFailed -> receivedAt >= codeSentAt ? Unknown(BOLUS_FAILED, sms.body) : addUnexpected(sms)
+//   BolusRefused – istniejąca gałąź else → Unknown(UNRECOGNIZED_REPLY)
+```
+
+`HistoryCodec`: literały `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` w `FAILURE_REASONS`/`encode`, `BOLUS_FAILED` w `UNKNOWN_REASONS`/`encode`. `ResultMessages`/`ResultMapper`, `HistoryEntryMapper`: nowe klucze `strings.xml` (`result_failed_aaps_bolus_interval`, `result_failed_aaps_bolus_queue`, `result_unknown_bolus_failed`). `BolusInterval` bez zmian (wpis `Unknown` z kodem liczy się, `Failed` bez kodu – nie).
+
+| Decyzja | Alternatywy | Powód |
+| --- | --- | --- |
+| Błąd bolusa = `Unknown(BOLUS_FAILED)` | `Failed(BOLUS_FAILED)` | AAPS każe zweryfikować prawdziwy stan; `Failed` sugerowałby, że insuliny nie podano, i zachęcał do powtórzenia (AGENTS.md: bez ponawiania). |
+| Dwa powody `Failed` dla odmów | jeden `AAPS_REFUSED` z tekstem z treści | Wyczerpujący `when` w `ui` bez parsowania treści drugi raz; teksty różnią się zaleceniem. |
+| Odmowa po kodzie → `Unknown(UNRECOGNIZED_REPLY)` | `Unknown` z nowym powodem | AAPS nie wysyła odmowy po kodzie; taka wiadomość dotyczy innego polecenia – bez nowego tekstu. |
+| Wzorce tylko w kontekście `Bolus` | rozpoznawanie we wszystkich kontekstach | Najmniejsza zmiana PARSER-01; w innych sesjach treść i tak kończy się stopem albo „nieznany”. |
+
+| Wymaganie | Test |
+| --- | --- |
+| BOL-20, BOL-21 (parser) | `BolusReplyParserTest`, `ParserRedactionTest` |
+| BOL-20, BOL-21 (sesja) | `CommandSessionBolusTest`, `BolusIntervalTest` |
+| BOL-22 | `ResultMapperBolusTest`, `HistoryCodecBolusTest`, `HistoryCodecTest` (parytet), `HistoryEntryMapperBolusTest` |
