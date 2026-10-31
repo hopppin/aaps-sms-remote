@@ -134,7 +134,7 @@ Wczytanie, zapis i usunięcie są wzajemnie wykluczające się: najwyżej jedna 
 
 ### DATA-07: Zawartość wpisu historii
 
-Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian, także `null` (SESSION-19). Ilość węglowodanów pochodzi z `Command.Carbs.grams` (wynik `CarbsConfirmed` ma zawsze tę samą ilość – Spec 004), ilość bolusa z `Command.Bolus.centiUnits` (BOL-17), numer i procent profilu z `Command.ProfileSwitch` (PROF-17; nazwa profilu nie jest osobnym polem). Treść odpowiedzi jest zapisywana w całości, bez skracania.
+Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian, także `null` (SESSION-19). Ilość węglowodanów pochodzi z `Command.Carbs.grams` (wynik `CarbsConfirmed` ma zawsze tę samą ilość – Spec 004), ilość bolusa z `Command.Bolus.centiUnits` (BOL-17), numer i procent profilu z `Command.ProfileSwitch` (PROF-17; aplikacja zmienia tylko profil 1, więc nowe wpisy mają numer 1; nazwa profilu nie jest osobnym polem). Treść odpowiedzi jest zapisywana w całości, bez skracania.
 
 | Pole wpisu | Źródło |
 | --- | --- |
@@ -142,10 +142,10 @@ Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian,
 | polecenie | `command.id`: `BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` |
 | ilość (g) | `Command.Carbs.grams` dla `CARBS`, inaczej brak |
 | ilość bolusa (setne części jednostki) | `Command.Bolus.centiUnits` dla `BOLUS`, inaczej brak |
-| numer i procent profilu | `Command.ProfileSwitch.number` i `.percent` dla `PROFILE_SWITCH`, inaczej brak (dwa osobne pola) |
-| rodzaj wyniku | `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `Failed`, `TimedOut`, `Unknown`, `Cancelled` |
+| numer i procent profilu | `Command.ProfileSwitch.number` (zawsze 1) i `.percent` dla `PROFILE_SWITCH`, inaczej brak (dwa osobne pola); wpisy z innym numerem mogą istnieć tylko sprzed zmiany 2026-10-30 |
+| rodzaj wyniku | `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `ProfileSwitchConfirmed`, `Failed`, `TimedOut`, `Unknown`, `Cancelled` |
 | powód | `Failed.reason` (`FailureReason`), `Unknown.reason` (`UnknownReason`), `TimedOut.phase` (`SessionPhase`); dla pozostałych brak |
-| treść odpowiedzi AAPS | `text` z `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `Failed`, `Unknown` (dla `Failed`/`Unknown` może być brak); dla `TimedOut` i `Cancelled` brak |
+| treść odpowiedzi AAPS | `text` z `Completed`, `CarbsConfirmed`, `BolusConfirmed`, `ProfileSwitchConfirmed`, `Failed`, `Unknown` (dla `Failed`/`Unknown` może być brak); dla `TimedOut` i `Cancelled` brak |
 | rozpoczęcie, wysłanie polecenia, wysłanie kodu, zakończenie | `startedAtEpochMillis`, `commandSentAtEpochMillis`, `codeSentAtEpochMillis`, `finishedAtEpochMillis` |
 | liczba wiadomości nieoczekiwanych | `unexpectedMessages.size` |
 
@@ -153,7 +153,7 @@ Wpis powstaje z wyniku sesji według tabeli. Pola czasu są kopiowane bez zmian,
 
 - **Zakładając** wynik `BG`: `Completed` z treścią `bg.txt`, rozpoczęcie `T0`, wysłanie polecenia `T0 + 1000`, wysłanie kodu `null`, zakończenie `T0 + 5000`, 0 wiadomości nieoczekiwanych, **gdy** utworzono wpis, **wtedy** polecenie = `BG`, ilość = brak, rodzaj = `Completed`, powód = brak, treść = `bg.txt`, czasy = `T0`, `T0 + 1000`, `null`, `T0 + 5000`, liczba = 0.
 - **Zakładając** wynik `CARBS 20`: `CarbsConfirmed(20, carbs-sukces.txt)` z czasami `T0`, `T0 + 1000`, `T0 + 61000`, `T0 + 120000` i 2 wiadomościami nieoczekiwanymi, **gdy** utworzono wpis, **wtedy** polecenie = `CARBS`, ilość = 20, rodzaj = `CarbsConfirmed`, treść = `carbs-sukces.txt`, czasy jak w wyniku, liczba = 2.
-- **Zakładając** wynik `BOLUS 1,20 j.` `BolusConfirmed(120, bolus-sukces-1-20.txt)` i wynik zmiany profilu (2, `LocalProfile2`, 115) `Unknown(UNRECOGNIZED_REPLY)`, **gdy** utworzono wpisy, **wtedy** pierwszy ma polecenie `BOLUS`, ilość bolusa 120, brak ilości węglowodanów i rodzaj `BolusConfirmed`, a drugi – polecenie `PROFILE_SWITCH`, numer 2, procent 115, przy czym żadne pole poza treścią nie zawiera nazwy profilu (BOL-17, PROF-17).
+- **Zakładając** wynik `BOLUS 1,20 j.` `BolusConfirmed(120, bolus-sukces-1-20.txt)` i wynik zmiany profilu (115) `Unknown(UNRECOGNIZED_REPLY)`, **gdy** utworzono wpisy, **wtedy** pierwszy ma polecenie `BOLUS`, ilość bolusa 120, brak ilości węglowodanów i rodzaj `BolusConfirmed`, a drugi – polecenie `PROFILE_SWITCH`, numer 1, procent 115, przy czym żadne pole poza treścią nie zawiera nazwy profilu (BOL-17, PROF-17).
 - **Zakładając** wyniki `Failed(WRONG_CODE, zly-kod.txt)`, `Failed(SEND_FAILED, null)`, `Unknown(CONFIRMATION_TIMEOUT, null)`, `Unknown(AMOUNT_MISMATCH, carbs-prosba-o-kod.txt)`, `TimedOut(AWAITING_REPLY)`, `Cancelled`, **gdy** utworzono wpisy, **wtedy** rodzaje i powody to kolejno `Failed`/`WRONG_CODE`, `Failed`/`SEND_FAILED`, `Unknown`/`CONFIRMATION_TIMEOUT`, `Unknown`/`AMOUNT_MISMATCH`, `TimedOut`/`AWAITING_REPLY`, `Cancelled`/brak, a treść jest tylko w pierwszym i czwartym wpisie.
 - **Zakładając** wynik `Cancelled` z wszystkimi czasami `null` (SESSION-19), **gdy** utworzono wpis, **wtedy** wszystkie cztery czasy = `null`.
 - **Zakładając** wynik `Failed(UNRECOGNIZED_REPLY, <2000 znaków "a">)`, **gdy** zamieniono go na wiersz i odczytano wpis, **wtedy** treść ma 2000 znaków i jest identyczna.
@@ -169,7 +169,7 @@ Wpis i wiersz mają wyłącznie pola z tabeli DATA-07. Nie zawierają PIN-u, kod
 
 ### DATA-09: Stabilne wartości tekstowe i wartości nieznane
 
-Polecenie, rodzaj wyniku i powód są zapisywane jako stałe teksty z tabeli w design (dla poleceń, powodów i faz równe obecnym nazwom wartości wyliczeniowych; dla rodzajów wyniku: `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `FAILED`, `TIMED_OUT`, `UNKNOWN`, `CANCELLED`). Zmiana nazwy wartości wyliczeniowej w kodzie nie zmienia zapisywanego tekstu. Odczyt wiersza nigdy nie rzuca:
+Polecenie, rodzaj wyniku i powód są zapisywane jako stałe teksty z tabeli w design (dla poleceń, powodów i faz równe obecnym nazwom wartości wyliczeniowych; dla rodzajów wyniku: `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `PROFILE_SWITCH_CONFIRMED`, `FAILED`, `TIMED_OUT`, `UNKNOWN`, `CANCELLED`). Zmiana nazwy wartości wyliczeniowej w kodzie nie zmienia zapisywanego tekstu. Odczyt wiersza nigdy nie rzuca:
 
 | Wiersz | Odczytany wpis |
 | --- | --- |
@@ -179,13 +179,13 @@ Polecenie, rodzaj wyniku i powód są zapisywane jako stałe teksty z tabeli w d
 | polecenie inne niż `PROFILE_SWITCH` z numerem lub procentem profilu | numer i procent = brak |
 | nieznany tekst rodzaju wyniku | rodzaj `Unrecognized`, powód = brak |
 | `FAILED`, `UNKNOWN`, `TIMED_OUT` z nieznanym albo brakującym powodem | ten rodzaj z powodem = brak |
-| `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `CANCELLED` z powodem | powód pominięty |
+| `COMPLETED`, `CARBS_CONFIRMED`, `BOLUS_CONFIRMED`, `PROFILE_SWITCH_CONFIRMED`, `CANCELLED` z powodem | powód pominięty |
 
 Pozostałe pola (identyfikator, czasy, treść, liczba) są odczytywane bez zmian.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** każdą wartość `CommandId`, `FailureReason`, `UnknownReason`, `SessionPhase` i każdy rodzaj wyniku, **gdy** zapisano ją do tekstu i odczytano, **wtedy** odczyt = wartość wyjściowa, a tekst = wartość z tabeli w design.
+- **Zakładając** każdą wartość `CommandId`, `FailureReason` (10 wartości, w tym nowe `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE`), `UnknownReason` (8 wartości, w tym nowa `BOLUS_FAILED`; BOL-22), `SessionPhase` i każdy rodzaj wyniku (w tym `PROFILE_SWITCH_CONFIRMED`; PROF-21), **gdy** zapisano ją do tekstu i odczytano, **wtedy** odczyt = wartość wyjściowa, a tekst = wartość z tabeli w design (dla nowych powodów i rodzaju – `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE`, `BOLUS_FAILED`, `PROFILE_SWITCH_CONFIRMED`).
 - **Zakładając** wiersz z poleceniem `TBR`, **gdy** go odczytano, **wtedy** polecenie = `UNRECOGNIZED`, bez wyjątku.
 - **Zakładając** wiersz z rodzajem `PARTIAL` i powodem `SEND_FAILED`, **gdy** go odczytano, **wtedy** rodzaj = `Unrecognized`, powód = brak.
 - **Zakładając** wiersz `FAILED` z powodem `NO_SIGNAL`, **gdy** go odczytano, **wtedy** rodzaj = `Failed`, powód = brak, pozostałe pola bez zmian.
@@ -367,7 +367,9 @@ Brak. Decyzje przyjęte przy tej specyfikacji:
 
 ## Historia zmian
 
-- **Planowane zmiany (Spec 013, 2026-10-30).** DATA-07: kryterium zmiany profilu z numerem 1 (aplikacja zmienia tylko profil 1, [PROF-17](../013-profil/spec.md#prof-17-historia)); wpisy z innym numerem mogą istnieć tylko sprzed zmiany. Schemat i kolumny bez zmian. Treść kryterium zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013 (PROF-17: nowe wpisy mają numer 1).
+- **2026-10-31 – scalenie zmian ze Spec 012 i 013 z 2026-10-30 i 2026-10-31 (po wdrożeniu).**
+  - DATA-07: kryterium zmiany profilu z numerem 1 (aplikacja zmienia tylko profil 1, PROF-17); wpisy z innym numerem mogą istnieć tylko sprzed zmiany 2026-10-30. Schemat i kolumny bez zmian. Rodzaj wyniku `ProfileSwitchConfirmed` w tabeli pól (treść zapisana jak dla pozostałych potwierdzeń).
+  - DATA-09: nowe stałe teksty powodów `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` (`FailureReason`, razem 10 wartości) i `BOLUS_FAILED` (`UnknownReason`, razem 8 wartości; BOL-22) oraz rodzaju wyniku `PROFILE_SWITCH_CONFIRMED` (PROF-21), bez zmiany schematu (kolumny tekstowe). Identyfikatory wymagań bez zmian.
 
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - Nowy plik ustawień `command_limits` (LIM-04); DATA-01 i plik `settings` bez zmian; DATA-16 obejmuje oba pliki (domena `sharedpref`).

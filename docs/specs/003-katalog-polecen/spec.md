@@ -14,7 +14,7 @@ Polecenia, które aplikacja wysyła do AAPS, mają być opisane w jednym miejscu
 - Katalog poleceń: `BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH` – identyfikator, słowo kluczowe SMS, parametr, czy AAPS wymaga kodu, sposób zatwierdzenia przez użytkownika. Reguły ilości `BOLUS` i zmiany profilu opisują Spec 012 i 013 (BOL-02 – BOL-05, PROF-02 – PROF-04).
 - Parametr `CARBS`: liczba całkowita gramów od 1 do `carbsMaxGrams` z ustawień ([Spec 011](../011-limity-polecen/spec.md), domyślnie 50 g), szybkie wartości 10, 20, 30 g ograniczone do progu, próg dodatkowego potwierdzenia = 80% limitu zaokrąglone w dół (domyślnie 40 g).
 - Walidacja ilości podanej jako liczba (`Int`) i jako tekst z pola formularza; wynik walidacji z rodzajem błędu zamiast wyjątku.
-- Budowa treści SMS z poprawnego polecenia (`BG`, `PUMP`, `CARBS 20`, `BOLUS 0.1`, `PROFILE LIST`, `PROFILE 2 115`).
+- Budowa treści SMS z poprawnego polecenia (`BG`, `PUMP`, `CARBS 20`, `BOLUS 0.1`, `PROFILE LIST`, `PROFILE 1 115`).
 - Odwzorowanie polecenia na `ExpectedCommand` z pakietu `parser` (Spec 002).
 - Brak ujawniania ilości w `toString()`, brak logowania.
 - Struktura pozwalająca dodać kolejne polecenie jako nowy wpis katalogu.
@@ -34,7 +34,7 @@ Polecenia, które aplikacja wysyła do AAPS, mają być opisane w jednym miejscu
 
 ## Pojęcia
 
-- **Polecenie** – poprawny, gotowy do wysłania egzemplarz: `BG`, `PUMP`, `CARBS` z ilością, `BOLUS` z ilością, `PROFILE STATUS`, `PROFILE LIST` albo zmiana profilu (numer, nazwa, procent). Niepoprawnego polecenia nie da się utworzyć.
+- **Polecenie** – poprawny, gotowy do wysłania egzemplarz: `BG`, `PUMP`, `CARBS` z ilością, `BOLUS` z ilością, `PROFILE STATUS`, `PROFILE LIST` albo zmiana profilu (procent; numer profilu zawsze 1). Niepoprawnego polecenia nie da się utworzyć.
 - **Wpis katalogu** – opis rodzaju polecenia (dane), wspólny dla wszystkich egzemplarzy.
 - **Ilość** – liczba całkowita gramów węglowodanów dla `CARBS` (dla `BOLUS` – setne części jednostki, Spec 012).
 - **Limity** – `CommandLimits` ze [Spec 011](../011-limity-polecen/spec.md): `carbsMaxGrams`, `bolusMaxCentiUnits`, `bolusMinIntervalMinutes`; walidacja `CARBS` i `BOLUS` przyjmuje je jako argument.
@@ -54,7 +54,7 @@ Katalog zawiera dokładnie siedem wpisów, w kolejności: `BG`, `PUMP`, `CARBS`,
 | `BOLUS` | `BOLUS` | ilość insuliny (BOL-01, BOL-02) | tak |
 | `PROFILE_STATUS` | `PROFILE STATUS` | brak | nie |
 | `PROFILE_LIST` | `PROFILE LIST` | brak | nie |
-| `PROFILE_SWITCH` | `PROFILE` | numer, nazwa z listy, procent (PROF-01, PROF-02) | tak |
+| `PROFILE_SWITCH` | `PROFILE` | procent (numer zawsze 1; PROF-01, PROF-02) | tak |
 
 **Kryteria akceptacji:**
 
@@ -62,7 +62,7 @@ Katalog zawiera dokładnie siedem wpisów, w kolejności: `BG`, `PUMP`, `CARBS`,
 - **Zakładając** katalog, **gdy** dla każdego identyfikatora rodzaju polecenia pobrano wpis, **wtedy** każdy zwraca wpis o tym samym identyfikatorze, a słowo kluczowe wpisu `BG` to `BG`, wpisu `PUMP` to `PUMP`, wpisu `CARBS` to `CARBS`, wpisu `BOLUS` to `BOLUS`, a wpisy profilu mają słowa `PROFILE STATUS`, `PROFILE LIST`, `PROFILE`.
 - **Zakładając** katalog, **gdy** sprawdzono słowa kluczowe, **wtedy** są unikalne i pasują do `[A-Z]+( [A-Z]+)*`.
 - **Zakładając** katalog, **gdy** sprawdzono pole „wymaga kodu”, **wtedy** `BG`, `PUMP`, `PROFILE_STATUS`, `PROFILE_LIST` – nie; `CARBS`, `BOLUS`, `PROFILE_SWITCH` – tak.
-- **Zakładając** katalog, **gdy** sprawdzono parametr, **wtedy** `BG` i `PUMP` nie mają parametru, a `CARBS` ma parametr ilości z min. 1 i szybkimi wartościami 10, 20, 30 (górna granica i próg pochodzą z limitów, LIM-06, LIM-07); `BOLUS` ma parametr ilości insuliny (min. 0,05 j., krok 0,05 j.), a zmiana profilu – parametr numeru, nazwy i procentu 50–200 (domyślnie 100).
+- **Zakładając** katalog, **gdy** sprawdzono parametr, **wtedy** `BG` i `PUMP` nie mają parametru, a `CARBS` ma parametr ilości z min. 1 i szybkimi wartościami 10, 20, 30 (górna granica i próg pochodzą z limitów, LIM-06, LIM-07); `BOLUS` ma parametr ilości insuliny (min. 0,05 j., krok 0,05 j.), a zmiana profilu – parametr procentu 50–200 (domyślnie 100; numer profilu jest stały i równy 1, bez wyboru nazwy).
 - **Zakładając** polecenie `BG`, `PUMP` i `CARBS 20`, **gdy** pobrano ich wpis katalogu, **wtedy** `BG` daje wpis `BG`, `PUMP` – wpis `PUMP`, `CARBS 20` – wpis `CARBS`.
 
 ### CMD-02: Sposób zatwierdzenia
@@ -165,7 +165,7 @@ Wpis `CARBS` udostępnia szybkie wartości 10, 20, 30 g w tej kolejności; limit
 
 ### CMD-07: Treść SMS
 
-Treść SMS jest budowana wyłącznie z poprawnego polecenia: słowo kluczowe z katalogu, a dla `CARBS` jedna spacja (U+0020) i ilość zapisana cyframi ASCII w systemie dziesiętnym, bez zer wiodących, bez znaku. Dla `BOLUS`: jedna spacja i ilość z kropką dziesiętną (BOL-05, np. `BOLUS 0.1`); dla `PROFILE STATUS` i `PROFILE LIST`: samo słowo kluczowe; dla zmiany profilu: `PROFILE <n>` przy procencie 100, w przeciwnym razie `PROFILE <n> <p>` (PROF-04; nazwa profilu nie trafia do SMS-a). Treść nie zawiera godziny, innych spacji niż opisane, końca linii ani innych znaków.
+Treść SMS jest budowana wyłącznie z poprawnego polecenia: słowo kluczowe z katalogu, a dla `CARBS` jedna spacja (U+0020) i ilość zapisana cyframi ASCII w systemie dziesiętnym, bez zer wiodących, bez znaku. Dla `BOLUS`: jedna spacja i ilość z kropką dziesiętną (BOL-05, np. `BOLUS 0.1`); dla `PROFILE STATUS` i `PROFILE LIST`: samo słowo kluczowe; dla zmiany profilu: zawsze `PROFILE 1 <p>`, także dla procentu 100 (PROF-04; `PROFILE 1 100` jest dla AAPS równoważne `PROFILE 1`, R7 w Spec 013; nazwa profilu nie trafia do SMS-a). Treść nie zawiera godziny, innych spacji niż opisane, końca linii ani innych znaków.
 
 **Kryteria akceptacji:**
 
@@ -174,26 +174,26 @@ Treść SMS jest budowana wyłącznie z poprawnego polecenia: słowo kluczowe z 
 - **Zakładając** polecenie `CARBS 20`, **gdy** zbudowano treść SMS, **wtedy** jest to dokładnie `CARBS 20` (8 znaków).
 - **Zakładając** polecenia `CARBS 1` i `CARBS 50`, **gdy** zbudowano treść SMS, **wtedy** są to `CARBS 1` i `CARBS 50`.
 - **Zakładając** polecenie utworzone z tekstu `007`, **gdy** zbudowano treść SMS, **wtedy** jest to `CARBS 7`.
-- **Zakładając** polecenia `BOLUS` 10, 125 i 200 (setne), `PROFILE STATUS`, `PROFILE LIST` oraz zmianę profilu (1, 100) i (2, 115), **gdy** zbudowano treści SMS, **wtedy** są to kolejno `BOLUS 0.1`, `BOLUS 1.25`, `BOLUS 2`, `PROFILE STATUS`, `PROFILE LIST`, `PROFILE 1`, `PROFILE 2 115` (BOL-05, PROF-04).
+- **Zakładając** polecenia `BOLUS` 10, 125 i 200 (setne), `PROFILE STATUS`, `PROFILE LIST` oraz zmianę profilu z procentem 100 i 115, **gdy** zbudowano treści SMS, **wtedy** są to kolejno `BOLUS 0.1`, `BOLUS 1.25`, `BOLUS 2`, `PROFILE STATUS`, `PROFILE LIST`, `PROFILE 1 100`, `PROFILE 1 115` (BOL-05, PROF-04).
 - **Zakładając** każde poprawne polecenie `CARBS` z ilością 1–50, **gdy** zbudowano treść SMS, **wtedy** pasuje ona w całości do wzorca `CARBS [1-9][0-9]?` i liczba w niej równa się ilości polecenia.
 - **Zakładając** `carbsMaxGrams` = 100 (LIM-02, LIM-06) i polecenie `CARBS` z ilością 100 (górna granica tego limitu), **gdy** zbudowano treść SMS, **wtedy** jest to dokładnie `CARBS 100` (9 znaków; przy domyślnym 50 g `CARBS 100` nie jest poprawnym poleceniem); ogólnie dla ilości 1…`carbsMaxGrams` treść pasuje do wzorca `CARBS [1-9][0-9]{0,2}` i liczba w niej równa się ilości.
 
 ### CMD-08: Kontekst dla parsera
 
-Każde polecenie odwzorowuje się na `ExpectedCommand` z [Spec 002](../002-parser-odpowiedzi/spec.md) (PARSER-01): `BG` → `ExpectedCommand.Bg`, `PUMP` → `ExpectedCommand.Pump`, `CARBS g` → `ExpectedCommand.Carbs(g)` z tą samą ilością, `BOLUS x` → `ExpectedCommand.Bolus(x)` (BOL-06), `PROFILE STATUS` → `ExpectedCommand.ProfileStatus`, `PROFILE LIST` → `ExpectedCommand.ProfileList`, zmiana profilu → `ExpectedCommand.ProfileSwitch(nazwa, procent)` (PROF-05). Odwzorowanie nie rzuca wyjątku dla żadnego poprawnego polecenia. Parser nie zależy od pakietu `commands`.
+Każde polecenie odwzorowuje się na `ExpectedCommand` z [Spec 002](../002-parser-odpowiedzi/spec.md) (PARSER-01): `BG` → `ExpectedCommand.Bg`, `PUMP` → `ExpectedCommand.Pump`, `CARBS g` → `ExpectedCommand.Carbs(g)` z tą samą ilością, `BOLUS x` → `ExpectedCommand.Bolus(x)` (BOL-06), `PROFILE STATUS` → `ExpectedCommand.ProfileStatus`, `PROFILE LIST` → `ExpectedCommand.ProfileList`, zmiana profilu → `ExpectedCommand.ProfileSwitch(procent)` (tylko procent, bez numeru i nazwy; PROF-05). Odwzorowanie nie rzuca wyjątku dla żadnego poprawnego polecenia. Parser nie zależy od pakietu `commands`.
 
 **Kryteria akceptacji:**
 
 - **Zakładając** polecenie `BG`, **gdy** odwzorowano je na kontekst parsera, **wtedy** wynik to `ExpectedCommand.Bg`.
 - **Zakładając** polecenie `PUMP`, **gdy** odwzorowano je, **wtedy** wynik to `ExpectedCommand.Pump`.
 - **Zakładając** każde poprawne polecenie `CARBS g` dla g = 1…50, **gdy** odwzorowano je, **wtedy** wynik jest równy `ExpectedCommand.Carbs(g)` i nie jest rzucany wyjątek.
-- **Zakładając** `BOLUS` 10, `PROFILE STATUS`, `PROFILE LIST` i zmianę profilu (2, `LocalProfile2`, 115), **gdy** odwzorowano je, **wtedy** wyniki to `ExpectedCommand.Bolus(10)`, `ProfileStatus`, `ProfileList` i `ProfileSwitch("LocalProfile2", 115)`.
+- **Zakładając** `BOLUS` 10, `PROFILE STATUS`, `PROFILE LIST` i zmianę profilu z procentem 115, **gdy** odwzorowano je, **wtedy** wyniki to `ExpectedCommand.Bolus(10)`, `ProfileStatus`, `ProfileList` i `ProfileSwitch(115)`.
 
 ### CMD-09: Brak ujawniania ilości i danych wejściowych
 
 Ilość węglowodanów to dana medyczna, więc – spójnie z PARSER-10 – pakiet `commands` jej nie ujawnia poza treścią SMS i polem ilości:
 
-- `toString()` poleceń z ilością (`CARBS`, `BOLUS`) i zmiany profilu (numer, nazwa, procent) oraz wyniku walidacji nie zawiera ilości ani danych profilu (BOL-06, PROF-05); wynik „błędna” nie przechowuje ani nie wypisuje tekstu wejściowego, tylko rodzaj błędu.
+- `toString()` poleceń z ilością (`CARBS`, `BOLUS`) i zmiany profilu (procent) oraz wyniku walidacji nie zawiera ilości ani procentu (BOL-06, PROF-05); wynik „błędna” nie przechowuje ani nie wypisuje tekstu wejściowego, tylko rodzaj błędu.
 - Pakiet `commands` nie wywołuje żadnego API logowania (`android.util.Log`, `println`, `System.out`/`err`, loggerów).
 - Dla danych od użytkownika (liczba, tekst) pakiet nie rzuca wyjątków (CMD-03, CMD-04).
 
@@ -236,7 +236,12 @@ Fikcyjne ilości i teksty z kryteriów akceptacji (CMD-03 – CMD-09). Brak plik
 
 ## Historia zmian
 
-- **Planowane zmiany (Spec 013, 2026-10-30).** CMD-01: parametr `PROFILE_SWITCH` = procent, numer zawsze 1 (bez nazwy z listy); 7 wpisów bez zmian (`PROFILE_LIST` zostaje). CMD-07: zmiana profilu zawsze `PROFILE 1 <p>` (np. `PROFILE 1 100`, `PROFILE 1 115`). CMD-08: kontekst zmiany profilu tylko z procentem. CMD-09: `toString()` bez procentu (nazwy już nie ma). Źródło: [PROF-02](../013-profil/spec.md#prof-02-polecenie-zmiany-profilu) – PROF-05. Treść wymagań zostanie przepisana w zadaniu 4 design 013 po wdrożeniu; do tego czasu obowiązuje Spec 013.
+- **2026-10-31 – scalenie zmian ze Spec 013 z 2026-10-30 (po wdrożeniu).**
+  - CMD-01: parametr `PROFILE_SWITCH` = procent, numer zawsze 1 (bez nazwy z listy); 7 wpisów bez zmian (`PROFILE_LIST` zostaje).
+  - CMD-07: zmiana profilu zawsze `PROFILE 1 <p>` (np. `PROFILE 1 100`, `PROFILE 1 115`); `PROFILE 1 100` jest dla AAPS równoważne `PROFILE 1` (R7 w Spec 013).
+  - CMD-08: kontekst zmiany profilu tylko z procentem (`ExpectedCommand.ProfileSwitch(procent)`).
+  - CMD-09: `toString()` zmiany profilu bez procentu (nazwy nie ma, numer jest stałą 1 (obliczana właściwość)).
+  - Zakres, „Pojęcia”: ujednolicone z powyższym. Źródło: [PROF-02](../013-profil/spec.md#prof-02-polecenie-zmiany-profilu) – PROF-05. Identyfikatory wymagań bez zmian.
 
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - CMD-01, CMD-02: katalog ma 7 wpisów (`BG`, `PUMP`, `CARBS`, `BOLUS`, `PROFILE_STATUS`, `PROFILE_LIST`, `PROFILE_SWITCH`); słowo kluczowe może mieć pojedyncze spacje między słowami (BOL-01, PROF-01); polecenia z kodem mają zatwierdzenie „podsumowanie z PIN-em”.
