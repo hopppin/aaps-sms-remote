@@ -655,6 +655,8 @@ Brak. Decyzje użytkownika przyjęte przy tej specyfikacji (wszystkie propozycje
 
 ## Historia zmian
 
+- **Planowane zmiany (Spec 012, 013, 2026-10-31).** CMDUI-19: wiersze `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` ([BOL-22](../012-bolus/spec.md#bol-22-teksty-wyniku-i-historia-odmów-i-błędu-bolusa)) i `ProfileSwitchConfirmed` ([PROF-21](../013-profil/spec.md#prof-21-wynik-i-historia-potwierdzenia-zmiany-profilu)); w kryterium 10 wartości `FailureReason` i 8 `UnknownReason`. Treść zostanie przepisana w zadaniu 4 zmiany 2026-10-31 (design 013); do tego czasu obowiązują Spec 012 i 013.
+
 - **2026-10-30 – zmiana profilu bez listy, kolejność panelu i fokus PIN (P14, P15; Spec 013 P9, P10).**
   - CMDUI-01: kolejność od góry – banery, Bolus, Profil, CARBS, `BG`, `PUMP`; kryterium źródłowe kolejności.
   - CMDUI-02, CMDUI-04 – CMDUI-06: przycisk „Zmień profil” otwiera formularz zmiany profilu 1 (zależy od sekretu, PROF-13); brak przycisku `PROFILE LIST`; `CommandRunViewModel` nie obserwuje sekretu (PROF-14 wycofane). CMDUI-06 obejmuje tylko `BG`, `PUMP`, `PROFILE STATUS`.

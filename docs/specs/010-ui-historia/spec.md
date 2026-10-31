@@ -318,6 +318,8 @@ Pytania rozstrzygnięte przez użytkownika (przyjęto wszystkie propozycje bez z
 
 ## Historia zmian
 
+- **Planowane zmiany (Spec 012, 013, 2026-10-31).** HISTUI-04: teksty wyników wpisów `Failed(AAPS_BOLUS_INTERVAL)`, `Failed(AAPS_BOLUS_QUEUE)`, `Unknown(BOLUS_FAILED)` ([BOL-22](../012-bolus/spec.md#bol-22-teksty-wyniku-i-historia-odmów-i-błędu-bolusa)) i `PROFILE_SWITCH_CONFIRMED` ([PROF-21](../013-profil/spec.md#prof-21-wynik-i-historia-potwierdzenia-zmiany-profilu)). Treść zostanie przepisana w zadaniu 4 zmiany 2026-10-31 (design 013); do tego czasu obowiązują Spec 012 i 013.
+
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
   - HISTUI-03: etykiety „BOLUS X j.”, „PROFILE STATUS”, „PROFILE LIST”, „Zmiana profilu N, P%” (BOL-17, PROF-17).
   - HISTUI-04: wynik `BolusConfirmed` → „AAPS potwierdził podanie X j.” (BOL-17); komunikaty niezgodności i nierozpoznanej odpowiedzi jak w BOL-16 i PROF-16; wpis `PROFILE_LIST` ma w historii tekst „Odpowiedź AAPS na PROFILE LIST.” (bez wezwania do wyboru profilu); „Kod nie został wysłany” i ostrzeżenie bolusowe dla nowych poleceń z kodem.
