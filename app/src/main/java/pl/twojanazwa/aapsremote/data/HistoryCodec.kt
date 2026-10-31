@@ -25,6 +25,7 @@ object HistoryCodec {
             is SessionOutcome.Completed -> { kind = "COMPLETED"; reason = null; text = outcome.text }
             is SessionOutcome.CarbsConfirmed -> { kind = "CARBS_CONFIRMED"; reason = null; text = outcome.text }
             is SessionOutcome.BolusConfirmed -> { kind = "BOLUS_CONFIRMED"; reason = null; text = outcome.text }
+            is SessionOutcome.ProfileSwitchConfirmed -> { kind = "PROFILE_SWITCH_CONFIRMED"; reason = null; text = outcome.text }
             is SessionOutcome.Failed -> { kind = "FAILED"; reason = encode(outcome.reason); text = outcome.text }
             is SessionOutcome.TimedOut -> { kind = "TIMED_OUT"; reason = encode(outcome.phase); text = null }
             is SessionOutcome.Unknown -> { kind = "UNKNOWN"; reason = encode(outcome.reason); text = outcome.text }
@@ -56,6 +57,7 @@ object HistoryCodec {
             "COMPLETED" -> HistoryOutcome.Completed
             "CARBS_CONFIRMED" -> HistoryOutcome.CarbsConfirmed
             "BOLUS_CONFIRMED" -> HistoryOutcome.BolusConfirmed
+            "PROFILE_SWITCH_CONFIRMED" -> HistoryOutcome.ProfileSwitchConfirmed
             "FAILED" -> HistoryOutcome.Failed(reason?.let { FAILURE_REASONS[it] })
             "TIMED_OUT" -> HistoryOutcome.TimedOut(reason?.let { PHASES[it] })
             "UNKNOWN" -> HistoryOutcome.Unknown(reason?.let { UNKNOWN_REASONS[it] })

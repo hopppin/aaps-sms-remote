@@ -52,6 +52,12 @@ object ResultMapper {
                 arg = outcome.centiUnits
                 text = outcome.text
             }
+            is SessionOutcome.ProfileSwitchConfirmed -> {
+                kind = ResultKind.SUCCESS
+                message = ResultMessage.PROFILE_SWITCH_CONFIRMED
+                arg = outcome.percent
+                text = outcome.text
+            }
             is SessionOutcome.Failed -> {
                 kind = ResultKind.FAILURE
                 message = outcome.reason.toResultMessage().forCommand(command)

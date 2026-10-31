@@ -196,6 +196,7 @@
     <string name="result_unknown_warning_bolus">Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.</string>
     <string name="history_command_bolus">BOLUS %1$s j.</string>
     <string name="history_command_bolus_no_amount">BOLUS (ilość nieznana)</string>
+    <string name="result_profile_switch_confirmed">AAPS potwierdził zmianę profilu (polecenie: profil 1, %1$d%%).</string>
     <string name="result_profile_status_reply">Odpowiedź AAPS na PROFILE STATUS</string>
     <string name="result_profile_list_reply">Lista profili z AAPS.</string>
     <string name="result_profile_amount_mismatch">AAPS poprosił o kod dla innego procentu niż wysłany.</string>

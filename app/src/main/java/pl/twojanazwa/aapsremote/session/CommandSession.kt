@@ -291,6 +291,8 @@ class CommandSession(
                             addUnexpected(sms)
                         }
                     AapsReply.WrongCode -> SessionOutcome.Failed(FailureReason.WRONG_CODE, sms.body)
+                    // PROF-20: powiadomienie o profilu bazowym to nie potwierdzenie; sesja czeka dalej.
+                    is AapsReply.ProfileBaseUpdated -> addUnexpected(sms)
                     is AapsReply.CommandMismatch ->
                         SessionOutcome.Unknown(UnknownReason.AMOUNT_MISMATCH, sms.body)
                     is AapsReply.MatchingCodeRequest -> SessionOutcome.Unknown(UnknownReason.UNEXPECTED_REPLY, sms.body)
@@ -360,8 +362,11 @@ class CommandSession(
     private fun confirmed(reply: AapsReply.MatchingDone, text: String): SessionOutcome = when (reply) {
         is AapsReply.CarbsDone -> SessionOutcome.CarbsConfirmed(reply.grams, text)
         is AapsReply.BolusDone -> SessionOutcome.BolusConfirmed(reply.centiUnits, text)
-        // Nieosiągalne do #266: ReplyMatch.isDoneFor zwraca fałsz dla zmiany profilu.
-        is AapsReply.ProfileSwitchDone -> error("ProfileSwitchDone nieobslugiwane")
+        // PROF-19: zgodność z poleceniem gwarantuje ReplyMatch; treść = prośba o kod, pusta linia, potwierdzenie.
+        is AapsReply.ProfileSwitchDone ->
+            SessionOutcome.ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, codeRequestText + "
+
+" + text)
     }
 
     /** Wiadomość nieoczekiwana (SESSION-18): trafia do wyniku, nie zmienia fazy ani limitów. Zawsze null. */

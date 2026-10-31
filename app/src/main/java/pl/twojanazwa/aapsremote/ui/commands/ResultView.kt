@@ -5,7 +5,7 @@ import pl.twojanazwa.aapsremote.commands.CommandId
 enum class ResultKind { SUCCESS, FAILURE, NO_RESPONSE, UNKNOWN, CANCELLED }
 
 enum class ResultMessage {
-    BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED, BOLUS_CONFIRMED,
+    BG_REPLY, PUMP_REPLY, CARBS_CONFIRMED, BOLUS_CONFIRMED, PROFILE_SWITCH_CONFIRMED,
     /** Bolus: osobne teksty niezgodnej ilości przed kodem i nierozpoznanej odpowiedzi po kodzie (BOL-16). */
     BOLUS_AMOUNT_MISMATCH, BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
     /** Bolus (BOL-22): odmowy AAPS przed kodem i błąd bolusa po kodzie. */
