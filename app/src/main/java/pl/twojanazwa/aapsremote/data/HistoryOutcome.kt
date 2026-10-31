@@ -9,6 +9,7 @@ sealed interface HistoryOutcome {
     data object Completed : HistoryOutcome
     data object CarbsConfirmed : HistoryOutcome
     data object BolusConfirmed : HistoryOutcome
+    data object ProfileSwitchConfirmed : HistoryOutcome
 
     /** reason == null: nieznany albo brakujący powód w wierszu (DATA-09). */
     data class Failed(val reason: FailureReason?) : HistoryOutcome

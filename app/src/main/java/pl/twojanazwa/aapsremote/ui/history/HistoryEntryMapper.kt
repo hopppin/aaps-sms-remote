@@ -121,6 +121,14 @@ object HistoryEntryMapper {
                     null
                 }
             }
+            HistoryOutcome.ProfileSwitchConfirmed -> {
+                kind = ResultKind.SUCCESS
+                message = if (entry.command == HistoryCommand.PROFILE_SWITCH && entry.profilePercent != null) {
+                    ResultMessage.PROFILE_SWITCH_CONFIRMED
+                } else {
+                    null
+                }
+            }
             is HistoryOutcome.Failed -> {
                 kind = ResultKind.FAILURE
                 message = outcome.reason?.toResultMessage()?.forCommand(entry)
@@ -146,6 +154,7 @@ object HistoryEntryMapper {
             null -> null
             ResultMessage.CARBS_CONFIRMED -> entry.carbsGrams
             ResultMessage.BOLUS_CONFIRMED -> entry.bolusCentiUnits
+            ResultMessage.PROFILE_SWITCH_CONFIRMED -> entry.profilePercent
             else -> message.minutesArg(timeouts)
         }
         val codeNotSent = entry.command in codeCommands &&

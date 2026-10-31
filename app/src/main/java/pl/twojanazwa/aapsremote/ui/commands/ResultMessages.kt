@@ -72,6 +72,7 @@ fun ResultMessage.minutesArg(timeouts: SessionTimeouts = SessionTimeouts()): Int
     ResultMessage.PUMP_REPLY,
     ResultMessage.CARBS_CONFIRMED,
     ResultMessage.BOLUS_CONFIRMED,
+    ResultMessage.PROFILE_SWITCH_CONFIRMED,
     ResultMessage.BOLUS_AMOUNT_MISMATCH,
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY,
     ResultMessage.AAPS_BOLUS_INTERVAL,

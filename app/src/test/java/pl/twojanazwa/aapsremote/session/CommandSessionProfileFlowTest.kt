@@ -291,43 +291,146 @@ class CommandSessionProfileFlowTest {
         assertNoCode()
     }
 
-    @Test
-    fun `PROF-19 nowa odpowiedz profileSwitchDone przed kodem to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
-        val body = AapsSamples.profileSwitchDone
-        val (_, run) = start(switch(100))
-        deliver(60_000, body)
-        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
-        assertNoCode()
+    private suspend fun TestScope.confirming(percent: Int = 100): Pair<CommandSession, Deferred<SessionResult>> {
+        val pair = start(switch(percent))
+        deliver(60_000, request.replace("100%", "$percent%"))
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, pair.first.state.value.phase)
+        return pair
     }
 
     @Test
-    fun `PROF-20 nowa odpowiedz profileBaseUpdated przed kodem to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
-        val body = AapsSamples.profileBaseUpdated
-        val (_, run) = start(switch(100))
-        deliver(60_000, body)
-        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
-        assertNoCode()
+    fun `PROF-19 potwierdzenie zmiany po kodzie to ProfileSwitchConfirmed z trescia prosby i potwierdzenia i 2 SMS-y`() = runTest {
+        val (_, run) = start(switch(90))
+        val req = request.replace("100%", "90%")
+        deliver(60_000, req)
+        deliver(120_000, AapsSamples.profileSwitchDone)
+        val result = run.await()
+        assertEquals(
+            SessionOutcome.ProfileSwitchConfirmed(90, req + "\n\n" + AapsSamples.profileSwitchDone),
+            result.outcome,
+        )
+        assertEquals(listOf("PROFILE 1 90", "0504714321"), sender.sentCommands + sender.sentCodeCopies)
     }
 
     @Test
-    fun `PROF-20 profileBaseUpdated po wyslaniu kodu to Unknown UNRECOGNIZED_REPLY i dokladnie jeden kod`() = runTest {
-        val body = AapsSamples.profileBaseUpdated
-        val (_, run) = start(switch(100))
+    fun `PROF-19 negatywne potwierdzenie w AWAITING_CODE_REQUEST trafia do nieoczekiwanych bez kodu`() = runTest {
+        val (session, _) = start(switch(100))
+        deliver(30_000, AapsSamples.profileSwitchDone)
+        assertEquals(SessionPhase.AWAITING_CODE_REQUEST, session.state.value.phase)
+        assertEquals(listOf(AapsSamples.profileSwitchDone), session.state.value.unexpectedMessages.map { it.body })
+        assertNoCode()
+        session.cancel()
+        runCurrent()
+    }
+
+    @Test
+    fun `PROF-19 negatywne potwierdzenie odebrane w SENDING_CODE przed chwila wyslania kodu trafia do nieoczekiwanych`() = runTest {
+        val session = testSession(switch(100), delayedCodeSender(3_000), source, SessionTestFixtures.credentials())
+        val run = async { session.run() }
+        runCurrent()
         deliver(60_000, request)
-        deliver(65_000, body)
-        assertEquals(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
+        assertEquals(SessionPhase.SENDING_CODE, session.state.value.phase)
+        deliver(62_000, AapsSamples.profileSwitchDone)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        assertEquals(listOf(AapsSamples.profileSwitchDone), session.state.value.unexpectedMessages.map { it.body })
+        session.cancel()
+        runCurrent()
+        run.await()
+    }
+
+    @Test
+    fun `PROF-19 BOL-19 sesje CARBS i BOLUS z potwierdzeniem zmiany profilu po kodzie to Unknown UNRECOGNIZED_REPLY`() = runTest {
+        val carbs = (Command.Carbs.of(1, CommandLimits.DEFAULT) as CarbsValidation.Valid).command
+        val bolus = (Command.Bolus.of(10, CommandLimits.DEFAULT) as BolusValidation.Valid).command
+        for ((c, req) in listOf(carbs to AapsSamples.carbsCodeRequest, bolus to AapsSamples.bolusCodeRequest)) {
+            val (_, run) = start(c)
+            val base = currentTime
+            deliver(base + 60_000, req)
+            deliver(base + 120_000, AapsSamples.profileSwitchDone)
+            assertEquals(
+                SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, AapsSamples.profileSwitchDone),
+                run.await().outcome,
+            )
+        }
+    }
+
+    @Test
+    fun `PROF-19 BOL-19 podstawiony parser zwracajacy CarbsDone lub BolusDone w sesji zmiany profilu to Unknown UNRECOGNIZED_REPLY`() =
+        runTest {
+            for (reply in listOf(AapsReply.CarbsDone(1, "x"), AapsReply.BolusDone(10, "x"))) {
+                val (_, run) = start(switch(100)) { body, _ ->
+                    if (body == request) AapsReply.ProfileCodeRequest(body) else reply
+                }
+                val base = currentTime
+                deliver(base + 60_000, request)
+                deliver(base + 120_000, "x")
+                assertEquals(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, "x"), run.await().outcome)
+            }
+        }
+
+    @Test
+    fun `PROF-19 toString wyniku z potwierdzeniem profilu 115 nie zawiera procentu ani tresci`() = runTest {
+        val (_, run) = start(switch(115))
+        deliver(60_000, request.replace("100%", "115%"))
+        deliver(120_000, AapsSamples.profileSwitchDone)
+        val result = run.await()
+        assertTrue(result.outcome is SessionOutcome.ProfileSwitchConfirmed)
+        assertEquals(false, result.toString().contains("115"))
+        assertEquals(false, result.toString().contains("Zmiana profilu wykonana"))
+        assertEquals(false, result.outcome.toString().contains("115"))
+    }
+
+    @Test
+    fun `PROF-20 powiadomienie o profilu bazowym po kodzie jest nieoczekiwane a potem potwierdzenie daje ProfileSwitchConfirmed`() = runTest {
+        val (session, run) = confirming()
+        deliver(90_000, AapsSamples.profileBaseUpdated)
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        assertEquals(1, session.state.value.unexpectedMessages.size)
+        deliver(120_000, AapsSamples.profileSwitchDone)
+        assertEquals(100, (run.await().outcome as SessionOutcome.ProfileSwitchConfirmed).percent)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `PROF-20 samo powiadomienie o profilu bazowym po kodzie konczy sie CONFIRMATION_TIMEOUT po 360000 ms`() = runTest {
+        val (session, run) = confirming()
+        deliver(90_000, AapsSamples.profileBaseUpdated)
+        advanceTimeBy(60_000 + 360_000 - currentTime - 1)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        advanceTimeBy(1)
+        runCurrent()
+        assertEquals(SessionOutcome.Unknown(UnknownReason.CONFIRMATION_TIMEOUT, null), run.await().outcome)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `PROF-20 powiadomienie o profilu bazowym przed kodem to Failed UNRECOGNIZED_REPLY w AWAITING_CODE_REQUEST i PREPARING_CODE bez kodu`() =
+        runTest {
+            val body = AapsSamples.profileBaseUpdated
+            val (_, early) = start(switch(100))
+            deliver(30_000, body)
+            assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), early.await().outcome)
+
+            val (session, preparing) = start(switch(100))
+            val base = currentTime
+            // Prosba w 58 000 od startu sesji: kod bliski wygasniecia czeka na nastepny okres.
+            deliver(base + 58_000, request)
+            assertEquals(SessionPhase.PREPARING_CODE, session.state.value.phase)
+            deliver(base + 58_500, body)
+            assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), preparing.await().outcome)
+            assertNoCode()
+        }
+
+    @Test
+    fun `PROF-12 PROF-19 PROF-20 nowe wyniki w zadnej fazie nie daja drugiego kodu`() = runTest {
+        val (_, run) = confirming()
+        deliver(70_000, AapsSamples.profileBaseUpdated)
+        deliver(80_000, AapsSamples.profileSwitchDone)
+        assertTrue(run.await().outcome is SessionOutcome.ProfileSwitchConfirmed)
         assertEquals(1, sender.sentCodeCopies.size)
         assertEquals(listOf("PROFILE 1 100"), sender.sentCommands)
-    }
-
-    @Test
-    fun `PROF-19 potwierdzenie po kodzie to Unknown UNRECOGNIZED_REPLY`() = runTest {
-        val (_, run) = start(switch(100))
-        deliver(60_000, request)
-        deliver(120_000, AapsSamples.profileSwitchDone)
-        assertEquals(
-            SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, AapsSamples.profileSwitchDone),
-            run.await().outcome,
-        )
     }
 }

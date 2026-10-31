@@ -112,4 +112,18 @@ class ResultMapperProfileTest {
             assertFalse(RunView.Finished(view).toString().contains("LocalProfile"))
         }
     }
+
+    @Test
+    fun `PROF-21 ProfileSwitchConfirmed 90 daje sukces z procentem 90 trescia i bez ostrzezenia`() {
+        val text = "prosba\n\npotwierdzenie"
+        val view = ResultMapper.map(result(switch, SessionOutcome.ProfileSwitchConfirmed(90, text)))
+        assertEquals(ResultKind.SUCCESS, view.kind)
+        assertEquals(ResultMessage.PROFILE_SWITCH_CONFIRMED, view.message)
+        assertEquals(90, view.messageArg)
+        assertEquals(text, view.replyText)
+        assertFalse(view.unknownWarning)
+        assertFalse(view.codeNotSent)
+        val xml = java.io.File("src/main/res/values/strings.xml").readText()
+        assertEquals(true, xml.contains("AAPS potwierdził zmianę profilu (polecenie: profil 1, %1\$d%%)."))
+    }
 }

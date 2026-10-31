@@ -53,6 +53,11 @@ sealed interface SessionOutcome {
         override fun toString(): String = "BolusConfirmed(***)"
     }
 
+    /** „AAPS potwierdził zmianę profilu” – nie dowód wykonania z aplikacji (PROF-19). */
+    data class ProfileSwitchConfirmed(val percent: Int, val text: String) : SessionOutcome {
+        override fun toString(): String = "ProfileSwitchConfirmed(***)"
+    }
+
     data class Failed(val reason: FailureReason, val text: String?) : SessionOutcome {
         override fun toString(): String = "Failed(reason=$reason)"
     }

@@ -34,6 +34,7 @@ fun ResultMessage.textRes(): Int = when (this) {
     ResultMessage.PUMP_REPLY -> R.string.result_pump_reply
     ResultMessage.CARBS_CONFIRMED -> R.string.result_carbs_confirmed
     ResultMessage.BOLUS_CONFIRMED -> R.string.result_bolus_confirmed
+    ResultMessage.PROFILE_SWITCH_CONFIRMED -> R.string.result_profile_switch_confirmed
     ResultMessage.BOLUS_AMOUNT_MISMATCH -> R.string.result_bolus_amount_mismatch
     ResultMessage.BOLUS_UNKNOWN_UNRECOGNIZED_REPLY -> R.string.result_bolus_unknown_unrecognized_reply
     ResultMessage.AAPS_BOLUS_INTERVAL -> R.string.result_failed_aaps_bolus_interval
