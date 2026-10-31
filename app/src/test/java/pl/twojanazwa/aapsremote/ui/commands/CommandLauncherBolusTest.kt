@@ -88,6 +88,19 @@ class CommandLauncherBolusTest {
     }
 
     @Test
+    fun `BOL-20 Failed AAPS_BOLUS_INTERVAL bez kodu nie blokuje`() = runTest {
+        val entry = bolusEntry(HistoryOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL), finishedAt = T0 - 60_000)
+        env(this, entry).assertStarted()
+        runCurrent()
+    }
+
+    @Test
+    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min daje BOLUS_INTERVAL z 5 min`() = runTest {
+        val entry = bolusEntry(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED), codeSentAt = T0 - 600_000)
+        env(this, entry).assertRejected(LaunchRejection.BOLUS_INTERVAL, 5)
+    }
+
+    @Test
     fun `BOL-12 Failed WRONG_CODE z wyslanym kodem blokuje`() = runTest {
         val entry = bolusEntry(HistoryOutcome.Failed(FailureReason.WRONG_CODE), codeSentAt = T0 - 60_000)
         env(this, entry).assertRejected(LaunchRejection.BOLUS_INTERVAL, 14)
