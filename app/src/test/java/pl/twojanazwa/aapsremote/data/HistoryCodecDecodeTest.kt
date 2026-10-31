@@ -31,6 +31,8 @@ class HistoryCodecDecodeTest {
         FailureReason.CODE_REQUEST_EXPIRED to "CODE_REQUEST_EXPIRED",
         FailureReason.CODE_PREPARATION_TIMEOUT to "CODE_PREPARATION_TIMEOUT",
         FailureReason.INTERNAL_ERROR to "INTERNAL_ERROR",
+        FailureReason.AAPS_BOLUS_INTERVAL to "AAPS_BOLUS_INTERVAL",
+        FailureReason.AAPS_BOLUS_QUEUE to "AAPS_BOLUS_QUEUE",
     )
 
     private val unknownCodes = mapOf(
@@ -41,6 +43,7 @@ class HistoryCodecDecodeTest {
         UnknownReason.AMOUNT_MISMATCH to "AMOUNT_MISMATCH",
         UnknownReason.UNEXPECTED_REPLY to "UNEXPECTED_REPLY",
         UnknownReason.INTERNAL_ERROR to "INTERNAL_ERROR",
+        UnknownReason.BOLUS_FAILED to "BOLUS_FAILED",
     )
 
     private val phaseCodes = mapOf(
@@ -71,8 +74,8 @@ class HistoryCodecDecodeTest {
         assertEquals(UnknownReason.entries.toSet(), unknownCodes.keys)
         assertEquals(SessionPhase.entries.toSet(), phaseCodes.keys)
         assertEquals(7, commandCodes.size)
-        assertEquals(8, failureCodes.size)
-        assertEquals(7, unknownCodes.size)
+        assertEquals(10, failureCodes.size)
+        assertEquals(8, unknownCodes.size)
         assertEquals(8, phaseCodes.size)
     }
 

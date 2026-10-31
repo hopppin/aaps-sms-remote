@@ -53,6 +53,8 @@ class ResultMapperTest {
         FailureReason.CODE_REQUEST_EXPIRED to ResultMessage.CODE_REQUEST_EXPIRED,
         FailureReason.CODE_PREPARATION_TIMEOUT to ResultMessage.CODE_PREPARATION_TIMEOUT,
         FailureReason.INTERNAL_ERROR to ResultMessage.INTERNAL_ERROR,
+        FailureReason.AAPS_BOLUS_INTERVAL to ResultMessage.AAPS_BOLUS_INTERVAL,
+        FailureReason.AAPS_BOLUS_QUEUE to ResultMessage.AAPS_BOLUS_QUEUE,
     )
 
     private val unknownMessages = mapOf(
@@ -63,6 +65,7 @@ class ResultMapperTest {
         UnknownReason.AMOUNT_MISMATCH to ResultMessage.UNKNOWN_AMOUNT_MISMATCH,
         UnknownReason.UNEXPECTED_REPLY to ResultMessage.UNKNOWN_UNEXPECTED_REPLY,
         UnknownReason.INTERNAL_ERROR to ResultMessage.UNKNOWN_INTERNAL_ERROR,
+        UnknownReason.BOLUS_FAILED to ResultMessage.UNKNOWN_BOLUS_FAILED,
     )
 
     @Test
@@ -186,6 +189,35 @@ class ResultMapperTest {
             strings["result_bolus_unknown_unrecognized_reply"],
         )
         assertTrue(failed.codeNotSent)
+    }
+
+    @Test
+    fun `BOL-22 odmowy i blad bolusa maja rodzaj, komunikat, tresc SMS i dodatki`() {
+        val interval = ResultMapper.map(
+            result(bolus(10), SessionOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL, "tresc")),
+        )
+        assertEquals(ResultKind.FAILURE, interval.kind)
+        assertEquals(ResultMessage.AAPS_BOLUS_INTERVAL, interval.message)
+        assertEquals("tresc", interval.replyText)
+        assertTrue(interval.codeNotSent)
+        val queue = ResultMapper.map(result(bolus(10), SessionOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE, "tresc")))
+        assertEquals(ResultMessage.AAPS_BOLUS_QUEUE, queue.message)
+        assertTrue(queue.codeNotSent)
+        val failed = ResultMapper.map(result(bolus(10), SessionOutcome.Unknown(UnknownReason.BOLUS_FAILED, "tresc")))
+        assertEquals(ResultKind.UNKNOWN, failed.kind)
+        assertEquals(ResultMessage.UNKNOWN_BOLUS_FAILED, failed.message)
+        assertEquals("tresc", failed.replyText)
+        assertTrue(failed.unknownWarning)
+        assertFalse(failed.codeNotSent)
+        assertEquals(
+            "AAPS odmówił bolusa: od ostatniego zdalnego bolusa minęło za mało czasu (minimalny odstęp w AAPS).",
+            strings["result_failed_aaps_bolus_interval"],
+        )
+        assertEquals("AAPS odmówił bolusa: w kolejce pompy czeka inny bolus.", strings["result_failed_aaps_bolus_queue"])
+        assertEquals(
+            "AAPS zgłosił, że bolus się nie powiódł. Sprawdź w AAPS, ile insuliny podano.",
+            strings["result_unknown_bolus_failed"],
+        )
     }
 
     @Test

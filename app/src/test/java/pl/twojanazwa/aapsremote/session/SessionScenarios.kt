@@ -12,7 +12,10 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import org.junit.jupiter.api.Assertions.assertEquals
+import pl.twojanazwa.aapsremote.commands.BolusValidation
 import pl.twojanazwa.aapsremote.commands.Command
+import pl.twojanazwa.aapsremote.commands.CommandLimits
+import pl.twojanazwa.aapsremote.commands.LimitsValidation
 import pl.twojanazwa.aapsremote.otp.EpochClock
 import pl.twojanazwa.aapsremote.otp.UsableTotpProvider
 import pl.twojanazwa.aapsremote.parser.AapsSamples
@@ -86,6 +89,9 @@ private suspend fun TestScope.play(
         }
     return ScenarioRun(checkNotNull(result), sender, credentials, pinClearedWhenFinished)
 }
+
+private fun bolus010(): Command =
+    (Command.Bolus.of(10, (CommandLimits.of(50, 1000, 15) as LimitsValidation.Valid).limits) as BolusValidation.Valid).command
 
 private fun hangingTotp(): UsableTotpProvider = mockk<UsableTotpProvider>().also {
     coEvery { it.awaitUsableCode(any()) } coAnswers { awaitCancellation() }
@@ -175,6 +181,12 @@ val sessionScenarios: List<SessionScenario> = listOf(
         coEvery { totp.awaitUsableCode(any()) } throws IllegalStateException("x")
         play(totp = totp) { _, source, _ -> requestCodeAt(source, 60_000) }
     },
+    SessionScenario("BOL-20 odmowa odstep przed kodem", "Failed.AAPS_BOLUS_INTERVAL") {
+        play(bolus010()) { _, source, _ -> deliverAt(source, 30_000, AapsSamples.bolusRefusedInterval) }
+    },
+    SessionScenario("BOL-20 odmowa kolejka przed kodem", "Failed.AAPS_BOLUS_QUEUE") {
+        play(bolus010()) { _, source, _ -> deliverAt(source, 30_000, AapsSamples.bolusRefusedQueue) }
+    },
     SessionScenario("SESSION-17 anulowanie przed kodem", "Cancelled") {
         play { session, _, _ ->
             advanceTimeBy(30_000)
@@ -197,6 +209,12 @@ val sessionScenarios: List<SessionScenario> = listOf(
     },
     SessionScenario("SESSION-13 ponowna prosba o kod po kodzie", "Unknown.UNEXPECTED_REPLY") {
         afterCode { _, source -> deliverAt(source, 70_000, AapsSamples.carbsCodeRequest) }
+    },
+    SessionScenario("BOL-21 blad bolusa po kodzie", "Unknown.BOLUS_FAILED") {
+        play(bolus010()) { _, source, _ ->
+            deliverAt(source, 60_000, AapsSamples.bolusCodeRequest)
+            deliverAt(source, 70_000, AapsSamples.bolusFailed)
+        }
     },
     SessionScenario("SESSION-15 brak potwierdzenia w limicie", "Unknown.CONFIRMATION_TIMEOUT") {
         afterCode { _, _ ->

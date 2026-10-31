@@ -9,7 +9,9 @@ import pl.twojanazwa.aapsremote.commands.Command
 import pl.twojanazwa.aapsremote.commands.CommandLimits
 import pl.twojanazwa.aapsremote.data.HistoryFixtures.T0
 import pl.twojanazwa.aapsremote.parser.AapsSamples
+import pl.twojanazwa.aapsremote.session.FailureReason
 import pl.twojanazwa.aapsremote.session.SessionOutcome
+import pl.twojanazwa.aapsremote.session.UnknownReason
 import pl.twojanazwa.aapsremote.session.SessionResult
 
 class HistoryCodecBolusTest {
@@ -58,6 +60,23 @@ class HistoryCodecBolusTest {
     fun `BOL-17 zapis CARBS i BG nie ma ilosci bolusa`() {
         assertNull(HistoryCodec.toRow(HistoryFixtures.carbsConfirmed()).bolusCentiUnits)
         assertNull(HistoryCodec.toRow(HistoryFixtures.bgCompleted()).bolusCentiUnits)
+    }
+
+    @Test
+    fun `BOL-22 odmowy i blad bolusa zapisuja tekst powodu i po odczycie daja ten sam powod`() {
+        fun result(outcome: SessionOutcome) = bolusResult().copy(outcome = outcome)
+        val interval = HistoryCodec.toRow(result(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL, "t")))
+        assertEquals("AAPS_BOLUS_INTERVAL", interval.reason)
+        assertEquals(
+            HistoryOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL),
+            HistoryCodec.toEntry(interval).outcome,
+        )
+        val queue = HistoryCodec.toRow(result(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE, "t")))
+        assertEquals("AAPS_BOLUS_QUEUE", queue.reason)
+        assertEquals(HistoryOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE), HistoryCodec.toEntry(queue).outcome)
+        val failed = HistoryCodec.toRow(result(SessionOutcome.Unknown(UnknownReason.BOLUS_FAILED, "t")))
+        assertEquals("BOLUS_FAILED", failed.reason)
+        assertEquals(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED), HistoryCodec.toEntry(failed).outcome)
     }
 
     @Test

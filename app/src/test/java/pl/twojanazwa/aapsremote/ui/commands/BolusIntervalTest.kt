@@ -37,6 +37,19 @@ class BolusIntervalTest {
     }
 
     @Test
+    fun `BOL-20 Failed AAPS_BOLUS_INTERVAL i AAPS_BOLUS_QUEUE bez kodu sie nie licza`() {
+        listOf(FailureReason.AAPS_BOLUS_INTERVAL, FailureReason.AAPS_BOLUS_QUEUE).forEach {
+            assertNull(left(bolusEntry(HistoryOutcome.Failed(it), finishedAt = T0 - 60_000)), "$it")
+        }
+    }
+
+    @Test
+    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min zostawia 5 min`() {
+        val entry = bolusEntry(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED), codeSentAt = T0 - 600_000)
+        assertEquals(5, left(entry))
+    }
+
+    @Test
     fun `BOL-12 Failed WRONG_CODE z wyslanym kodem sie liczy`() {
         val entry = bolusEntry(HistoryOutcome.Failed(FailureReason.WRONG_CODE), codeSentAt = T0 - 60_000)
         assertEquals(14, left(entry))

@@ -345,59 +345,119 @@ class CommandSessionBolusTest {
     }
 
     @Test
-    fun `BOL-20 BOL-21 odmowa odstep przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+    fun `BOL-20 odmowa odstep przed prosba o kod to Failed AAPS_BOLUS_INTERVAL bez kodu`() = runTest {
         val body = AapsSamples.bolusRefusedInterval
         val (_, run) = start(bolus(10))
         deliver(30_000, body)
-        assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        val result = run.await()
+        assertOutcome(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL, body), result)
         assertNoCode()
         assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+        assertFalse(result.toString().contains(body.lines().first()))
     }
 
     @Test
-    fun `BOL-20 BOL-21 odmowa odstep po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
+    fun `BOL-20 odmowa kolejka przed prosba o kod to Failed AAPS_BOLUS_QUEUE bez kodu`() = runTest {
+        val body = AapsSamples.bolusRefusedQueue
+        val (_, run) = start(bolus(10))
+        deliver(30_000, body)
+        val result = run.await()
+        assertOutcome(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE, body), result)
+        assertNoCode()
+        assertFalse(result.toString().contains(body.lines().first()))
+    }
+
+    @Test
+    fun `BOL-20 odmowa kolejka w PREPARING_CODE to Failed AAPS_BOLUS_QUEUE bez kodu`() = runTest {
+        val (_, run) = preparing()
+        deliver(58_500, AapsSamples.bolusRefusedQueue)
+        assertOutcome(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE, AapsSamples.bolusRefusedQueue), run.await())
+        assertNoCode()
+    }
+
+    @Test
+    fun `BOL-20 odmowa odstep po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
         val body = AapsSamples.bolusRefusedInterval
         val (_, run) = confirming(10)
         deliver(120_000, body)
         assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
         assertEquals(1, sender.sentCodeCopies.size)
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
     }
 
     @Test
-    fun `BOL-20 BOL-21 odmowa kolejka przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
-        val body = AapsSamples.bolusRefusedQueue
-        val (_, run) = start(bolus(10))
+    fun `BOL-20 odmowa odstep w sesji CARBS to Failed UNRECOGNIZED_REPLY`() = runTest {
+        val body = AapsSamples.bolusRefusedInterval
+        val (_, run) = start(carbsCommand(1))
         deliver(30_000, body)
         assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertNoCode()
+    }
+
+    @Test
+    fun `BOL-20 podstawiony parser zwracajacy BolusRefused w AWAITING_CODE_REQUEST to Failed bez kodu`() = runTest {
+        val replies = mapOf(
+            BolusRefusal.INTERVAL to FailureReason.AAPS_BOLUS_INTERVAL,
+            BolusRefusal.QUEUE to FailureReason.AAPS_BOLUS_QUEUE,
+        )
+        for ((i, e) in replies.entries.withIndex()) {
+            val (_, run) = startWithParser(bolus(10)) { _, _ -> AapsReply.BolusRefused(e.key, "x") }
+            deliver(60_000L * (i + 1), "dowolna tresc")
+            assertOutcome(SessionOutcome.Failed(e.value, "dowolna tresc"), run.await())
+        }
+        assertNoCode()
+    }
+
+    @Test
+    fun `SESSION-08 BOL-20 prosba o kod po odmowie nie dostaje kodu`() = runTest {
+        val (session, run) = start(bolus(10))
+        deliver(30_000, AapsSamples.bolusRefusedInterval)
+        val result = run.await()
+        deliver(60_000, AapsSamples.bolusCodeRequest)
+        assertOutcome(SessionOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL, AapsSamples.bolusRefusedInterval), result)
+        assertEquals(SessionPhase.FINISHED, session.state.value.phase)
         assertNoCode()
         assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
     }
 
     @Test
-    fun `BOL-20 BOL-21 odmowa kolejka po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
-        val body = AapsSamples.bolusRefusedQueue
-        val (_, run) = confirming(10)
+    fun `BOL-21 blad bolusa po kodzie to Unknown BOLUS_FAILED i dokladnie 2 SMS-y`() = runTest {
+        val body = AapsSamples.bolusFailed
+        val (_, run) = confirming(120)
         deliver(120_000, body)
-        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
-        assertEquals(1, sender.sentCodeCopies.size)
+        val result = run.await()
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.BOLUS_FAILED, body), result)
+        assertEquals(listOf("BOLUS 1.2", "0504714321"), sender.sentCommands + sender.sentCodeCopies)
+        assertFalse(result.toString().contains("94%"))
+        assertFalse(result.toString().contains(body.lines().first()))
     }
 
     @Test
-    fun `BOL-20 BOL-21 blad przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+    fun `BOL-21 blad bolusa sprzed chwili wyslania kodu trafia do nieoczekiwanych`() = runTest {
+        val session = testSession(
+            bolus(120), delayedCodeSender(3_000), source, SessionTestFixtures.credentials(),
+        )
+        val run = async { session.run() }
+        runCurrent()
+        deliver(60_000, bolusRequestFor(120))
+        assertEquals(SessionPhase.SENDING_CODE, session.state.value.phase)
+        deliver(62_000, AapsSamples.bolusFailed)
+        advanceTimeBy(1_000)
+        runCurrent()
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        assertEquals(listOf(AapsSamples.bolusFailed), session.state.value.unexpectedMessages.map { it.body })
+        session.cancel()
+        runCurrent()
+        run.await()
+    }
+
+    @Test
+    fun `BOL-21 blad bolusa przed prosba o kod to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
         val body = AapsSamples.bolusFailed
         val (_, run) = start(bolus(10))
         deliver(30_000, body)
         assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
         assertNoCode()
         assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
-    }
-
-    @Test
-    fun `BOL-20 BOL-21 blad po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
-        val body = AapsSamples.bolusFailed
-        val (_, run) = confirming(10)
-        deliver(120_000, body)
-        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
-        assertEquals(1, sender.sentCodeCopies.size)
     }
 }

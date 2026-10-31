@@ -36,6 +36,20 @@ class HistoryEntryMapperBolusTest {
     }
 
     @Test
+    fun `BOL-22 wpis z odmowa i bledem bolusa ma tekst wyniku jak w tabeli`() {
+        val interval = HistoryEntryMapper.result(bolus(HistoryOutcome.Failed(FailureReason.AAPS_BOLUS_INTERVAL)))
+        assertEquals(ResultKind.FAILURE, interval.kind)
+        assertEquals(ResultMessage.AAPS_BOLUS_INTERVAL, interval.message)
+        assertTrue(interval.codeNotSent)
+        val queue = HistoryEntryMapper.result(bolus(HistoryOutcome.Failed(FailureReason.AAPS_BOLUS_QUEUE)))
+        assertEquals(ResultMessage.AAPS_BOLUS_QUEUE, queue.message)
+        val failed = HistoryEntryMapper.result(bolus(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED)))
+        assertEquals(ResultKind.UNKNOWN, failed.kind)
+        assertEquals(ResultMessage.UNKNOWN_BOLUS_FAILED, failed.message)
+        assertTrue(failed.unknownWarning)
+    }
+
+    @Test
     fun `BOL-17 niezgodna ilosc i nierozpoznana odpowiedz bolusa maja teksty bolusowe, ilosc z CARBS nie wycieka`() {
         val failed = HistoryEntryMapper.result(bolus(HistoryOutcome.Failed(FailureReason.AMOUNT_MISMATCH)))
         assertEquals(ResultMessage.BOLUS_AMOUNT_MISMATCH, failed.message)
