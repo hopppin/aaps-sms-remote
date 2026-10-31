@@ -335,7 +335,7 @@ class CommandSession(
             is AapsReply.BolusDone -> sent is Command.Bolus && reply.centiUnits == sent.centiUnits
             is AapsReply.CodeRequest -> sent is Command.Carbs && reply.grams == sent.grams
             is AapsReply.CarbsDone -> sent is Command.Carbs && reply.grams == sent.grams
-            // PROF-11, PROF-12: raport tylko dla własnego polecenia; prośba o kod tylko z dokładnie tą nazwą i procentem.
+            // PROF-11, PROF-12: raport tylko dla własnego polecenia; prośba o kod tylko z dokładnie tym procentem (nazwy nie porównujemy).
             is AapsReply.ProfileStatusReport -> sent is Command.ProfileStatus
             is AapsReply.ProfileListReport -> sent is Command.ProfileList
             is AapsReply.ProfileCodeRequest -> sent is Command.ProfileSwitch && profileRequestMatches(reply.text, sent)

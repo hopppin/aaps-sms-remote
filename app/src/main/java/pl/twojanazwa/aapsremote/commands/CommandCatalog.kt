@@ -55,7 +55,7 @@ object CommandCatalog {
         CommandDefinition(
             id = CommandId.PROFILE_SWITCH,
             keyword = "PROFILE",
-            parameter = CommandParameter.ProfileAndPercent(
+            parameter = CommandParameter.Percent(
                 minPercent = ProfileLimits.MIN_PERCENT,
                 maxPercent = ProfileLimits.MAX_PERCENT,
                 defaultPercent = Command.ProfileSwitch.DEFAULT_PERCENT,

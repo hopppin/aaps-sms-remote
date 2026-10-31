@@ -49,7 +49,7 @@ sealed interface AapsReply {
         override fun toString(): String = "AapsReply.ProfileListReport(***)"
     }
 
-    /** PROF-08. Istnieje tylko, gdy nazwa i procent są równe ExpectedCommand.ProfileSwitch. */
+    /** PROF-08. Istnieje tylko, gdy procent jest równy procentowi z ExpectedCommand.ProfileSwitch (nazwa jest tylko wyświetlana). */
     data class ProfileCodeRequest(val text: String) : MatchingCodeRequest {
         override fun toString(): String = "AapsReply.ProfileCodeRequest(***)"
     }

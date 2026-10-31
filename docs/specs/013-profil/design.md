@@ -37,7 +37,7 @@ enum class ProfileSwitchError { EMPTY, INVALID_CHARACTERS, BELOW_MIN, ABOVE_MAX 
 // smsText(): ProfileStatus -> "PROFILE STATUS"; ProfileList -> "PROFILE LIST";
 //            ProfileSwitch -> "PROFILE $number $percent" (zawsze z procentem, PROF-04)
 // toExpectedCommand(): ExpectedCommand.ProfileStatus / ProfileList / ProfileSwitch(percent)
-// CommandParameter.ProfileAndPercent(minPercent, maxPercent, defaultPercent) – bez zmian pól; KDoc: numer stały 1.
+// CommandParameter.Percent(minPercent, maxPercent, defaultPercent) – bez zmian pól; KDoc: numer stały 1.
 // Usuwane: ProfileChoice, ProfileSwitchError.INVALID_CHOICE, ProfileLimits.MAX_NUMBER.
 ```
 

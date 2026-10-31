@@ -29,7 +29,7 @@ class ProfileCommandTest {
         assertEquals(Approval.ONE_TAP, list.approval)
         assertEquals(Approval.SUMMARY_WITH_PIN, sw.approval)
         assertEquals(CommandParameter.None, status.parameter)
-        assertEquals(CommandParameter.ProfileAndPercent(50, 200, 100), sw.parameter)
+        assertEquals(CommandParameter.Percent(50, 200, 100), sw.parameter)
         assertEquals(
             listOf(
                 CommandId.BG, CommandId.PUMP, CommandId.CARBS, CommandId.BOLUS, CommandId.PROFILE_STATUS,
