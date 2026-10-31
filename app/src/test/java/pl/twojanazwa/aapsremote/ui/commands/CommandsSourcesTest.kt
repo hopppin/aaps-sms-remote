@@ -60,7 +60,7 @@ class CommandsSourcesTest {
     @Test
     fun `BOL-13 sekcja Bolus nie ma szybkich wartosci i uzywa klawiatury dziesietnej`() {
         val panel = withoutComments(File(commandsDirectory, "CommandsPanel.kt").readText())
-        val section = panel.substringAfter("commands_bolus_title").substringBefore("@Composable")
+        val section = panel.substringAfter("commands_bolus_title").substringBefore("commands_profile_title")
         assertTrue("KeyboardType.Decimal" in section)
         assertFalse("QuickValue" in section)
     }
