@@ -119,6 +119,18 @@ class RunTextsTest {
     }
 
     @Test
+    fun `PROF-16 teksty niezgodnosci zmiany profilu wg spec`() {
+        assertEquals(
+            "AAPS poprosił o kod dla innego procentu niż wysłany.",
+            strings["result_profile_amount_mismatch"],
+        )
+        assertEquals(
+            "Po wysłaniu kodu AAPS podał inny procent.",
+            strings["result_profile_unknown_amount_mismatch"],
+        )
+    }
+
+    @Test
     fun `CMDUI-17 kazdy StepStatus ma niezerowy i rozny opis stanu`() {
         assertDistinctNonZero(StepStatus.entries.map { it.descriptionRes() })
     }

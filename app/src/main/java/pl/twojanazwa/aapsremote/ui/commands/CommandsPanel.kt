@@ -32,6 +32,7 @@ fun CommandsPanel(
     onBgClicked: () -> Unit,
     onPumpClicked: () -> Unit,
     onProfileStatusClicked: () -> Unit,
+    onProfileSwitchClicked: () -> Unit,
     onCarbsInputChanged: (String) -> Unit,
     onQuickValueClicked: (Int) -> Unit,
     onCarbsNextClicked: () -> Unit,
@@ -160,6 +161,12 @@ fun CommandsPanel(
                     enabled = state.canSendNoCode,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.commands_profile_status)) }
+                // PROF-13: formularz procentu profilu 1; wymaga sekretu, numeru i uprawnień.
+                FilledTonalButton(
+                    onClick = onProfileSwitchClicked,
+                    enabled = state.canStartProfile,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.commands_profile_switch)) }
             }
         }
     }

@@ -27,7 +27,7 @@ class CommandsViewModelLockTest {
     private val numbers = FakeAapsNumberSettingsStore().also { it.setConfigured("+447700900123") }
 
     private fun viewModel() =
-        CommandsViewModel(launcher, session.coordinator, CurrentRun(), numbers, FakeTotpSecretStore(), FakeSmsPermissions(), FakeCommandLimitsStore(), ProfileSelection())
+        CommandsViewModel(launcher, session.coordinator, CurrentRun(), numbers, FakeTotpSecretStore(), FakeSmsPermissions(), FakeCommandLimitsStore())
 
     @Test
     fun `CMDUI-05 polecenie w toku nie woluje launchera i daje komunikat COMMAND_ACTIVE`() =

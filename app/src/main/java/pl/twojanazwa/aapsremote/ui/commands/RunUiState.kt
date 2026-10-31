@@ -36,8 +36,6 @@ sealed interface RunView {
 data class RunUiState(
     val view: RunView? = null,
     val commandActive: Boolean = false,
-    /** PROF-14: wybór pozycji listy jest możliwy tylko bez ABSENT / INVALIDATED. */
-    val secret: SecretReadiness = SecretReadiness.UNKNOWN,
     val confirmingStopWaiting: Boolean = false,
     val confirmingExit: Boolean = false,
     /** Jednorazowe żądanie Activity.finish() (CMDUI-24); kasowane przez onExitHandled. */

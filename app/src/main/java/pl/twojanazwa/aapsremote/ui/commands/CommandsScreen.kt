@@ -138,8 +138,6 @@ fun CommandsScreen(
         } else if (runView is RunView.Finished) {
             ResultCard(
                 result = runView.result,
-                secret = run.secret,
-                onProfileChosen = runViewModel::onProfileChosen,
                 onResultDismissed = runViewModel::onResultDismissed,
             )
         } else if (commands.profile != null && summary == null) {
@@ -166,6 +164,7 @@ fun CommandsScreen(
                 onBgClicked = commandsViewModel::onBgClicked,
                 onPumpClicked = commandsViewModel::onPumpClicked,
                 onProfileStatusClicked = commandsViewModel::onProfileStatusClicked,
+                onProfileSwitchClicked = commandsViewModel::onProfileSwitchClicked,
                 onCarbsInputChanged = commandsViewModel::onCarbsInputChanged,
                 onQuickValueClicked = commandsViewModel::onQuickValueClicked,
                 onCarbsNextClicked = commandsViewModel::onCarbsNextClicked,

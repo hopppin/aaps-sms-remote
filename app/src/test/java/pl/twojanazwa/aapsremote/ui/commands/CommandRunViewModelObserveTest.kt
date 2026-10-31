@@ -25,7 +25,7 @@ class CommandRunViewModelObserveTest {
     @RegisterExtension
     val main = MainDispatcherExtension()
 
-    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator, ProfileSelection(), secrets)
+    private fun CommandTestEnv.viewModel() = CommandRunViewModel(currentRun, coordinator)
 
     private fun CommandRunViewModel.active(): RunView.Active = uiState.value.view as RunView.Active
 
