@@ -322,6 +322,9 @@ class CommandSession(
             is AapsReply.ProfileListReport -> sent is Command.ProfileList
             is AapsReply.ProfileCodeRequest -> sent is Command.ProfileSwitch && profileRequestMatches(reply.text, sent)
             is AapsReply.ProfileSwitchMismatch -> sent is Command.ProfileSwitch
+            // Nowe wyniki (zad. 1 spec 2026-10-31): tylko dla własnego polecenia, dalej gałąź else (bez kodu).
+            is AapsReply.BolusRefused, is AapsReply.BolusFailed -> sent is Command.Bolus
+            is AapsReply.ProfileSwitchDone, is AapsReply.ProfileBaseUpdated -> sent is Command.ProfileSwitch
             is AapsReply.BgReport -> sent is Command.Bg
             is AapsReply.PumpStatus -> sent is Command.Pump
             is AapsReply.BolusAmountMismatch, is AapsReply.CarbsAmountMismatch,
@@ -341,6 +344,8 @@ class CommandSession(
     private fun confirmed(reply: AapsReply.MatchingDone, text: String): SessionOutcome = when (reply) {
         is AapsReply.CarbsDone -> SessionOutcome.CarbsConfirmed(reply.grams, text)
         is AapsReply.BolusDone -> SessionOutcome.BolusConfirmed(reply.centiUnits, text)
+        // Nieosiągalne do #266: ReplyMatch.isDoneFor zwraca fałsz dla zmiany profilu.
+        is AapsReply.ProfileSwitchDone -> error("ProfileSwitchDone nieobslugiwane")
     }
 
     /** Wiadomość nieoczekiwana (SESSION-18): trafia do wyniku, nie zmienia fazy ani limitów. Zawsze null. */

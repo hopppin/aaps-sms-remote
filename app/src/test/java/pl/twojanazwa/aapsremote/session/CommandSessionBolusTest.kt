@@ -330,4 +330,61 @@ class CommandSessionBolusTest {
         const val PROFILE_REQUEST = "Aby przelaczyc profil na LocalProfile1 100% odpowiedz kodem z aplikacji " +
             "Authenticator dla: Jan, z doklejonym PIN-em"
     }
+
+    @Test
+    fun `BOL-20 BOL-21 odmowa odstep przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.bolusRefusedInterval
+        val (_, run) = start(bolus(10))
+        deliver(30_000, body)
+        assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertNoCode()
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+    }
+
+    @Test
+    fun `BOL-20 BOL-21 odmowa odstep po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
+        val body = AapsSamples.bolusRefusedInterval
+        val (_, run) = confirming(10)
+        deliver(120_000, body)
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `BOL-20 BOL-21 odmowa kolejka przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.bolusRefusedQueue
+        val (_, run) = start(bolus(10))
+        deliver(30_000, body)
+        assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertNoCode()
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+    }
+
+    @Test
+    fun `BOL-20 BOL-21 odmowa kolejka po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
+        val body = AapsSamples.bolusRefusedQueue
+        val (_, run) = confirming(10)
+        deliver(120_000, body)
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `BOL-20 BOL-21 blad przed prosba o kod to UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.bolusFailed
+        val (_, run) = start(bolus(10))
+        deliver(30_000, body)
+        assertOutcome(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertNoCode()
+        assertEquals(listOf("BOLUS 0.1"), sender.sentCommands)
+    }
+
+    @Test
+    fun `BOL-20 BOL-21 blad po kodzie to Unknown UNRECOGNIZED_REPLY bez drugiego kodu`() = runTest {
+        val body = AapsSamples.bolusFailed
+        val (_, run) = confirming(10)
+        deliver(120_000, body)
+        assertOutcome(SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, body), run.await())
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
 }

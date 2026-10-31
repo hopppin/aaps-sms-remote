@@ -290,4 +290,33 @@ class CommandSessionProfileFlowTest {
         }
         assertNoCode()
     }
+
+    @Test
+    fun `PROF-19 nowa odpowiedz profileSwitchDone przed kodem to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.profileSwitchDone
+        val (_, run) = start(switch(100))
+        deliver(60_000, body)
+        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
+        assertNoCode()
+    }
+
+    @Test
+    fun `PROF-20 nowa odpowiedz profileBaseUpdated przed kodem to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.profileBaseUpdated
+        val (_, run) = start(switch(100))
+        deliver(60_000, body)
+        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), run.await().outcome)
+        assertNoCode()
+    }
+
+    @Test
+    fun `PROF-19 potwierdzenie po kodzie to Unknown UNRECOGNIZED_REPLY`() = runTest {
+        val (_, run) = start(switch(100))
+        deliver(60_000, request)
+        deliver(120_000, AapsSamples.profileSwitchDone)
+        assertEquals(
+            SessionOutcome.Unknown(UnknownReason.UNRECOGNIZED_REPLY, AapsSamples.profileSwitchDone),
+            run.await().outcome,
+        )
+    }
 }
