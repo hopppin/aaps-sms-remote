@@ -38,4 +38,18 @@ internal object AapsPl3426Patterns {
     )
 
     val WRONG_CODE = Regex("""Zly kod\. Polecenie anulowano\.""")
+
+    // Spec 012, BOL-20, BOL-21 (z kodu AAPS 3.4.2.6). Odmowy: cała treść; błąd: pierwsza linia.
+    val BOLUS_REFUSED_INTERVAL = Regex("""Bolus zdalny niedostepny\. Sprobuj ponownie pozniej\.""")
+
+    val BOLUS_REFUSED_QUEUE = Regex("""W kolejce oczekuje inny bolus\. Sprobuj ponownie pozniej\.""")
+
+    val BOLUS_FAILED_FIRST_LINE = Regex(
+        """Bolus nie powiodl sie\. Zweryfikuj prawdziwy stan przed wyslaniem kolejnej komendy!""",
+    )
+
+    // Spec 013, PROF-19, PROF-20: cała treść.
+    val PROFILE_SWITCH_DONE = Regex("""Zmiana profilu wykonana""")
+
+    val PROFILE_BASE_UPDATED = Regex("""Profil bazowy w pompie uaktualniony""")
 }

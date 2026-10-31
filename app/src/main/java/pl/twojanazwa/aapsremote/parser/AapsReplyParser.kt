@@ -49,7 +49,12 @@ object AapsReplyParser {
 
     private fun parseProfileSwitch(n: String, body: String, expected: ExpectedCommand.ProfileSwitch): AapsReply? {
         if (AapsPl3426Patterns.WRONG_CODE.matchEntire(n) != null) return AapsReply.WrongCode
-        val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues ?: return null
+        val g = AapsPl3426Patterns.PROFILE_CODE_REQUEST.matchEntire(n)?.groupValues
+            ?: return when {
+                AapsPl3426Patterns.PROFILE_SWITCH_DONE.matchEntire(n) != null -> AapsReply.ProfileSwitchDone(body)
+                AapsPl3426Patterns.PROFILE_BASE_UPDATED.matchEntire(n) != null -> AapsReply.ProfileBaseUpdated(body)
+                else -> null
+            }
         // Tylko procent (nazwę podaje AAPS, nie porównujemy jej); inaczej stop, nigdy kod (PROF-09).
         return if (g[2].toInt() == expected.percent) {
             AapsReply.ProfileCodeRequest(body)
@@ -70,6 +75,13 @@ object AapsReplyParser {
                 AapsReply.BolusAmountMismatch(expected, received, CarbsStage.CODE_REQUEST, body)
             }
         }
+        if (AapsPl3426Patterns.BOLUS_REFUSED_INTERVAL.matchEntire(n) != null) {
+            return AapsReply.BolusRefused(BolusRefusal.INTERVAL, body)
+        }
+        if (AapsPl3426Patterns.BOLUS_REFUSED_QUEUE.matchEntire(n) != null) {
+            return AapsReply.BolusRefused(BolusRefusal.QUEUE, body)
+        }
+        if (AapsPl3426Patterns.BOLUS_FAILED_FIRST_LINE.matchEntire(firstLine) != null) return AapsReply.BolusFailed(body)
         val done = AapsPl3426Patterns.BOLUS_DONE_FIRST_LINE.matchEntire(firstLine)?.let(::centiUnits) ?: return null
         return if (done == expected) {
             AapsReply.BolusDone(done, body)

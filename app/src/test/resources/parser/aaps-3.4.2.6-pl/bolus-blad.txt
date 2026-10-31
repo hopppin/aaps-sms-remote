@@ -1,0 +1,4 @@
+Bolus nie powiodl sie. Zweryfikuj prawdziwy stan przed wyslaniem kolejnej komendy!
+Ost. Pol.: 0 m. temu
+Tymcz.: 0,95 U/h @22:17 4/30'
+Bat.: 94%

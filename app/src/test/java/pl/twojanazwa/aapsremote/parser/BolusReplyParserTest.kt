@@ -224,4 +224,56 @@ class BolusReplyParserTest {
         )
         for (body in variants) assertEquals(unrecognized(body), parse(body, ExpectedCommand.Bolus(120)))
     }
+
+    private val nonBolusContexts = listOf(
+        ExpectedCommand.Carbs(1), ExpectedCommand.Bg, ExpectedCommand.Pump, ExpectedCommand.ProfileSwitch(100),
+    )
+
+    @Test
+    fun `BOL-20 odmowy w kontekscie Bolus 10 to odmowa z rodzajem i trescia`() {
+        val interval = AapsSamples.bolusRefusedInterval
+        val queue = AapsSamples.bolusRefusedQueue
+        assertEquals(AapsReply.BolusRefused(BolusRefusal.INTERVAL, interval), parse(interval, ExpectedCommand.Bolus(10)))
+        assertEquals(AapsReply.BolusRefused(BolusRefusal.QUEUE, queue), parse(queue, ExpectedCommand.Bolus(10)))
+    }
+
+    @Test
+    fun `BOL-20 odmowy w innych kontekstach to nierozpoznana`() {
+        for (body in listOf(AapsSamples.bolusRefusedInterval, AapsSamples.bolusRefusedQueue)) {
+            for (ctx in nonBolusContexts) assertEquals(unrecognized(body), parse(body, ctx))
+        }
+    }
+
+    @Test
+    fun `BOL-20 warianty syntetyczne odmowy to nierozpoznana`() {
+        val base = AapsSamples.bolusRefusedInterval
+        val variants = listOf(
+            base.replace("Sprobuj", "Spr\u00F3buj"),
+            base.removeSuffix("."),
+            "$base\nBat.: 94%",
+            base.replace("zdalny niedostepny", "zdalny  niedostepny"),
+        )
+        for (body in variants) assertEquals(unrecognized(body), parse(body, ExpectedCommand.Bolus(10)))
+    }
+
+    @Test
+    fun `BOL-21 blad bolusa w kontekscie Bolus to blad z trescia`() {
+        val body = AapsSamples.bolusFailed
+        for (amount in listOf(10, 120)) {
+            assertEquals(AapsReply.BolusFailed(body), parse(body, ExpectedCommand.Bolus(amount)))
+        }
+        val first = body.lines().first()
+        assertEquals(AapsReply.BolusFailed(first), parse(first, ExpectedCommand.Bolus(10)))
+    }
+
+    @Test
+    fun `BOL-21 warianty bledu i inne konteksty to nierozpoznana`() {
+        val first = AapsSamples.bolusFailed.lines().first()
+        for (body in listOf(first.replace("nie powiodl", "powiodl"), first.removeSuffix("!"), "Powiadomienie\n$first")) {
+            assertEquals(unrecognized(body), parse(body, ExpectedCommand.Bolus(10)))
+        }
+        for (ctx in nonBolusContexts) {
+            assertEquals(unrecognized(AapsSamples.bolusFailed), parse(AapsSamples.bolusFailed, ctx))
+        }
+    }
 }

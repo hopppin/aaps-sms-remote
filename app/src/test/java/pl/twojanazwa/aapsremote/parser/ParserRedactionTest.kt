@@ -81,4 +81,32 @@ class ParserRedactionTest {
             }
         }
     }
+
+    @Test
+    fun `BOL-20 toString odmowy bolusa nie zawiera tresci`() {
+        for (body in listOf(AapsSamples.bolusRefusedInterval, AapsSamples.bolusRefusedQueue)) {
+            val reply = AapsReplyParser.parse(body, ExpectedCommand.Bolus(10))
+            assertTrue(reply is AapsReply.BolusRefused)
+            assertRedacted(reply.toString(), body)
+        }
+    }
+
+    @Test
+    fun `BOL-21 toString bledu bolusa nie zawiera tresci`() {
+        val body = AapsSamples.bolusFailed
+        val reply = AapsReplyParser.parse(body, ExpectedCommand.Bolus(10))
+        assertTrue(reply is AapsReply.BolusFailed)
+        assertFalse(reply.toString().contains("94%"))
+        assertRedacted(reply.toString(), body)
+    }
+
+    @Test
+    fun `PROF-19 PROF-20 toString potwierdzenia i powiadomienia profilu nie zawiera tresci`() {
+        val done = AapsReplyParser.parse(AapsSamples.profileSwitchDone, ExpectedCommand.ProfileSwitch(100))
+        assertTrue(done is AapsReply.ProfileSwitchDone)
+        assertFalse(done.toString().contains("Zmiana profilu wykonana"))
+        val base = AapsReplyParser.parse(AapsSamples.profileBaseUpdated, ExpectedCommand.ProfileSwitch(100))
+        assertTrue(base is AapsReply.ProfileBaseUpdated)
+        assertRedacted(base.toString(), AapsSamples.profileBaseUpdated)
+    }
 }

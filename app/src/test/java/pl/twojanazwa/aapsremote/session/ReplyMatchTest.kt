@@ -35,6 +35,15 @@ class ReplyMatchTest {
         }
     }
 
+    /**
+     * PROF-19. Przypiecie obecnego zachowania: ProfileSwitchDone nie jest zgodne z PROFILE_SWITCH.
+     * Zmiana na true wymaga zmiany CommandSession.confirmed (zadanie #266), nie samego ReplyMatch.
+     */
+    @Test
+    fun `PROF-19 ProfileSwitchDone nie jest zgodne z PROFILE_SWITCH (zmiana na true wymaga zadania 266)`() {
+        assertEquals(false, ReplyMatch.isDoneFor(CommandId.PROFILE_SWITCH, AapsReply.ProfileSwitchDone("x")))
+    }
+
     @Test
     fun `BOL-19 potwierdzenie jest zgodne tylko z wlasnym poleceniem`() {
         for ((reply, owner) in dones) {

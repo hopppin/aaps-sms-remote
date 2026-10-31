@@ -59,6 +59,26 @@ sealed interface AapsReply {
         override fun toString(): String = "AapsReply.ProfileSwitchMismatch(***)"
     }
 
+    /** BOL-20. Nie jest MatchingCodeRequest ani MatchingDone – nigdy nie daje kodu. */
+    data class BolusRefused(val refusal: BolusRefusal, val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.BolusRefused(refusal=$refusal, ***)"
+    }
+
+    /** BOL-21. Nie jest MatchingDone – nigdy nie daje BolusConfirmed. */
+    data class BolusFailed(val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.BolusFailed(***)"
+    }
+
+    /** PROF-19. Bez procentu i nazwy (AAPS ich nie podaje). */
+    data class ProfileSwitchDone(val text: String) : MatchingDone {
+        override fun toString(): String = "AapsReply.ProfileSwitchDone(***)"
+    }
+
+    /** PROF-20. Powiadomienie do wszystkich numerów – nie MatchingDone, nie MatchingCodeRequest. */
+    data class ProfileBaseUpdated(val text: String) : AapsReply {
+        override fun toString(): String = "AapsReply.ProfileBaseUpdated(***)"
+    }
+
     /** PARSER-03 */
     data class BgReport(val glucoseMgdl: Int, val text: String) : AapsReply {
         override fun toString(): String = "AapsReply.BgReport(***)"
@@ -97,5 +117,7 @@ sealed interface AapsReply {
         override fun toString(): String = "AapsReply.Unrecognized(***)"
     }
 }
+
+enum class BolusRefusal { INTERVAL, QUEUE }
 
 enum class CarbsStage { CODE_REQUEST, CONFIRMATION }

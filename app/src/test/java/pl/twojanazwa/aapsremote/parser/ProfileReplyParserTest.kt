@@ -247,4 +247,44 @@ class ProfileReplyParserTest {
             }
         }
     }
+
+    @Test
+    fun `PROF-10 nieprawidlowy profil jest nierozpoznany z trescia`() {
+        val body = AapsSamples.profileInvalid
+        assertEquals("Nieprawidlowy profil!", body)
+        for (ctx in listOf(switch(100), ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList)) {
+            assertEquals(unrecognized(body), parse(body, ctx))
+        }
+    }
+
+    @Test
+    fun `PROF-19 potwierdzenie zmiany profilu w kontekscie zmiany to wykonano zmiane z trescia`() {
+        val body = AapsSamples.profileSwitchDone
+        for (p in listOf(100, 115)) assertEquals(AapsReply.ProfileSwitchDone(body), parse(body, switch(p)))
+        val crlf = "$body\r\n"
+        assertEquals(AapsReply.ProfileSwitchDone(crlf), parse(crlf, switch(100)))
+    }
+
+    @Test
+    fun `PROF-19 warianty potwierdzenia i inne konteksty to nierozpoznana`() {
+        for (body in listOf("Zmiana profilu wykonana.", "zmiana profilu wykonana", "Zmiana profilu wykonana\nBat.: 94%")) {
+            assertEquals(unrecognized(body), parse(body, switch(100)))
+        }
+        val ok = AapsSamples.profileSwitchDone
+        val others = listOf(
+            ExpectedCommand.Bg, ExpectedCommand.Pump, ExpectedCommand.Carbs(1), ExpectedCommand.Bolus(10),
+            ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList,
+        )
+        for (ctx in others) assertEquals(unrecognized(ok), parse(ok, ctx))
+    }
+
+    @Test
+    fun `PROF-20 powiadomienie o profilu bazowym tylko w kontekscie zmiany`() {
+        val body = AapsSamples.profileBaseUpdated
+        assertEquals(AapsReply.ProfileBaseUpdated(body), parse(body, switch(100)))
+        val others = listOf(
+            ExpectedCommand.Bg, ExpectedCommand.Carbs(1), ExpectedCommand.Bolus(10), ExpectedCommand.ProfileStatus,
+        )
+        for (ctx in others) assertEquals(unrecognized(body), parse(body, ctx))
+    }
 }
