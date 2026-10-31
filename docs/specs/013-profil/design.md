@@ -132,8 +132,10 @@ sealed interface SessionOutcome {
 
 // ReplyMatch.isDoneFor: CommandId.PROFILE_SWITCH -> reply is AapsReply.ProfileSwitchDone
 // CommandSession.amountMatches: is ProfileSwitchDone, is ProfileBaseUpdated -> sent is Command.ProfileSwitch
-// CommandSession.confirmed: is ProfileSwitchDone -> ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, text)
-//   (procent z polecenia sesji – treść AAPS go nie zawiera)
+// CommandSession.confirmed: is ProfileSwitchDone -> ProfileSwitchConfirmed((command as Command.ProfileSwitch).percent, "$codeRequestText
+
+$text")
+//   (procent z polecenia sesji – treść AAPS go nie zawiera; treść prośby o kod z nazwą profilu zachowana w text, PROF-21)
 // processMessage, AWAITING_CONFIRMATION: is AapsReply.ProfileBaseUpdated -> addUnexpected(sms)
 //   (przed kodem – istniejąca gałąź else → Failed(UNRECOGNIZED_REPLY))
 ```
@@ -168,7 +170,7 @@ Historia bez zmian schematu: `HistoryCommand` z `PROFILE_STATUS`, `PROFILE_LIST`
 | `Command.ProfileSwitch.number` jako stała właściwość | usunięcie pola | `HistoryCodec`, nagłówek i etykieta historii („Zmiana profilu N, P%”) zostają bez zmian. |
 | Usunięcie przycisku `PROFILE LIST` w zadaniu 1 | dopiero w zadaniu 2 | Po zadaniu 1 polecenie nie zna wybranego numeru; ścieżka „lista → wybór profilu 2” wysłałaby `PROFILE 1 p`. Bez przycisku formularz jest nieosiągalny do zadania 2. |
 | Bez wyniku „potwierdzono zmianę profilu” (do 2026-10-30) | zgadnięty wzorzec | Treść nieznana – `Unknown` z treścią (P4). Zastąpione 2026-10-31 przez PROF-19 (treść z kodu AAPS, R8). |
-| `ProfileSwitchConfirmed` z procentem z polecenia sesji (2026-10-31) | wynik bez procentu | AAPS nie podaje procentu w potwierdzeniu; procent wysłany był sprawdzony w prośbie o kod (PROF-08, PROF-12), a komunikat mówi o potwierdzeniu AAPS. |
+| `ProfileSwitchConfirmed` z procentem z polecenia sesji (2026-10-31) | wynik bez procentu | AAPS nie podaje procentu w potwierdzeniu; procent wysłany był sprawdzony w prośbie o kod (PROF-08, PROF-12), a komunikat („AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).”) mówi o potwierdzeniu AAPS i podaje procent jako dane polecenia. Treść prośby o kod (nazwa profilu) jest dołączona do `text`, bo samo potwierdzenie jej nie zawiera. |
 | `Profil bazowy w pompie uaktualniony`: po kodzie nieoczekiwana, przed kodem stop (2026-10-31) | zawsze nieoczekiwana; zawsze nierozpoznana | Po kodzie powiadomienie może towarzyszyć naszej zmianie (R11) i nie powinno kończyć sesji „nieznanym”; przed kodem oznacza zmianę profilu z innego źródła – w razie wątpliwości stop (AGENTS.md). |
 | Wzorce PROF-19, PROF-20 tylko w kontekście zmiany profilu | we wszystkich kontekstach | Najmniejsza zmiana PARSER-01; inne konteksty – „Przyszłe zmiany”. |
 | Powód `AMOUNT_MISMATCH` dla profilu | nowy `PROFILE_MISMATCH` | Bez zmiany `FailureReason`, DATA-09 i testów parytetu historii; tekst rozróżnia `ui` po poleceniu. |

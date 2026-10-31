@@ -1,6 +1,6 @@
 # AAPS SMS Communicator: BOLUS i PROFILE wg kodu źródłowego
 
-- **Wersja:** AndroidAPS, tag `3.4.2.6` (commit `598e2eb`), płytki klon w `C:/Users/user/projects/AndroidAPS` (tylko do odczytu; nic z niego nie uruchamiano).
+- **Wersja:** AndroidAPS, tag `3.4.2.6` (commit `598e2eb`), lokalny płytki klon, tylko do odczytu (nic z niego nie uruchamiano).
 - **Data analizy:** 2026-10-31.
 - **Pliki:** `plugins/main/src/main/kotlin/app/aaps/plugins/main/general/smsCommunicator/SmsCommunicatorPlugin.kt` (dalej `Plugin.kt`), `.../AuthRequest.kt`, teksty `plugins/main/src/main/res/values-pl-rPL/strings.xml` (dalej `pl-main`) i `core/ui/src/main/res/values-pl-rPL/strings.xml` (dalej `pl-ui`).
 - Dane fikcyjne. Teksty niżej: wersja z polskimi znakami (źródło) i wersja bez diakrytyków (tak SMS wychodzi z AAPS: `sendSMS` robi `stripAccents`, `Plugin.kt:1253`, `1288-1293`; `ł` zamieniane na `l`).

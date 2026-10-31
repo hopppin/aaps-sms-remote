@@ -236,7 +236,7 @@ W `AWAITING_CONFIRMATION` (i dla wiadomości odebranych w `SENDING_CODE`, przetw
 | prośba o kod (bolus) | `Unknown(UNEXPECTED_REPLY)`; kod nie jest wysyłany ponownie |
 | błąd bolusa (BOL-21), `receivedAt` ≥ chwili wysłania kodu | `Unknown(BOLUS_FAILED)` z treścią |
 | błąd bolusa (BOL-21), `receivedAt` < chwili wysłania kodu | wiadomość nieoczekiwana |
-| odmowa AAPS: odstęp / kolejka (BOL-20) | `Unknown(UNRECOGNIZED_REPLY)` z treścią (odmowa po kodzie nie dotyczy tego polecenia) |
+| odmowa AAPS: odstęp / kolejka (BOL-20) | `Unknown(UNRECOGNIZED_REPLY)` z treścią (odmowa po kodzie może dotyczyć tego polecenia – dawka mogła zostać podana ze starej prośby) |
 | nierozpoznana (np. przekroczony czas kolejki pompy, B6) | `Unknown(UNRECOGNIZED_REPLY)` z treścią |
 
 Brak potwierdzenia przez 6 min → `Unknown(CONFIRMATION_TIMEOUT)` (SESSION-15). `BolusConfirmed` – jak `CarbsConfirmed` (SESSION-12) – oznacza potwierdzenie AAPS, nie dowód wykonania polecenia z tej aplikacji. Sesja nigdy nie wysyła drugiego `BOLUS` ani drugiego kodu (SESSION-20).
@@ -392,7 +392,7 @@ W kontekście `Bolus x` wiadomość, której cała treść po normalizacji to do
 | `Bolus zdalny niedostepny. Sprobuj ponownie pozniej.` | odmowa (bolus) – minimalny odstęp | `Failed(AAPS_BOLUS_INTERVAL)` z treścią |
 | `W kolejce oczekuje inny bolus. Sprobuj ponownie pozniej.` | odmowa (bolus) – bolus w kolejce | `Failed(AAPS_BOLUS_QUEUE)` z treścią |
 
-daje wynik „odmowa (bolus)” z rodzajem odmowy i treścią. W innych kontekstach te treści są „nierozpoznane”. Sesja `BOLUS` w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` kończy się wynikiem z tabeli, kod nie jest wysyłany. Po kodzie (`AWAITING_CONFIRMATION`) odmowa nie dotyczy tego polecenia (AAPS odmawia przed prośbą o kod, B4) → `Unknown(UNRECOGNIZED_REPLY)` z treścią. Nowe wartości `FailureReason`: `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE`. Wpis z takim wynikiem nie ma wysłanego kodu, więc nie liczy się do odstępu aplikacji (BOL-12, bez zmian). Aplikacja wysyła tylko `BOLUS <x>` (bez `MEAL`), więc odmowa przez odstęp AAPS dotyczy każdego jej bolusa (B10).
+daje wynik „odmowa (bolus)” z rodzajem odmowy i treścią. W innych kontekstach te treści są „nierozpoznane”. Sesja `BOLUS` w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` kończy się wynikiem z tabeli, kod nie jest wysyłany. Po kodzie (`AWAITING_CONFIRMATION`) odmowa **może dotyczyć tego polecenia**: AAPS odmawia przed utworzeniem prośby (B4), a kolejność SMS-ów mogła się zmienić, więc kod mógł zostać wysłany na starą prośbę z tą samą ilością i dawka mogła zostać podana z tej starej prośby (SESSION-08, „Bezpieczeństwo” 004) → `Unknown(UNRECOGNIZED_REPLY)` z treścią i ostrzeżeniem „nieznany” (sprawdź w AAPS przed ponowieniem); komunikat nie sugeruje, że nic się nie stało. Nowe wartości `FailureReason`: `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE`. Wpis z takim wynikiem nie ma wysłanego kodu, więc nie liczy się do odstępu aplikacji (BOL-12, bez zmian). Aplikacja wysyła tylko `BOLUS <x>` (bez `MEAL`), więc odmowa przez odstęp AAPS dotyczy każdego jej bolusa (B10).
 
 **Kryteria akceptacji:**
 

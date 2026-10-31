@@ -217,7 +217,7 @@ Sesja zmiany profilu przebiega jak `CARBS`/`BOLUS` (fazy, limity, SESSION-08 –
 | niezgodny profil (inny procent) | `Failed(AMOUNT_MISMATCH)`, bez kodu | `Unknown(AMOUNT_MISMATCH)` |
 | zły kod | `Failed(UNEXPECTED_REPLY)` | `Failed(WRONG_CODE)` (P4, R9) |
 | wykonano zmianę profilu (PROF-19) | wiadomość nieoczekiwana (SESSION-18) | `ProfileSwitchConfirmed` (PROF-19) |
-| powiadomienie o profilu bazowym (PROF-20) | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | wiadomość nieoczekiwana, sesja czeka dalej (PROF-20) |
+| powiadomienie o profilu bazowym (PROF-20) | `Failed(UNRECOGNIZED_REPLY)`, bez kodu (świadomie przerywa też poprawną sesję) | wiadomość nieoczekiwana, sesja czeka dalej (PROF-20) |
 | nierozpoznana (np. `Bledny format`, `Nieprawidlowy profil!`) | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | `Unknown(UNRECOGNIZED_REPLY)` z treścią |
 
 Brak potwierdzenia w 6 min → `Unknown(CONFIRMATION_TIMEOUT)`. Powód `AMOUNT_MISMATCH` obejmuje dla profilu niezgodny procent (bez nowego powodu w `FailureReason`). Kod jest odsyłany tylko na `ProfileCodeRequest` w sesji zmiany profilu; prośba o kod innego polecenia daje stop bez kodu (BOL-19). Sesja niezależnie od parsera sprawdza w treści prośby, że procent jest równy wysłanemu (druga linia obrony, jak BOL-10); nazwy profilu nie sprawdza (PROF-08). Inny nadawca (SMS-04), wiadomość sprzed wysłania polecenia (SESSION-05) i nierozpoznana treść kończą się jak dotychczas – bez kodu; każdy z tych przypadków ma własne kryterium poniżej.
@@ -283,7 +283,7 @@ Nagłówki: „Polecenie PROFILE STATUS”, „Polecenie PROFILE LIST”, „Zmi
 | `Unknown(UNRECOGNIZED_REPLY)`, zmiana profilu | nieznany | „Po wysłaniu kodu przyszła odpowiedź AAPS, której aplikacja nie rozpoznaje. Przeczytaj treść SMS i sprawdź w AAPS.” |
 | `ProfileSwitchConfirmed` | sukces | PROF-21 |
 
-Wynik każdej zmiany profilu z treścią SMS pokazuje tę treść (CMDUI-20), więc nazwa profilu z prośby AAPS jest widoczna w wyniku.
+Wynik każdej zmiany profilu z treścią SMS pokazuje tę treść (CMDUI-20). Dla `ProfileSwitchConfirmed` treść zawiera prośbę o kod z nazwą profilu (PROF-21), więc nazwa jest widoczna w wyniku i historii.
 
 **Kryteria akceptacji:**
 
@@ -331,7 +331,7 @@ Sesja zmiany profilu przyjmuje ten wynik jako potwierdzenie tylko w `AWAITING_CO
 - **Zakładając** `profile-sukces.txt` z końcem linii `\r\n` na końcu, **gdy** kontekst = zmiana (100), **wtedy** wykonano zmianę profilu.
 - **Zakładając** warianty syntetyczne `Zmiana profilu wykonana.` (kropka), `zmiana profilu wykonana`, `Zmiana profilu wykonana` z drugą linią `Bat.: 94%`, **gdy** kontekst = zmiana (100), **wtedy** nierozpoznana.
 - **Zakładając** `profile-sukces.txt`, **gdy** kontekst = `BG`, `PUMP`, `Carbs(1)`, `Bolus(10)`, stan profilu albo lista profili, **wtedy** nierozpoznana.
-- **Zakładając** sesję zmiany (90) z kodem wysłanym w chwili 60 000, **gdy** w chwili 120 000 przychodzi `profile-sukces.txt`, **wtedy** wynik = `ProfileSwitchConfirmed` z procentem 90 i treścią pliku; port wysyłania dostał dokładnie 2 SMS-y: `PROFILE 1 90` i `0504714321`.
+- **Zakładając** sesję zmiany (90) z kodem wysłanym w chwili 60 000, **gdy** w chwili 120 000 przychodzi `profile-sukces.txt`, **wtedy** wynik = `ProfileSwitchConfirmed` z procentem 90 i treścią = treść przyjętej prośby o kod, pusta linia, treść pliku; port wysyłania dostał dokładnie 2 SMS-y: `PROFILE 1 90` i `0504714321`.
 - **Zakładając** sesję zmiany (100) w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `profile-sukces.txt`, **wtedy** wiadomość trafia do nieoczekiwanych, faza = `AWAITING_CODE_REQUEST` i port nie dostał kodu.
 - **Zakładając** sesję zmiany (100), w której wiadomość `profile-sukces.txt` odebrano w `SENDING_CODE` z chwilą odbioru wcześniejszą niż chwila wysłania kodu, **gdy** port zwrócił „wysłano”, **wtedy** wiadomość trafia do nieoczekiwanych, a faza = `AWAITING_CONFIRMATION`.
 - **Zakładając** sesję `CARBS 1` po kodzie i osobno sesję `BOLUS 0,10 j.` po kodzie, **gdy** przychodzi `profile-sukces.txt`, **wtedy** `Unknown(UNRECOGNIZED_REPLY)` (nie potwierdzenie).
@@ -344,7 +344,7 @@ Sesja zmiany profilu przyjmuje ten wynik jako potwierdzenie tylko w `AWAITING_CO
 W kontekście „zmiana profilu (procent p)” wiadomość, której cała treść po normalizacji to dokładnie `Profil bazowy w pompie uaktualniony`, daje wynik „powiadomienie o profilu bazowym” z treścią (R11). W innych kontekstach – „nierozpoznana” (bez zmian). Sesja zmiany profilu:
 
 - w `AWAITING_CONFIRMATION` (i dla wiadomości z `SENDING_CODE`) – wiadomość nieoczekiwana (SESSION-18): sesja czeka dalej na potwierdzenie albo limit 6 min (SESSION-15); powiadomienie nigdy nie daje `ProfileSwitchConfirmed`;
-- w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` – jak „nierozpoznana”: `Failed(UNRECOGNIZED_REPLY)`, kod nie jest wysyłany (zmiana profilu z innego źródła przed kodem = stan AAPS inny, niż zakłada sesja; stop).
+- w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` – jak „nierozpoznana”: `Failed(UNRECOGNIZED_REPLY)`, kod nie jest wysyłany (zmiana profilu z innego źródła przed kodem = stan AAPS inny, niż zakłada sesja; stop). Powiadomienie jest rozsyłane do wszystkich numerów niezależnie od polecenia aplikacji (R11), więc może przerwać poprawną sesję przed kodem; to świadome, ostrożne zachowanie (fail-closed), a ponowienie ręczne jest właściwe.
 
 **Kryteria akceptacji:**
 
@@ -355,11 +355,11 @@ W kontekście „zmiana profilu (procent p)” wiadomość, której cała treś�
 
 ### PROF-21: Wynik i historia potwierdzenia zmiany profilu
 
-Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAPS potwierdził zmianę profilu 1 na P%.” (P = procent z wyniku), treść SMS pokazana (CMDUI-20), bez ostrzeżenia „nieznany”. Historia (zmiana DATA-09, HISTUI-04): nowy stały tekst rodzaju wyniku `PROFILE_SWITCH_CONFIRMED` (bez zmiany schematu bazy, rodzaj jest kolumną tekstową); wynik wpisu z procentem → „AAPS potwierdził zmianę profilu 1 na P%.”; bez procentu → „Brak szczegółów wyniku …” (jak BOL-17). Numer i procent wpisu – jak PROF-17.
+Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).” (P = procent z wyniku), treść SMS pokazana (CMDUI-20), bez ostrzeżenia „nieznany”. AAPS w potwierdzeniu nie podaje numeru, nazwy ani procentu, więc komunikat nie twierdzi więcej niż wiemy: „procent P” i „profil 1” to dane **polecenia wysłanego przez sesję** (procent był sprawdzony w prośbie o kod, PROF-08, PROF-12), nie fakt z odpowiedzi AAPS. Treść wyniku (`text`) to treść przyjętej prośby o kod (z nazwą profilu od AAPS), pusta linia i treść potwierdzenia; dzięki temu nazwa profilu jest widoczna w wyniku (CMDUI-20) i zapisana w historii (to samo pole „treść odpowiedzi”, DATA-07; bez zmiany schematu). Historia (zmiana DATA-09, HISTUI-04): nowy stały tekst rodzaju wyniku `PROFILE_SWITCH_CONFIRMED` (bez zmiany schematu bazy, rodzaj jest kolumną tekstową); wynik wpisu z procentem → „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).”; bez procentu → „Brak szczegółów wyniku …” (jak BOL-17). Numer i procent wpisu – jak PROF-17.
 
 **Kryteria akceptacji:**
 
-- **Zakładając** wynik `ProfileSwitchConfirmed(90)` z treścią `profile-sukces.txt`, **gdy** odwzorowano wynik, **wtedy** rodzaj = sukces, argument procentu = 90, treść SMS pokazana, brak ostrzeżenia „nieznany”.
+- **Zakładając** wynik `ProfileSwitchConfirmed(90)` z treścią (prośba o kod z `profile-prosba-o-kod.txt`, pusta linia, `profile-sukces.txt`), **gdy** odwzorowano wynik, **wtedy** rodzaj = sukces, komunikat „AAPS potwierdził zmianę profilu (polecenie: profil 1, 90%).”, argument procentu = 90, treść SMS pokazana, brak ostrzeżenia „nieznany”.
 - **Zakładając** ten wynik, **gdy** utworzono wpis i wiersz historii, **wtedy** polecenie = `PROFILE_SWITCH`, numer = 1, procent = 90, rodzaj = `PROFILE_SWITCH_CONFIRMED`; **gdy** wiersz odczytano, **wtedy** wynik wpisu = potwierdzenie zmiany profilu, a procent wpisu = 90.
 - **Zakładając** wiersz `PROFILE_SWITCH_CONFIRMED` bez procentu (osobno: przy poleceniu `CARBS`), **gdy** odczytano i odwzorowano wpis, **wtedy** tekst wyniku = „Brak szczegółów wyniku …”, bez wyjątku (procent jest odczytywany tylko dla `PROFILE_SWITCH`, PROF-17).
 
@@ -407,7 +407,7 @@ Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAP
 | W2 | Zmiana profilu 1 na 90% (wirtualna pompa): formularz, podsumowanie, kod, wynik z treścią prośby (nazwa profilu); potem powrót na 100% (`PROFILE 1 100`). Od 2026-10-31 nie jest warunkiem scalenia: O1 – O3 rozstrzyga kod AAPS 3.4.2.6 (R7 – R9); zgodność z telefonem sprawdza W5 | PROF-04, PROF-12, PROF-15, PROF-16 |
 | W3 | Historia po zadaniu 2: nowy wpis „Zmiana profilu 1, 90%”, wcześniejsze wpisy zachowane (migracja 2 → 3 sprawdzona w pierwszej wersji) | PROF-17 |
 | W4 | Przejście na Ustawienia z otwartym formularzem → po powrocie panel; „Zmień profil” → tekst `100` | PROF-15 |
-| W5 | Po zadaniu 3 zmiany 2026-10-31 (wynik w opisie PR, nie warunek scalenia): zmiana profilu 1 na 90% → wynik „AAPS potwierdził zmianę profilu 1 na 90%.” i treść `Zmiana profilu wykonana`; zły PIN → „zły kod”; zanotować, czy przyszło też `Profil bazowy w pompie uaktualniony` (R11). Gdy treść z telefonu różni się od pliku z `dane/` – PR `Spec:` z poprawką | PROF-19 – PROF-21 |
+| W5 | Po zadaniu 3 zmiany 2026-10-31 (wynik w opisie PR, nie warunek scalenia): zmiana profilu 1 na 90% → wynik „AAPS potwierdził zmianę profilu (polecenie: profil 1, 90%).” i treść `Zmiana profilu wykonana`; zły PIN → „zły kod”; zanotować, czy przyszło też `Profil bazowy w pompie uaktualniony` (R11). Gdy treść z telefonu różni się od pliku z `dane/` – PR `Spec:` z poprawką | PROF-19 – PROF-21 |
 
 ## Otwarte pytania
 
@@ -442,7 +442,7 @@ Propozycje specyfikatora przyjęte w tej zmianie (scalenie PR `Spec: …` = akce
 
 Propozycje specyfikatora w zmianie 2026-10-31 (scalenie PR `Spec: …` = akceptacja):
 
-- [x] **P13. Rozpoznawanie po kodzie (PROF-19 – PROF-21):** `Zmiana profilu wykonana` → `ProfileSwitchConfirmed` z procentem wysłanym, komunikat „AAPS potwierdził zmianę profilu 1 na P%.”; `Profil bazowy w pompie uaktualniony` po kodzie → wiadomość nieoczekiwana, przed kodem → stop bez kodu. Alternatywa: zostawić `Unknown(UNRECOGNIZED_REPLY)` (P4) – bezpieczne, ale każdy udany wynik wymagał sprawdzenia w AAPS.
+- [x] **P13. Rozpoznawanie po kodzie (PROF-19 – PROF-21):** `Zmiana profilu wykonana` → `ProfileSwitchConfirmed` z procentem wysłanym, komunikat „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).”; `Profil bazowy w pompie uaktualniony` po kodzie → wiadomość nieoczekiwana, przed kodem → stop bez kodu. Alternatywa: zostawić `Unknown(UNRECOGNIZED_REPLY)` (P4) – bezpieczne, ale każdy udany wynik wymagał sprawdzenia w AAPS.
 
 ## Przyszłe zmiany (nie blokują)
 

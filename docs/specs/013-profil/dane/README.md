@@ -2,8 +2,9 @@
 
 - **Wersja AAPS:** jak w [Spec 002](../../002-parser-odpowiedzi/dane/README.md) (3.4.2.6) – decyzja użytkownika (P6 w [spec.md](../spec.md#otwarte-pytania)).
 - **Język:** polski, bez znaków diakrytycznych.
-- **Źródło:** SMS-y z telefonu użytkownika, przepisane znak w znak. Nazwy profili (`LocalProfile1`, `LocalProfile2`) to domyślne nazwy AAPS, nie dane osobowe.
-- **Anonimizacja:** imię z nazwy konta Authenticatora zastąpione fikcyjnym `Jan`. Brak numerów telefonu, PIN-ów i kodów TOTP.
+- **Źródło (pliki zebrane z telefonu: `profile-status.txt`, `profile-list.txt`, `profile-prosba-o-kod.txt`, `profile-bledny-format.txt`):** SMS-y z telefonu użytkownika, przepisane znak w znak. Nazwy profili (`LocalProfile1`, `LocalProfile2`) to domyślne nazwy AAPS, nie dane osobowe.
+- **Pliki wygenerowane z zasobów AAPS 3.4.2.6** (`profile-sukces.txt`, `profile-bazowy-uaktualniony.txt`, `profile-nieprawidlowy.txt`): nie pochodzą z telefonu, to teksty `values-pl-rPL` po `stripAccents`; opis w Uwagach i w [aaps-kod-zrodlowy.md](aaps-kod-zrodlowy.md).
+- **Anonimizacja (pliki z telefonu):** imię z nazwy konta Authenticatora zastąpione fikcyjnym `Jan`. Brak numerów telefonu, PIN-ów i kodów TOTP.
 
 | Plik | Polecenie wysłane | Wiadomość AAPS | Linie |
 | --- | --- | --- | --- |
