@@ -240,7 +240,7 @@ Fikcyjne ilości i teksty z kryteriów akceptacji (CMD-03 – CMD-09). Brak plik
   - CMD-01: parametr `PROFILE_SWITCH` = procent, numer zawsze 1 (bez nazwy z listy); 7 wpisów bez zmian (`PROFILE_LIST` zostaje).
   - CMD-07: zmiana profilu zawsze `PROFILE 1 <p>` (np. `PROFILE 1 100`, `PROFILE 1 115`); `PROFILE 1 100` jest dla AAPS równoważne `PROFILE 1` (R7 w Spec 013).
   - CMD-08: kontekst zmiany profilu tylko z procentem (`ExpectedCommand.ProfileSwitch(procent)`).
-  - CMD-09: `toString()` zmiany profilu bez procentu (nazwy ani numeru polecenie już nie ma).
+  - CMD-09: `toString()` zmiany profilu bez procentu (nazwy nie ma, numer jest stałą 1 (obliczana właściwość)).
   - Zakres, „Pojęcia”: ujednolicone z powyższym. Źródło: [PROF-02](../013-profil/spec.md#prof-02-polecenie-zmiany-profilu) – PROF-05. Identyfikatory wymagań bez zmian.
 
 - **2026-10-29 – scalenie zmian ze Spec 011 – 013 (po wdrożeniu).**
