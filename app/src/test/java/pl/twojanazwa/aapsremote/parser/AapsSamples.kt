@@ -16,6 +16,7 @@ object AapsSamples {
     val bolusFailed: String get() = read("bolus-blad.txt")
     val profileSwitchDone: String get() = read("profile-sukces.txt")
     val profileBaseUpdated: String get() = read("profile-bazowy-uaktualniony.txt")
+    val profileSettingOk: String get() = read("profile-pomyslnie-ustawiony.txt")
     val profileInvalid: String get() = read("profile-nieprawidlowy.txt")
     val wrongCode: String get() = read("zly-kod.txt")
     val profileStatus: String get() = read("profile-status.txt")

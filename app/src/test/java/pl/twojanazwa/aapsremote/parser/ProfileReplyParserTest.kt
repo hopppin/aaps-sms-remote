@@ -287,4 +287,25 @@ class ProfileReplyParserTest {
         )
         for (ctx in others) assertEquals(unrecognized(body), parse(body, ctx))
     }
+
+    @Test
+    fun `PROF-20 drugi tekst powiadomienia Profil pomyslnie ustawiony to ProfileBaseUpdated tylko w kontekscie zmiany`() {
+        val body = AapsSamples.profileSettingOk
+        assertEquals(AapsReply.ProfileBaseUpdated(body), parse(body, switch(100)))
+        val others = listOf(
+            ExpectedCommand.Bg, ExpectedCommand.Pump, ExpectedCommand.Carbs(1), ExpectedCommand.Bolus(10),
+            ExpectedCommand.ProfileStatus, ExpectedCommand.ProfileList,
+        )
+        for (ctx in others) assertEquals(unrecognized(body), parse(body, ctx))
+    }
+
+    @Test
+    fun `PROF-20 warianty powiadomienia z s z akcentem angielskie z kropka i z dopisana linia sa nierozpoznane`() {
+        val variants = listOf(
+            "Profil pomyślnie ustawiony", "Basal profile in pump updated", "Profile set OK",
+            "Profil pomyslnie ustawiony.", "Profil bazowy w pompie uaktualniony.",
+            "Profil pomyslnie ustawiony\nBat.: 94%", "Profil bazowy w pompie uaktualniony\nProfil pomyslnie ustawiony",
+        )
+        for (body in variants) assertEquals(unrecognized(body), parse(body, switch(100)))
+    }
 }

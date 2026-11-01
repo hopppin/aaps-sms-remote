@@ -51,5 +51,6 @@ internal object AapsPl3426Patterns {
     // Spec 013, PROF-19, PROF-20: cała treść.
     val PROFILE_SWITCH_DONE = Regex("""Zmiana profilu wykonana""")
 
-    val PROFILE_BASE_UPDATED = Regex("""Profil bazowy w pompie uaktualniony""")
+    // R11: oba teksty to zasób AAPS profile_set_ok (zależnie od builda); powiadomienie, nie potwierdzenie.
+    val PROFILE_BASE_UPDATED = Regex("""(?:Profil bazowy w pompie uaktualniony|Profil pomyslnie ustawiony)""")
 }
