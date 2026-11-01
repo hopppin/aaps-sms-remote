@@ -534,6 +534,7 @@ Propozycje specyfikatora w zmianie 2026-10-31 (scalenie PR `Spec: …` = akcepta
 
 ## Przyszłe zmiany (nie blokują)
 
+- Opcjonalne ostrzeżenie w podsumowaniu `BOLUS` (bez blokady), gdy ostatni bolus z aplikacji to `Unknown(BOLUS_FAILED)` – propozycja recenzenta po zmianie 2026-11-01; nie wprowadzone.
 - Rozpoznawanie pozostałych odmów z kodu AAPS 3.4.2.6 (B4): `Pompa wstrzymana`, `Zdalne komendy nie sa dozwolone`, `Bledny format` przed kodem; `Przekroczono limit czasu oczekiwania na zakonczenie poprzedniej komunikacji z pompa` po kodzie (B6) – dziś „nierozpoznana”.
 
 ## Historia zmian
