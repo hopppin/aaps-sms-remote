@@ -109,4 +109,11 @@ class ParserRedactionTest {
         assertTrue(base is AapsReply.ProfileBaseUpdated)
         assertRedacted(base.toString(), AapsSamples.profileBaseUpdated)
     }
+
+    @Test
+    fun `PROF-20 toString drugiego tekstu powiadomienia nie zawiera tresci`() {
+        val base = AapsReplyParser.parse(AapsSamples.profileSettingOk, ExpectedCommand.ProfileSwitch(100))
+        assertTrue(base is AapsReply.ProfileBaseUpdated)
+        assertRedacted(base.toString(), AapsSamples.profileSettingOk)
+    }
 }

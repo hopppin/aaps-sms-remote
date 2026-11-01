@@ -433,4 +433,43 @@ class CommandSessionProfileFlowTest {
         assertEquals(1, sender.sentCodeCopies.size)
         assertEquals(listOf("PROFILE 1 100"), sender.sentCommands)
     }
+
+    @Test
+    fun `PROF-20 Profil pomyslnie ustawiony przed potwierdzeniem daje ProfileSwitchConfirmed i jeden kod`() = runTest {
+        val (session, run) = confirming()
+        deliver(90_000, AapsSamples.profileSettingOk)
+        assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        assertEquals(1, session.state.value.unexpectedMessages.size)
+        deliver(120_000, AapsSamples.profileSwitchDone)
+        assertEquals(100, (run.await().outcome as SessionOutcome.ProfileSwitchConfirmed).percent)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `PROF-20 Profil pomyslnie ustawiony po potwierdzeniu daje ten sam wynik i jeden kod`() = runTest {
+        val (_, run) = confirming()
+        deliver(90_000, AapsSamples.profileSwitchDone)
+        deliver(100_000, AapsSamples.profileSettingOk)
+        assertTrue(run.await().outcome is SessionOutcome.ProfileSwitchConfirmed)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `PROF-20 samo Profil pomyslnie ustawiony po kodzie konczy sie CONFIRMATION_TIMEOUT`() = runTest {
+        val (_, run) = confirming()
+        deliver(90_000, AapsSamples.profileSettingOk)
+        advanceTimeBy(60_000 + 360_000 - currentTime)
+        runCurrent()
+        assertEquals(SessionOutcome.Unknown(UnknownReason.CONFIRMATION_TIMEOUT, null), run.await().outcome)
+        assertEquals(1, sender.sentCodeCopies.size)
+    }
+
+    @Test
+    fun `PROF-20 Profil pomyslnie ustawiony przed kodem to Failed UNRECOGNIZED_REPLY bez kodu`() = runTest {
+        val body = AapsSamples.profileSettingOk
+        val (_, early) = start(switch(100))
+        deliver(30_000, body)
+        assertEquals(SessionOutcome.Failed(FailureReason.UNRECOGNIZED_REPLY, body), early.await().outcome)
+        assertNoCode()
+    }
 }
