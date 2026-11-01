@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-11-01 (po #276)_
+_Ostatnia aktualizacja: 2026-11-01 (po #280)_
 
 ## Zrobione
 
@@ -41,6 +41,7 @@ _Ostatnia aktualizacja: 2026-11-01 (po #276)_
 | Test na telefonie (2026-11-01) | użytkownik potwierdził: klawiatura nie zasłania pola PIN w podsumowaniu; po odmowie AAPS przy za krótkim odstępie bolusa pokazuje się komunikat o odstępie | – |
 | Odstęp po błędzie bolusa | `Unknown(BOLUS_FAILED)` („Bolus nie powiodl sie” odebrany po wysłaniu kodu) nie wlicza się do odstępu, kolejny `BOLUS` można wysłać od razu (decyzja użytkownika); `BolusConfirmed` i pozostałe `Unknown` po kodzie nadal blokują; ryzyko podwójnej dawki przy częściowo podanym bolusie zapisane jako zaakceptowane | PR #274 (spec), #276 (kod, issue #275) |
 | Sprzątanie profilu | nieaktualne komentarze KDoc i nazwa `CommandParameter.Percent` | PR #273 (issue #271) |
+| Powiadomienie o ustawieniu profilu | AAPS wysyła po zmianie profilu (gdy zmiana ma identyfikator Nightscouta) do wszystkich numerów powiadomienie `profile_set_ok`; jego polski tekst zależy od builda: „Profil bazowy w pompie uaktualniony” albo „Profil pomyślnie ustawiony” (u użytkownika drugi, nieregularnie, czasem przed „Zmiana profilu wykonana”); oba rozpoznawane jako powiadomienie, nie potwierdzenie | PR #278 (spec), #280 (kod, issue #279) |
 | Porównanie z AAPS 4.0.0 | SMS Communicator istnieje w 4.0.0, ale zmienił się m.in. format `BG`, liczenie odstępu bolusa (od przyjęcia przez pompę, także po błędzie), zakres procentu profilu (30–250) i odmowy po kodzie; nowy Client Control (Nightscout, drugi telefon z AAPSClient) bez TOTP/PIN. Raport: [aaps-4.0.0-porownanie.md](aaps-4.0.0-porownanie.md) | – |
 | Test na telefonie | pierwsza instalacja APK (debug) na telefonie z AAPS: Historia, `BG`, `CARBS 1` z kodem działają; `PUMP` bez pompy przy telefonie nie dostaje stanu pompy (AAPS odpowiada spóźnionym „Odczyt statusu nie powiodl sie”, aplikacja traktuje to jako wiadomość nieoczekiwaną) | zamknięte issue #205 |
 
