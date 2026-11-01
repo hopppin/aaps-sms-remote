@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import pl.twojanazwa.aapsremote.commands.CarbsValidation
@@ -397,11 +398,14 @@ class CommandSessionProfileFlowTest {
     fun `PROF-20 samo powiadomienie o profilu bazowym po kodzie konczy sie CONFIRMATION_TIMEOUT po 360000 ms`() = runTest {
         val (session, run) = confirming()
         deliver(90_000, AapsSamples.profileBaseUpdated)
+        // Limit liczony od wysłania kodu (60 000), nie od powiadomienia (90 000).
         advanceTimeBy(60_000 + 360_000 - currentTime - 1)
         runCurrent()
         assertEquals(SessionPhase.AWAITING_CONFIRMATION, session.state.value.phase)
+        assertFalse(run.isCompleted)
         advanceTimeBy(1)
         runCurrent()
+        assertTrue(run.isCompleted)
         assertEquals(SessionOutcome.Unknown(UnknownReason.CONFIRMATION_TIMEOUT, null), run.await().outcome)
         assertEquals(1, sender.sentCodeCopies.size)
     }
