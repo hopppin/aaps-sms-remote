@@ -12,7 +12,7 @@ Użytkownik sprawdza z aplikacji aktualny profil AAPS (`PROFILE STATUS`) i zmien
 ## Zakres
 
 - Wpisy katalogu: `PROFILE STATUS` (bez kodu, jednym dotknięciem), zmiana profilu `PROFILE 1 <procent>` (z kodem, formularz procentu i podsumowanie z PIN-em). Wpis `PROFILE LIST` zostaje w katalogu, parserze i sesji, ale aplikacja nie ma przycisku, który go wysyła (zmiana 2026-10-30).
-- Parser: odpowiedź na `PROFILE STATUS`, lista profili (bez użycia w UI), prośba o kod zmiany profilu (porównanie procentu), „Zly kod”, potwierdzenie `Zmiana profilu wykonana` i powiadomienie `Profil bazowy w pompie uaktualniony` (zmiana 2026-10-31).
+- Parser: odpowiedź na `PROFILE STATUS`, lista profili (bez użycia w UI), prośba o kod zmiany profilu (porównanie procentu), „Zly kod”, potwierdzenie `Zmiana profilu wykonana` i powiadomienie `Profil bazowy w pompie uaktualniony` (zmiana 2026-10-31) albo `Profil pomyslnie ustawiony` (drugi tekst tego samego powiadomienia, zmiana 2026-11-01).
 - Sesja: `PROFILE STATUS` jak `BG`; zmiana profilu jak polecenie z kodem, z potwierdzeniem po kodzie (PROF-19, PROF-20).
 - UI: przyciski „Aktualny profil” i „Zmień profil” w panelu, formularz procentu, podsumowanie z PIN-em, przebieg i wynik.
 - Historia: polecenia profilu, numer i procent profilu, migracja bazy 2 → 3.
@@ -41,7 +41,7 @@ Użytkownik sprawdza z aplikacji aktualny profil AAPS (`PROFILE STATUS`) i zmien
 | R8 | Po poprawnym kodzie i udanym `createProfileSwitch` AAPS odsyła `Zmiana profilu wykonana` (jedna linia, bez stanu pompy) **tylko do nadawcy polecenia**; przy porażce – `Nieprawidlowy profil!`, też tylko do nadawcy. Prośba o kod idzie tylko do nadawcy. | z kodu AAPS 3.4.2.6 (nie z telefonu), `Plugin.kt:701-718`, `AuthRequest.kt:39` | PROF-19 (O2 zamknięte); `Nieprawidlowy profil!` po kodzie = nierozpoznana. |
 | R9 | Zły kod: `Zly kod. Polecenie anulowano.` do nadawcy; prośba zużyta. Zły kod jest sprawdzany przed czasem ważności. | z kodu AAPS 3.4.2.6 (nie z telefonu), `AuthRequest.kt:51-56` | PROF-10, PROF-12 bez zmian (O3 zamknięte). |
 | R10 | `PROFILE LIST` przy pustej liście → `Nieprawidlowy profil!`; pozycje listy rozdzielone LF, bez nagłówka. | z kodu AAPS 3.4.2.6 (nie z telefonu), `Plugin.kt:673-683` | PROF-07 bez zmian; `Nieprawidlowy profil!` = nierozpoznana (O4 zamknięte). |
-| R11 | Osobna ścieżka kolejki pompy (`CommandSetProfile.kt:52-57`) wysyła do wszystkich numerów `Profil bazowy w pompie uaktualniony` po ustawieniu profilu w pompie, gdy zmiana pochodzi z Nightscout. Czy zmiana z SMS też ją uruchamia – wywnioskowane, nie sprawdzone. | z kodu AAPS 3.4.2.6 (nie z telefonu) | PROF-20: powiadomienie nie jest potwierdzeniem zmiany profilu. |
+| R11 | Osobna ścieżka kolejki pompy (`CommandSetProfile.kt:52-57`) wysyła do wszystkich numerów powiadomienie `profile_set_ok`, gdy pompa przyjęła nowy profil (`r.enacted`), zmiana profilu ma identyfikator Nightscouta (`hasNsId`), AAPS nie jest AAPSCLIENT, SMS Communicator jest włączony i nie ustawiono `doNotSendSmsOnProfileChange`. Zasób `profile_set_ok` ma w `values-pl-rPL` dwa teksty zależnie od builda: `Profil bazowy w pompie uaktualniony` (`core/ui`, `strings.xml:6`) i `Profil pomyślnie ustawiony` (`pump/omnipod/dash`, `strings.xml:40`; nadpisuje zasób w buildzie z modułem Omnipod Dash). Po `stripAccents`: `Profil bazowy w pompie uaktualniony`, `Profil pomyslnie ustawiony`. Użytkownik (2026-11-01) po zmianie profilu z SMS czasem dostaje `Profil pomyslnie ustawiony` przed `Zmiana profilu wykonana`, a czasem nie (warunki wyżej). | z kodu AAPS 3.4.2.6 (teksty, warunki); obserwacja użytkownika na telefonie 2026-11-01 (że przychodzi, kolejność) | PROF-20: oba teksty to to samo powiadomienie; nie jest potwierdzeniem zmiany profilu. |
 
 Od 2026-10-31 otwarte punkty O1 – O4 rozstrzyga kod AAPS 3.4.2.6 (R7 – R10). Nie były obserwowane na telefonie; wzorce oparte na nich sprawdza W5.
 
@@ -341,7 +341,7 @@ Sesja zmiany profilu przyjmuje ten wynik jako potwierdzenie tylko w `AWAITING_CO
 
 ### PROF-20: Powiadomienie o profilu bazowym nie jest potwierdzeniem
 
-W kontekście „zmiana profilu (procent p)” wiadomość, której cała treść po normalizacji to dokładnie `Profil bazowy w pompie uaktualniony`, daje wynik „powiadomienie o profilu bazowym” z treścią (R11). W innych kontekstach – „nierozpoznana” (bez zmian). Sesja zmiany profilu:
+W kontekście „zmiana profilu (procent p)” wiadomość, której cała treść po normalizacji to dokładnie `Profil bazowy w pompie uaktualniony` albo dokładnie `Profil pomyslnie ustawiony`, daje wynik „powiadomienie o profilu bazowym” z treścią (R11; oba teksty to ten sam zasób AAPS `profile_set_ok`, więc ten sam wynik, zmiana 2026-11-01). Inne treści, w tym wersje z polskimi znakami (`Profil pomyślnie ustawiony`), angielskie (`Basal profile in pump updated`, `Profile set OK`) i dłuższe (np. z dopisanym tekstem) – „nierozpoznana”. W innych kontekstach – „nierozpoznana” (bez zmian). Sesja zmiany profilu:
 
 - w `AWAITING_CONFIRMATION` (i dla wiadomości z `SENDING_CODE`) – wiadomość nieoczekiwana (SESSION-18): sesja czeka dalej na potwierdzenie albo limit 6 min (SESSION-15); powiadomienie nigdy nie daje `ProfileSwitchConfirmed`;
 - w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` – jak „nierozpoznana”: `Failed(UNRECOGNIZED_REPLY)`, kod nie jest wysyłany (zmiana profilu z innego źródła przed kodem = stan AAPS inny, niż zakłada sesja; stop). Powiadomienie jest rozsyłane do wszystkich numerów niezależnie od polecenia aplikacji (R11), więc może przerwać poprawną sesję przed kodem; to świadome, ostrożne zachowanie (fail-closed), a ponowienie ręczne jest właściwe.
@@ -352,6 +352,13 @@ W kontekście „zmiana profilu (procent p)” wiadomość, której cała treś�
 - **Zakładając** sesję zmiany (100) z kodem wysłanym w chwili 60 000, **gdy** w chwili 90 000 przychodzi `profile-bazowy-uaktualniony.txt`, a w chwili 120 000 `profile-sukces.txt`, **wtedy** po pierwszej wiadomości faza = `AWAITING_CONFIRMATION` z 1 wiadomością nieoczekiwaną, a wynik końcowy = `ProfileSwitchConfirmed(100)`.
 - **Zakładając** sesję zmiany (100) z kodem wysłanym w chwili 60 000, **gdy** przychodzi tylko `profile-bazowy-uaktualniony.txt`, **wtedy** po 360 000 ms od wysłania kodu wynik = `Unknown(CONFIRMATION_TIMEOUT)`.
 - **Zakładając** sesję zmiany (100) w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `profile-bazowy-uaktualniony.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` z tą treścią i port nie dostał kodu.
+- **Zakładając** `profile-pomyslnie-ustawiony.txt`, **gdy** kontekst = zmiana (100), **wtedy** wynik = powiadomienie o profilu bazowym z treścią równą treści pliku, które nie jest ani prośbą o kod, ani niezgodnością, ani potwierdzeniem; **gdy** kontekst = `BG`, `PUMP`, `Carbs(1)`, `Bolus(10)`, stan profilu albo lista profili, **wtedy** nierozpoznana.
+- **Zakładając** kontekst = zmiana (100), **gdy** treść to `Profil pomyślnie ustawiony` (z `ś`), `Profile set OK`, `Basal profile in pump updated`, `Profil pomyslnie ustawiony.` (z kropką) albo `Profil pomyslnie ustawiony` + LF + `Zmiana profilu wykonana`, **wtedy** wynik = nierozpoznana.
+- **Zakładając** sesję zmiany (100) z kodem wysłanym w chwili 60 000, **gdy** w chwili 90 000 przychodzi `profile-pomyslnie-ustawiony.txt`, a w chwili 120 000 `profile-sukces.txt`, **wtedy** po pierwszej wiadomości faza = `AWAITING_CONFIRMATION` z 1 wiadomością nieoczekiwaną, a wynik końcowy = `ProfileSwitchConfirmed(100)`; port dostał dokładnie 1 kod.
+- **Zakładając** sesję zmiany (100) z kodem wysłanym w chwili 60 000, **gdy** w chwili 90 000 przychodzi `profile-sukces.txt`, a w chwili 120 000 `profile-pomyslnie-ustawiony.txt`, **wtedy** wynik = `ProfileSwitchConfirmed(100)` po pierwszej wiadomości, druga wiadomość go nie zmienia, a port dostał dokładnie 1 kod.
+- **Zakładając** sesję zmiany (100) z kodem wysłanym w chwili 60 000, **gdy** przychodzi tylko `profile-pomyslnie-ustawiony.txt`, **wtedy** po 360 000 ms od wysłania kodu wynik = `Unknown(CONFIRMATION_TIMEOUT)`.
+- **Zakładając** sesję zmiany (100) w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `profile-pomyslnie-ustawiony.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` z tą treścią i port nie dostał kodu.
+- **Zakładając** wynik parsera z `profile-pomyslnie-ustawiony.txt` w kontekście zmiany (100), **gdy** wywołano `toString()`, **wtedy** tekst nie zawiera `pomyslnie` ani `ustawiony` (nazwa typu `ProfileBaseUpdated` jest dozwolona).
 
 ### PROF-21: Wynik i historia potwierdzenia zmiany profilu
 
@@ -375,7 +382,7 @@ Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAP
 | Zły kod | `Failed(WRONG_CODE)` | PROF-12 |
 | `Zmiana profilu wykonana` po kodzie | `ProfileSwitchConfirmed` z procentem wysłanym | PROF-19, PROF-21 |
 | `Zmiana profilu wykonana` przed kodem albo odebrana przed wysłaniem kodu | wiadomość nieoczekiwana, kod nie jest wysyłany | PROF-19 |
-| `Profil bazowy w pompie uaktualniony` po kodzie / przed kodem | wiadomość nieoczekiwana, sesja czeka dalej / `Failed(UNRECOGNIZED_REPLY)` bez kodu | PROF-20 |
+| `Profil bazowy w pompie uaktualniony` albo `Profil pomyslnie ustawiony` po kodzie / przed kodem | wiadomość nieoczekiwana, sesja czeka dalej / `Failed(UNRECOGNIZED_REPLY)` bez kodu | PROF-20 |
 | `Nieprawidlowy profil!` po kodzie (porażka zmiany w AAPS) | `Unknown(UNRECOGNIZED_REPLY)` z treścią i ostrzeżeniem | PROF-10, PROF-12 |
 | Nieznana odpowiedź po kodzie | `Unknown(UNRECOGNIZED_REPLY)` z treścią i ostrzeżeniem | PROF-12, PROF-16 |
 | „Aktualny profil” albo „Zmień profil” w trakcie innego polecenia | „zajęte” / przycisk nieaktywny | PROF-11, PROF-13, CMDUI-05 |
@@ -389,13 +396,13 @@ Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAP
 - **Bez ponawiania:** najwyżej 1 SMS polecenia i 1 kod na sesję; aplikacja nie zmienia profilu sama.
 - **PIN i kod:** zasady Spec 004 i 009; fokus pola PIN nie zapisuje PIN-u (CMDUI-28); `FLAG_SECURE` na formularzu, podsumowaniu, przebiegu i wyniku (PROF-15, CMDUI-23).
 - **`PROFILE STATUS` bez kodu** nie nadpisuje w AAPS oczekującej prośby o kod (A6, R6; poprawione 2026-10-31), a aplikacja i tak nie wyśle go w trakcie własnego polecenia (SESSION-22).
-- **Potwierdzenie i powiadomienie nie dają kodu (PROF-19, PROF-20):** rozpoznanie `Zmiana profilu wykonana` albo `Profil bazowy w pompie uaktualniony` nigdy nie prowadzi do wysłania kodu ani drugiego polecenia. Potwierdzenie jest przyjmowane tylko po wysłaniu kodu, od numeru AAPS, z chwilą odbioru ≥ chwili wysłania kodu; powiadomienie o profilu bazowym nie jest potwierdzeniem. Ryzyko szczątkowe: `Zmiana profilu wykonana` nie zawiera procentu ani nazwy, więc gdy w oknie oczekiwania przyjdzie potwierdzenie innej zmiany profilu z numeru aplikacji (np. ręczne `PROFILE 2 100` wysłane z tego samego telefonu), aplikacja przyjmie je jako potwierdzenie; dlatego komunikat mówi o potwierdzeniu AAPS, a do sprawdzenia aktualnego profilu służy „Aktualny profil”.
+- **Potwierdzenie i powiadomienie nie dają kodu (PROF-19, PROF-20):** rozpoznanie `Zmiana profilu wykonana`, `Profil bazowy w pompie uaktualniony` albo `Profil pomyslnie ustawiony` nigdy nie prowadzi do wysłania kodu ani drugiego polecenia. Potwierdzenie jest przyjmowane tylko po wysłaniu kodu, od numeru AAPS, z chwilą odbioru ≥ chwili wysłania kodu; sukces zmiany profilu potwierdza wyłącznie `Zmiana profilu wykonana`. Powiadomienie o profilu bazowym (oba teksty) nie jest potwierdzeniem, mimo że `Profil pomyslnie ustawiony` brzmi jak sukces: przychodzi do wszystkich numerów i tylko przy części zmian (R11). Ryzyko szczątkowe: `Zmiana profilu wykonana` nie zawiera procentu ani nazwy, więc gdy w oknie oczekiwania przyjdzie potwierdzenie innej zmiany profilu z numeru aplikacji (np. ręczne `PROFILE 2 100` wysłane z tego samego telefonu), aplikacja przyjmie je jako potwierdzenie; dlatego komunikat mówi o potwierdzeniu AAPS, a do sprawdzenia aktualnego profilu służy „Aktualny profil”.
 - **Dane w repo:** domyślne nazwy profili AAPS, imię `Jan`; brak numerów, PIN-ów, kodów.
 
 ## Dane testowe
 
 - [dane/](dane/README.md): `profile-status.txt`, `profile-list.txt`, `profile-prosba-o-kod.txt`, `profile-bledny-format.txt` – prawdziwe SMS-y użytkownika (imię → `Jan`).
-- [dane/](dane/README.md): `profile-sukces.txt`, `profile-bazowy-uaktualniony.txt`, `profile-nieprawidlowy.txt` – treści z kodu AAPS 3.4.2.6 (zasoby `values-pl-rPL` po `stripAccents`), nie z telefonu; źródło: [dane/aaps-kod-zrodlowy.md](dane/aaps-kod-zrodlowy.md).
+- [dane/](dane/README.md): `profile-sukces.txt`, `profile-bazowy-uaktualniony.txt`, `profile-pomyslnie-ustawiony.txt`, `profile-nieprawidlowy.txt` – treści z kodu AAPS 3.4.2.6 (zasoby `values-pl-rPL` po `stripAccents`), nie z telefonu; źródło: [dane/aaps-kod-zrodlowy.md](dane/aaps-kod-zrodlowy.md).
 - Warianty syntetyczne tylko w kryteriach (np. prośba z `LocalProfile2 100%`).
 - Weryfikacja na telefonie: AAPS z wirtualną pompą; po teście przywrócić profil 100%.
 
@@ -407,7 +414,7 @@ Wynik `ProfileSwitchConfirmed` (CMDUI-19): rodzaj „sukces”, komunikat „AAP
 | W2 | Zmiana profilu 1 na 90% (wirtualna pompa): formularz, podsumowanie, kod, wynik z treścią prośby (nazwa profilu); potem powrót na 100% (`PROFILE 1 100`). Od 2026-10-31 nie jest warunkiem scalenia: O1 – O3 rozstrzyga kod AAPS 3.4.2.6 (R7 – R9); zgodność z telefonem sprawdza W5 | PROF-04, PROF-12, PROF-15, PROF-16 |
 | W3 | Historia po zadaniu 2: nowy wpis „Zmiana profilu 1, 90%”, wcześniejsze wpisy zachowane (migracja 2 → 3 sprawdzona w pierwszej wersji) | PROF-17 |
 | W4 | Przejście na Ustawienia z otwartym formularzem → po powrocie panel; „Zmień profil” → tekst `100` | PROF-15 |
-| W5 | Po zadaniu 3 zmiany 2026-10-31 (wynik w opisie PR, nie warunek scalenia): zmiana profilu 1 na 90% → wynik „AAPS potwierdził zmianę profilu (polecenie: profil 1, 90%).” i treść `Zmiana profilu wykonana`; zły PIN → „zły kod”; zanotować, czy przyszło też `Profil bazowy w pompie uaktualniony` (R11). Gdy treść z telefonu różni się od pliku z `dane/` – PR `Spec:` z poprawką | PROF-19 – PROF-21 |
+| W5 | Po zadaniu 3 zmiany 2026-10-31 (wynik w opisie PR, nie warunek scalenia): zmiana profilu 1 na 90% → wynik „AAPS potwierdził zmianę profilu (polecenie: profil 1, 90%).” i treść `Zmiana profilu wykonana`; zły PIN → „zły kod”; zanotować, czy przyszło też `Profil bazowy w pompie uaktualniony` albo `Profil pomyslnie ustawiony` (R11; użytkownik 2026-11-01: `Profil pomyslnie ustawiony` czasem przychodzi przed `Zmiana profilu wykonana`) i że wynik to mimo to potwierdzenie, nie „nieznany”. Gdy treść z telefonu różni się od pliku z `dane/` – PR `Spec:` z poprawką | PROF-19 – PROF-21 |
 
 ## Otwarte pytania
 
@@ -444,14 +451,20 @@ Propozycje specyfikatora w zmianie 2026-10-31 (scalenie PR `Spec: …` = akcepta
 
 - [x] **P13. Rozpoznawanie po kodzie (PROF-19 – PROF-21):** `Zmiana profilu wykonana` → `ProfileSwitchConfirmed` z procentem wysłanym, komunikat „AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).”; `Profil bazowy w pompie uaktualniony` po kodzie → wiadomość nieoczekiwana, przed kodem → stop bez kodu. Alternatywa: zostawić `Unknown(UNRECOGNIZED_REPLY)` (P4) – bezpieczne, ale każdy udany wynik wymagał sprawdzenia w AAPS.
 
+Propozycje specyfikatora w zmianie 2026-11-01 (scalenie PR `Spec: …` = akceptacja):
+
+- [x] **P14. Drugi tekst powiadomienia (PROF-20):** `Profil pomyslnie ustawiony` daje ten sam wynik co `Profil bazowy w pompie uaktualniony` (bez nowego rodzaju wyniku i bez zmian w sesji). Angielskie teksty `profile_set_ok` (`Basal profile in pump updated`, `Profile set OK`) nie są rozpoznawane: wszystkie wzorce parsera dotyczą polskiej wersji AAPS 3.4.2.6 (P6, `AapsPl3426Patterns`), a angielski bez reszty wzorców nic by nie dał. Alternatywa: zostawić `Profil pomyslnie ustawiony` jako „nierozpoznana” – bezpieczne, ale udana zmiana kończy się „nieznanym”, gdy powiadomienie przyjdzie przed potwierdzeniem.
+
 ## Przyszłe zmiany (nie blokują)
 
 - Okno „Na pewno P%?” dla procentu spoza 80–120% (sugestia z recenzji PR #221; dziś procent jest tylko w podsumowaniu).
 - Rozpoznawanie odmów i porażek profilu z kodu AAPS 3.4.2.6 (R8, R10): `Nieprawidlowy profil!` po kodzie (np. jako `Unknown` z czytelnym powodem), `Nie skonfigurowano`, `Nie zaladowano profilu z NS`, `Zdalne komendy nie sa dozwolone` przed kodem, `Przekroczono limit czasu oczekiwania na zakonczenie poprzedniej komunikacji z pompa` po kodzie. Dziś „nierozpoznana” z treścią.
-- Powiadomienie `Profil bazowy w pompie uaktualniony` w sesjach innych niż zmiana profilu (dziś „nierozpoznana”: w `BG` – `Failed(UNRECOGNIZED_REPLY)`, po kodzie `CARBS`/`BOLUS` – `Unknown`).
+- Powiadomienie `Profil bazowy w pompie uaktualniony` / `Profil pomyslnie ustawiony` w sesjach innych niż zmiana profilu (dziś „nierozpoznana”: w `BG` – `Failed(UNRECOGNIZED_REPLY)`, po kodzie `CARBS`/`BOLUS` – `Unknown`).
 - Usunięcie nieużywanego `PROFILE LIST` (`CommandId.PROFILE_LIST`, `Command.ProfileList`, `ExpectedCommand.ProfileList`, `ProfileListReport`, wzorzec listy, gałęzie sesji i wyniku) – wymaga zmiany CMD-01 (Spec 003), PARSER-01 (Spec 002), SESSION-06 (Spec 004) oraz PROF-01, PROF-04, PROF-05, PROF-07, PROF-11, PROF-16; `HistoryCommand.PROFILE_LIST` musi zostać dla starych wpisów.
 
 ## Historia zmian
+
+- **2026-11-01 – drugi tekst powiadomienia o ustawieniu profilu.** Użytkownik po zmianie profilu czasem dostaje `Profil pomyslnie ustawiony` przed `Zmiana profilu wykonana`; dziś to „nierozpoznana”, więc sesja kończy się `Unknown(UNRECOGNIZED_REPLY)` przed potwierdzeniem. Z kodu AAPS 3.4.2.6: to ten sam zasób `profile_set_ok` co `Profil bazowy w pompie uaktualniony`, nadpisany w buildzie z modułem Omnipod Dash. Zmienione: „Zakres”, R11 (warunki wysyłki, oba teksty, obserwacja użytkownika), PROF-20 (drugi tekst, kryteria parsera i sesji w obu kolejnościach), „Przypadki błędów”, „Bezpieczeństwo” (sukces tylko z `Zmiana profilu wykonana`), „Dane testowe”, W5, „Przyszłe zmiany”, nowe P14; nowy plik `dane/profile-pomyslnie-ustawiony.txt`. Design: wzorzec `PROFILE_BASE_UPDATED`, decyzja, zadanie zmiany 2026-11-01. Identyfikatory wymagań bez zmian; Spec 002 i 004 bez zmian (opisują wynik „powiadomienie o profilu bazowym” bez treści wzorca).
 
 - **2026-10-31 – scalenie planowanych zmian po zmianach 2026-10-30 i 2026-10-31 (po wdrożeniu).** Wykonano zadanie 4 zmiany 2026-10-30 i zadanie 4 zmiany 2026-10-31 (design, jedno zadanie): treść PARSER-01 (Spec 002), CMD-01, CMD-07 – CMD-09 (Spec 003), SESSION-11 – SESSION-13 i „Bezpieczeństwo” (Spec 004), DATA-07, DATA-09 (Spec 007), CMDUI-19 (Spec 009), HISTUI-04 (Spec 010) przepisana zgodnie z tą specyfikacją i stanem kodu na `main`; wpisy „Planowane zmiany” zamienione na zwykłe wpisy historii. Wymagania Spec 013 bez zmian; w design 013 poprawiono opis kluczy tekstów historii wyniku `ProfileSwitchConfirmed` (wspólne `result_*`).
 

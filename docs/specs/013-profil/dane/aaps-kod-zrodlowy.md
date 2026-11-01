@@ -57,6 +57,7 @@ Rozgałęzienie `Plugin.kt:318-324`, kolejność kontroli (każda odmowa wychodz
 - Zły kod: wspólny `Zly kod. Polecenie anulowano.`
 - **Prośba o kod dla profilu idzie tylko do nadawcy polecenia** (`AuthRequest.with`, `AuthRequest.kt:39`).
 - Zmiana profilu wywołana przez INNY numer: kod SMS Communicatora nie rozsyła jej do pozostałych numerów (potwierdzenie `Zmiana profilu wykonana` tylko do nadawcy). Osobna ścieżka: `CommandSetProfile.kt:52-57` wysyła do wszystkich numerów `Profil bazowy w pompie uaktualniony` / `Profil bazowy w pompie uaktualniony` (`profile_set_ok`, pl-ui:6), ale tylko gdy przełączenie pochodzi z NS (`hasNsId`), nie jest AAPSCLIENT i nie wyłączono `doNotSendSmsOnProfileChange`. Czy zmiana z SMS wywołuje tę ścieżkę – **wywnioskowane, nie sprawdzone do końca** (zależy od `hasNsId` po stronie kolejki). W praktyce nasz numer może więc dostać `Profil bazowy w pompie uaktualniony` bez własnego polecenia; trzeba to traktować jako nieznaną wiadomość (nie jako potwierdzenie).
+- Uzupełnienie 2026-11-01: dokładny warunek (`CommandSetProfile.kt:54-56`) to `profileSwitch != null && r.enacted && hasNsId && !config.AAPSCLIENT`, potem `smsCommunicator.isEnabled() && !config.doNotSendSmsOnProfileChange()`; tekst idzie przez `sendNotificationToAllNumbers` → `sendSMS` ze `stripAccents` (`Plugin.kt:1237-1253`). Zasób `profile_set_ok` ma drugi polski tekst: `Profil pomyślnie ustawiony` / `Profil pomyslnie ustawiony` (`pump/omnipod/dash/src/main/res/values-pl-rPL/strings.xml:40`; angielski `Profile set OK`, `values/strings.xml:49`), który w buildzie z modułem Omnipod Dash nadpisuje tekst z `core/ui` (angielski `Basal profile in pump updated`). Inne użycia `profile_set_ok` w modułach pomp to powiadomienia w aplikacji AAPS, nie SMS. Użytkownik (2026-11-01) obserwuje na telefonie `Profil pomyslnie ustawiony` po części zmian profilu z SMS, przed `Zmiana profilu wykonana` – zgodne z warunkiem wyżej.
 
 ## d) Nadpisywanie oczekującej prośby
 
@@ -83,6 +84,6 @@ Stan to jedno pole `messageToConfirm` (`Plugin.kt:136`), bez identyfikatora pro�
 | c) `PROFILE 1 100` | równoważne `PROFILE 1`, prośba o kod identyczna | kod |
 | c) błędy | numer > liczba profili, 0, nieliczbowy; procent 0 → `Bledny format`; górnego zakresu procentu brak | kod |
 | c) sukces / adresaci | `Zmiana profilu wykonana` tylko do nadawcy; prośba o kod tylko do nadawcy | kod |
-| c) inny numer | brak rozesłania przez SMS Communicator; możliwa osobna wiadomość `Profil bazowy w pompie uaktualniony` do wszystkich (tylko gdy zmiana z NS) | kod / wywnioskowane |
+| c) inny numer | brak rozesłania przez SMS Communicator; możliwa osobna wiadomość `Profil bazowy w pompie uaktualniony` albo (build z Omnipod Dash) `Profil pomyslnie ustawiony` do wszystkich (tylko gdy zmiana ma `hasNsId`) | kod / wywnioskowane |
 | d) nadpisanie | nadpisują polecenia tworzące prośbę; `PROFILE STATUS`/`BG` nie | kod |
 | e) ważność | 5 min | kod |
