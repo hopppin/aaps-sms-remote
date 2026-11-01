@@ -95,9 +95,10 @@ class CommandLauncherBolusTest {
     }
 
     @Test
-    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min daje BOLUS_INTERVAL z 5 min`() = runTest {
+    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min nie blokuje`() = runTest {
         val entry = bolusEntry(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED), codeSentAt = T0 - 600_000)
-        env(this, entry).assertRejected(LaunchRejection.BOLUS_INTERVAL, 5)
+        env(this, entry).assertStarted()
+        runCurrent()
     }
 
     @Test
