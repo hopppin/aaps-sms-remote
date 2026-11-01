@@ -14,7 +14,7 @@
 | [profile-bledny-format.txt](profile-bledny-format.txt) | `PROFILE 99` (numer spoza listy) i `PROFILE 1 0` (procent 0) | odmowa, ta sama treść w obu przypadkach | 1 |
 | [profile-sukces.txt](profile-sukces.txt) | `PROFILE 1 <p>` + poprawny kod | potwierdzenie zmiany profilu (`sms_profile_switch_created`), tylko do nadawcy – **z kodu AAPS** | 1 |
 | [profile-bazowy-uaktualniony.txt](profile-bazowy-uaktualniony.txt) | brak (powiadomienie do wszystkich numerów po ustawieniu profilu w pompie, `profile_set_ok`) | powiadomienie, nie potwierdzenie – **z kodu AAPS** (tekst z `core/ui`) | 1 |
-| [profile-pomyslnie-ustawiony.txt](profile-pomyslnie-ustawiony.txt) | brak (to samo powiadomienie `profile_set_ok` co wyżej) | powiadomienie, nie potwierdzenie – **z kodu AAPS** (tekst z `pump/omnipod/dash`, nadpisuje zasób w buildzie z Omnipod Dash) | 1 |
+| [profile-pomyslnie-ustawiony.txt](profile-pomyslnie-ustawiony.txt) | brak (to samo powiadomienie `profile_set_ok` co wyżej) | powiadomienie, nie potwierdzenie – **z kodu AAPS** (tekst z `pump/omnipod/dash`, prawdopodobnie nadpisuje zasób w buildzie z Omnipod Dash – wniosek, nie fakt z kodu) | 1 |
 | [profile-nieprawidlowy.txt](profile-nieprawidlowy.txt) | `PROFILE LIST` przy pustej liście albo porażka zmiany po kodzie (`invalid_profile`) | odmowa – **z kodu AAPS** | 1 |
 | [aaps-kod-zrodlowy.md](aaps-kod-zrodlowy.md) | – | raport z analizy kodu AndroidAPS 3.4.2.6 dla BOLUS i PROFILE (źródło plików oznaczonych „z kodu AAPS”) | – |
 
