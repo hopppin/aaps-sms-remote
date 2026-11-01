@@ -165,7 +165,7 @@ Kolejność w `launch` dla `BOLUS`: kroki 0–3 CMDUI-12 → LIM-09 → BOL-12 �
 | Kolumna `bolus_centi_units` + migracja 1 → 2 | wspólna kolumna „ilość” | DATA-09 i istniejące wiersze bez zmian; brak migracji destrukcyjnej (DATA-14). |
 | Migracja sprawdzana testem JVM (SQL + `2.json`) i ręcznie (W3) | `MigrationTestHelper` | Projekt nie używa `androidTest` ani Robolectric (decyzja użytkownika w Spec 007 – 009). |
 | `Failed(WRONG_CODE)` liczy się do odstępu | pomijać wpisy ze złym kodem | Kod był wysłany; aplikacja nie ma pewności, czy AAPS go odrzucił – strona bezpieczna (BOL-12). |
-| `Unknown(BOLUS_FAILED)` nie liczy się do odstępu (2026-11-01) | liczyć jak inne `Unknown` | Decyzja użytkownika; AAPS liczy odstęp tylko od udanego bolusa (B10), więc blokada w aplikacji nie chroniła przed niczym, czego AAPS by nie przepuścił, a utrudniała ponowienie po potwierdzonym przez AAPS błędzie (BOL-12). |
+| `Unknown(BOLUS_FAILED)` nie liczy się do odstępu (2026-11-01) | liczyć jak inne `Unknown` | Decyzja użytkownika z 2026-11-01 (po teście na telefonie chce móc od razu ponowić `BOLUS` po komunikacie AAPS „Bolus nie powiodl sie”; `launch` zwraca wtedy `Started`). Kontekst: AAPS liczy odstęp tylko od udanego bolusa (B10); odstęp w aplikacji był świadomie ostrzejszy, więc to nie jest powód, tylko tło (BOL-12). |
 | Port parsera w `CommandSession` (parametr z wartością domyślną) | testy tylko na prawdziwym parserze | BOL-19 da się sprawdzić tylko przy wyniku, którego prawdziwy parser w danym kontekście nie zwraca. |
 | Brak szybkich wartości bolusa | jak `CARBS` | Ilość insuliny zawsze wpisywana świadomie; użytkownik nie prosił. |
 
@@ -275,7 +275,7 @@ val counts = entry.outcome != HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED)
 
 | Wymaganie | Test |
 | --- | --- |
-| BOL-12, BOL-21 (odstęp) | `BolusIntervalTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 60 000` → `null`; ten wpis razem z `BolusConfirmed` z kodem `T0 − 600 000` → 5; `Unknown(CONFIRMATION_TIMEOUT)`, `Unknown(UNRECOGNIZED_REPLY)`, `Unknown(null)` z kodem `T0 − 60 000` → 14; `BolusConfirmed` – dotychczasowe testy. `CommandLauncherBolusTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 600 000` → `Started` (zamiast dzisiejszego `BOLUS_INTERVAL` z 5). |
+| BOL-12, BOL-21 (odstęp) | `BolusIntervalTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 60 000` → `null`; kilka takich wpisów → `null`; ten wpis razem z `BolusConfirmed` z kodem `T0 − 600 000` (także gdy `BolusConfirmed` nowszy) → 5; `BOLUS_FAILED` `T0 − 600 000` i późniejszy `BolusConfirmed` `T0 − 60 000` → 14; `Unknown(AMOUNT_MISMATCH)` z kodem `T0 − 60 000` → 14; `Unknown(CONFIRMATION_TIMEOUT)`, `Unknown(UNRECOGNIZED_REPLY)`, `Unknown(null)` z kodem `T0 − 60 000` → 14; `BolusConfirmed` – dotychczasowe testy. `CommandLauncherBolusTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 600 000` → `Started` (zamiast dzisiejszego `BOLUS_INTERVAL` z 5). |
 
 ### Zadania zmiany 2026-11-01
 
