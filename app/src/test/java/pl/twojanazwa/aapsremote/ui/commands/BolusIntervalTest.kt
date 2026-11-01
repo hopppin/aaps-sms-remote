@@ -43,10 +43,38 @@ class BolusIntervalTest {
         }
     }
 
+    private val failed = HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED)
+
     @Test
-    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min zostawia 5 min`() {
-        val entry = bolusEntry(HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED), codeSentAt = T0 - 600_000)
-        assertEquals(5, left(entry))
+    fun `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 1 min nie liczy sie do odstepu`() {
+        assertNull(left(bolusEntry(failed, codeSentAt = T0 - 60_000)))
+    }
+
+    @Test
+    fun `BOL-21 kilka wpisow BOLUS_FAILED nie liczy sie do odstepu`() {
+        assertNull(left(bolusEntry(failed, codeSentAt = T0 - 60_000), bolusEntry(failed, codeSentAt = T0 - 120_000)))
+    }
+
+    @Test
+    fun `BOL-12 BolusConfirmed nowszy niz BOLUS_FAILED blokuje`() {
+        val confirmed = bolusEntry(HistoryOutcome.BolusConfirmed, codeSentAt = T0 - 600_000)
+        assertEquals(5, left(bolusEntry(failed, codeSentAt = T0 - 660_000), confirmed))
+        assertEquals(5, left(bolusEntry(failed, codeSentAt = T0 - 600_000), confirmed))
+    }
+
+    @Test
+    fun `BOL-12 BolusConfirmed jako druga proba po bledzie daje 14`() {
+        val confirmed = bolusEntry(HistoryOutcome.BolusConfirmed, codeSentAt = T0 - 60_000)
+        assertEquals(14, left(bolusEntry(failed, codeSentAt = T0 - 600_000), confirmed))
+    }
+
+    @Test
+    fun `BOL-21 inne Unknown po kodzie nadal blokuja`() {
+        listOf(
+            UnknownReason.AMOUNT_MISMATCH, UnknownReason.CONFIRMATION_TIMEOUT, UnknownReason.UNRECOGNIZED_REPLY, null,
+        ).forEach {
+            assertEquals(14, left(bolusEntry(HistoryOutcome.Unknown(it), codeSentAt = T0 - 60_000)), "$it")
+        }
     }
 
     @Test
