@@ -165,6 +165,7 @@ Kolejność w `launch` dla `BOLUS`: kroki 0–3 CMDUI-12 → LIM-09 → BOL-12 �
 | Kolumna `bolus_centi_units` + migracja 1 → 2 | wspólna kolumna „ilość” | DATA-09 i istniejące wiersze bez zmian; brak migracji destrukcyjnej (DATA-14). |
 | Migracja sprawdzana testem JVM (SQL + `2.json`) i ręcznie (W3) | `MigrationTestHelper` | Projekt nie używa `androidTest` ani Robolectric (decyzja użytkownika w Spec 007 – 009). |
 | `Failed(WRONG_CODE)` liczy się do odstępu | pomijać wpisy ze złym kodem | Kod był wysłany; aplikacja nie ma pewności, czy AAPS go odrzucił – strona bezpieczna (BOL-12). |
+| `Unknown(BOLUS_FAILED)` nie liczy się do odstępu (2026-11-01) | liczyć jak inne `Unknown` | Decyzja użytkownika z 2026-11-01 (po teście na telefonie chce móc od razu ponowić `BOLUS` po komunikacie AAPS „Bolus nie powiodl sie”; `launch` zwraca wtedy `Started`). Kontekst: AAPS liczy odstęp tylko od udanego bolusa (B10); odstęp w aplikacji był świadomie ostrzejszy, więc to nie jest powód, tylko tło (BOL-12). |
 | Port parsera w `CommandSession` (parametr z wartością domyślną) | testy tylko na prawdziwym parserze | BOL-19 da się sprawdzić tylko przy wyniku, którego prawdziwy parser w danym kontekście nie zwraca. |
 | Brak szybkich wartości bolusa | jak `CARBS` | Ilość insuliny zawsze wpisywana świadomie; użytkownik nie prosił. |
 
@@ -244,7 +245,7 @@ enum class UnknownReason { /* dotychczasowe */ BOLUS_FAILED }                   
 //   BolusRefused – istniejąca gałąź else → Unknown(UNRECOGNIZED_REPLY)
 ```
 
-`HistoryCodec`: literały `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` w `FAILURE_REASONS`/`encode`, `BOLUS_FAILED` w `UNKNOWN_REASONS`/`encode`. `ResultMessages`/`ResultMapper`, `HistoryEntryMapper`: nowe klucze `strings.xml` (`result_failed_aaps_bolus_interval`, `result_failed_aaps_bolus_queue`, `result_unknown_bolus_failed`). `BolusInterval` bez zmian (wpis `Unknown` z kodem liczy się, `Failed` bez kodu – nie).
+`HistoryCodec`: literały `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` w `FAILURE_REASONS`/`encode`, `BOLUS_FAILED` w `UNKNOWN_REASONS`/`encode`. `ResultMessages`/`ResultMapper`, `HistoryEntryMapper`: nowe klucze `strings.xml` (`result_failed_aaps_bolus_interval`, `result_failed_aaps_bolus_queue`, `result_unknown_bolus_failed`). `BolusInterval` bez zmian (wpis `Unknown` z kodem liczy się, `Failed` bez kodu – nie); od 2026-11-01 wyjątek dla `Unknown(BOLUS_FAILED)` – „Zmiana 2026-11-01”.
 
 | Decyzja | Alternatywy | Powód |
 | --- | --- | --- |
@@ -258,3 +259,24 @@ enum class UnknownReason { /* dotychczasowe */ BOLUS_FAILED }                   
 | BOL-20, BOL-21 (parser) | `BolusReplyParserTest`, `ParserRedactionTest` |
 | BOL-20, BOL-21 (sesja) | `CommandSessionBolusTest`, `BolusIntervalTest` |
 | BOL-22 | `ResultMapperBolusTest`, `HistoryCodecBolusTest`, `HistoryCodecTest` (parytet), `HistoryEntryMapperBolusTest` |
+
+## Zmiana 2026-11-01: błąd bolusa nie liczy się do odstępu (BOL-12, BOL-21)
+
+Interfejs `BolusInterval.minutesLeft` bez zmian (`null` = można). Zmienia się tylko warunek „liczy się”:
+
+```kotlin
+// BolusInterval.minutesLeft – warunek dla wpisu BOLUS:
+val counts = entry.outcome != HistoryOutcome.Unknown(UnknownReason.BOLUS_FAILED) &&
+    (entry.codeSentAtEpochMillis != null ||
+        entry.outcome is HistoryOutcome.BolusConfirmed || entry.outcome is HistoryOutcome.Unknown)
+```
+
+`HistoryOutcome.Unknown(null)` (nieodczytany powód, DATA-09) i pozostałe powody `Unknown` liczą się jak dotąd. `CommandLauncher`, sesja, parser, historia i teksty bez zmian.
+
+| Wymaganie | Test |
+| --- | --- |
+| BOL-12, BOL-21 (odstęp) | `BolusIntervalTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 60 000` → `null`; kilka takich wpisów → `null`; ten wpis razem z `BolusConfirmed` z kodem `T0 − 600 000` (także gdy `BolusConfirmed` nowszy) → 5; `BOLUS_FAILED` `T0 − 600 000` i późniejszy `BolusConfirmed` `T0 − 60 000` → 14; `Unknown(AMOUNT_MISMATCH)` z kodem `T0 − 60 000` → 14; `Unknown(CONFIRMATION_TIMEOUT)`, `Unknown(UNRECOGNIZED_REPLY)`, `Unknown(null)` z kodem `T0 − 60 000` → 14; `BolusConfirmed` – dotychczasowe testy. `CommandLauncherBolusTest`: `Unknown(BOLUS_FAILED)` z kodem `T0 − 600 000` → `Started` (zamiast dzisiejszego `BOLUS_INTERVAL` z 5). |
+
+### Zadania zmiany 2026-11-01
+
+1. **Odstęp: błąd bolusa się nie liczy** – `ui/commands/BolusInterval.kt` (warunek i KDoc); testy `BolusIntervalTest` (zmiana testu `BOL-21 Unknown BOLUS_FAILED z kodem sprzed 10 min zostawia 5 min` na wynik `null` i nowe przypadki z tabeli), `CommandLauncherBolusTest` (zmiana testu `BOL-21 Unknown BOLUS_FAILED … daje BOLUS_INTERVAL z 5 min` na `Started`). Wymagania: BOL-12, BOL-21. Etykiety `bezpieczenstwo`, `trudnosc:latwe`. PR opisuje W7, jeśli wystąpił błąd bolusa.

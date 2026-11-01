@@ -14,7 +14,7 @@ Użytkownik zleca z aplikacji bolus `BOLUS <j>`. Aplikacja wysyła polecenie tyl
 - Wpis katalogu `BOLUS` (wymaga kodu, podsumowanie z PIN-em), ilość w setnych jednostki, walidacja liczby i tekstu, treść SMS.
 - Parser: prośba o kod dla bolusa, potwierdzenie podania bolusa, niezgodna ilość, „Zly kod” w kontekście bolusa; od 2026-10-31 także odmowy AAPS przed kodem (minimalny odstęp, bolus w kolejce) i błąd bolusa po kodzie (BOL-20 – BOL-22).
 - Sesja: reguły przed kodem i po kodzie dla `BOLUS` (jak `CARBS`).
-- Sprawdzenie w aplikacji: limit ilości (Spec 011), pytanie „Na pewno X j?” powyżej połowy limitu, minimalny odstęp od ostatniego bolusa z aplikacji.
+- Sprawdzenie w aplikacji: limit ilości (Spec 011), pytanie „Na pewno X j?” powyżej połowy limitu, minimalny odstęp od ostatniego bolusa z aplikacji (od 2026-11-01 z wyjątkiem błędu bolusa `Unknown(BOLUS_FAILED)`, BOL-12).
 - UI: sekcja „Bolus” w panelu, okno „Na pewno”, podsumowanie z PIN-em, przebieg, wynik, `FLAG_SECURE`.
 - Historia: wpis `BOLUS` z ilością, nowy rodzaj wyniku, migracja bazy 1 → 2.
 
@@ -40,7 +40,7 @@ Użytkownik zleca z aplikacji bolus `BOLUS <j>`. Aplikacja wysyła polecenie tyl
 | B7 | W AAPS użytkownika: max bolus 5 j., minimalny odstęp między zdalnymi bolusami 15 min. | użytkownik | Wartości domyślne limitów (Spec 011). |
 | B8 | Zły kod: AAPS odsyła `Zly kod. Polecenie anulowano.` wspólnym kodem prośby o kod (`AuthRequest.kt:51-56`), także dla bolusa (z kodu AAPS 3.4.2.6, nie z telefonu). | kod (A2) | BOL-11 bez zmian; P4 potwierdzone z kodu. |
 | B9 | Potwierdzenie bolusa (`Bolus X U podany prawidlowo` i stan pompy) AAPS wysyła do **wszystkich** dozwolonych numerów (`sendSMSToAllNumbers`, `Plugin.kt:1023`), jak A5 dla `CARBS`; ilość w potwierdzeniu = faktycznie podana (`bolusDelivered`). | z kodu AAPS 3.4.2.6 (nie z telefonu) | BOL-11 i „Bezpieczeństwo” bez zmian (P7 potwierdzone z kodu). |
-| B10 | Minimalny odstęp AAPS dotyczy tylko `BOLUS <x>` (bez `MEAL`) i liczy się od ostatniego **udanego** zdalnego bolusa (po restarcie AAPS – brak); 15 min, a przy więcej niż jednym dozwolonym numerze – ustawienie AAPS 3–60 min (domyślnie 15). | z kodu AAPS 3.4.2.6 (nie z telefonu), `Plugin.kt:278-281`, `321`, `995` | BOL-12 bez zmian (odstęp aplikacji jest dodatkowy); odmowa AAPS – BOL-20. |
+| B10 | Minimalny odstęp AAPS dotyczy tylko `BOLUS <x>` (bez `MEAL`) i liczy się od ostatniego **udanego** zdalnego bolusa (po restarcie AAPS – brak); 15 min, a przy więcej niż jednym dozwolonym numerze – ustawienie AAPS 3–60 min (domyślnie 15). | z kodu AAPS 3.4.2.6 (nie z telefonu), `Plugin.kt:278-281`, `321`, `995` | Odstęp aplikacji jest dodatkowy (BOL-12); po błędzie bolusa (B5) `lastRemoteBolusTime` się nie zmienia, więc AAPS nie odmówi kolejnego bolusa – od 2026-11-01 wpis z błędem bolusa nie liczy się też do odstępu aplikacji (BOL-12); odmowa AAPS – BOL-20. |
 
 Od 2026-10-31 punkty wcześniej niezweryfikowane (odmowa przez odstęp, bolus w kolejce, błąd bolusa, zły kod, potwierdzenie do wszystkich numerów) rozstrzyga kod AAPS 3.4.2.6 (B4 – B10). Nie były obserwowane na telefonie; wzorce oparte na nich sprawdza W6.
 
@@ -257,11 +257,13 @@ Brak potwierdzenia przez 6 min → `Unknown(CONFIRMATION_TIMEOUT)` (SESSION-15).
 Dodatkowy bezpiecznik aplikacji (AAPS i tak stosuje własny odstęp, B4). `CommandLauncher.launch` dla `BOLUS`, po sprawdzeniu limitu (LIM-09), a przed odczytem sekretu: gdy odstęp z limitów = 0 – brak sprawdzenia. W przeciwnym razie czyta jeden stan historii (`CommandHistory.entries`, pierwsza emisja):
 
 - `Unavailable` → odrzucenie `BOLUS_HISTORY_UNAVAILABLE`.
-- Wpis **liczy się**, gdy polecenie = `BOLUS` i (chwila wysłania kodu ≠ `null` albo rodzaj wyniku = `BolusConfirmed` albo `Unknown`). Chwila odniesienia wpisu = wysłanie kodu, a gdy brak – zakończenie, a gdy brak – rozpoczęcie; wpis bez żadnej z nich jest pomijany.
+- Wpis **liczy się**, gdy polecenie = `BOLUS`, (chwila wysłania kodu ≠ `null` albo rodzaj wyniku = `BolusConfirmed` albo `Unknown`) i wynik ≠ `Unknown(BOLUS_FAILED)`. Wpis `Unknown` z nieodczytanym powodem (`null`, DATA-09) się liczy. Chwila odniesienia wpisu = wysłanie kodu, a gdy brak – zakończenie, a gdy brak – rozpoczęcie; wpis bez żadnej z nich jest pomijany.
 - Gdy istnieje liczący się wpis z chwilą odniesienia `t`, dla której `teraz − t < odstęp × 60 000 ms` albo `t > teraz` (zegar cofnięty) → odrzucenie `BOLUS_INTERVAL` z liczbą minut do końca odstępu (zaokrągloną w górę, najmniej 1; dla `t > teraz` – pełny odstęp).
 - „teraz” = `EpochClock` aplikacji.
 
 Przy odrzuceniu PIN jest czyszczony, brak startu.
+
+Decyzja (użytkownik, 2026-11-01, po teście na telefonie): wpis `Unknown(BOLUS_FAILED)` (AAPS odpisał „Bolus nie powiodl sie…”, BOL-21) **nie liczy się** do odstępu – po tym wpisie `CommandLauncher.launch` zwraca `Started` (brak `BOLUS_INTERVAL`) przy `minutesLeft == null`. Podstawa: wyłącznie decyzja użytkownika (chce móc ponowić `BOLUS` po komunikacie AAPS „Bolus nie powiodl sie”). Kontekst, nie powód: AAPS liczy własny odstęp tylko od udanego bolusa (B10), więc po błędzie nie odmówi kolejnego; odstęp w aplikacji był świadomie ostrzejszy niż w AAPS, a jego zdjęcie dla tego jednego wyniku jest przyjętym ryzykiem. AAPS w tej samej wiadomości każe zweryfikować prawdziwy stan, a wynik w aplikacji zostaje „nieznany” z ostrzeżeniem bolusowym (BOL-16, BOL-22). Pozostałe wyniki `Unknown` po kodzie (np. `UNRECOGNIZED_REPLY`, `CONFIRMATION_TIMEOUT`, `AMOUNT_MISMATCH`) i `BolusConfirmed` liczą się nadal, bo bolus mógł zostać podany, a AAPS nie zgłosił błędu. Ryzyko – „Bezpieczeństwo”.
 
 Decyzja: wpis `Failed(WRONG_CODE)` ma wysłany kod, więc liczy się do odstępu – literówka w PIN-ie blokuje ponowną próbę z aplikacji do końca odstępu. To strona bezpieczna (aplikacja nie wie na pewno, czy AAPS odrzucił kod); w razie potrzeby użytkownik ustawia odstęp 0 albo podaje bolus w AAPS.
 
@@ -282,6 +284,14 @@ Komunikaty:
 - **Zakładając** wpis `BOLUS` `Failed(AMOUNT_MISMATCH)` bez wysłania kodu z zakończeniem `T0 − 60 000`, **gdy** wywołano `launch`, **wtedy** `Started` (bolus nie mógł zostać podany).
 - **Zakładając** wpis `BOLUS` `BolusConfirmed` z wysłaniem kodu `T0 + 60 000` (zegar cofnięty), **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 15.
 - **Zakładając** wpis `CARBS` `CarbsConfirmed` z wysłaniem kodu `T0 − 60 000`, **gdy** wywołano `launch(BOLUS …)`, **wtedy** `Started`.
+- **Zakładając** wpis `BOLUS` `Unknown(BOLUS_FAILED)` z wysłaniem kodu `T0 − 60 000` (1 min), **gdy** wywołano `BolusInterval.minutesLeft`, **wtedy** wynik = `null`.
+- **Zakładając** ten sam wpis, **gdy** wywołano `launch(BOLUS 0,10 j., PIN)`, **wtedy** `Started` (brak `BOLUS_INTERVAL`).
+- **Zakładając** wpis `BOLUS` `Unknown(BOLUS_FAILED)` z wysłaniem kodu `T0 − 60 000` i wpis `BOLUS` `BolusConfirmed` z wysłaniem kodu `T0 − 600 000`, **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 5 (wpis z błędem nie zmienia odstępu od potwierdzonego).
+- **Zakładając** kilka wpisów `BOLUS` `Unknown(BOLUS_FAILED)` (kody `T0 − 60 000`, `T0 − 120 000`, `T0 − 180 000`), **gdy** wywołano `BolusInterval.minutesLeft`, **wtedy** `null`.
+- **Zakładając** wpis `BOLUS` `BolusConfirmed` z kodem `T0 − 600 000` i nowszy wpis `Unknown(BOLUS_FAILED)` z kodem `T0 − 60 000`, **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 5 (liczy się tylko `BolusConfirmed`).
+- **Zakładając** wpis `Unknown(BOLUS_FAILED)` z kodem `T0 − 600 000` i późniejszy `BolusConfirmed` (druga próba po błędzie) z kodem `T0 − 60 000`, **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 14 (odstęp od drugiej próby).
+- **Zakładając** wpis `BOLUS` `Unknown(AMOUNT_MISMATCH)` z wysłaniem kodu `T0 − 60 000`, **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 14 (nadal się liczy).
+- **Zakładając** wpis `BOLUS` `Unknown(CONFIRMATION_TIMEOUT)` (osobno `Unknown(UNRECOGNIZED_REPLY)` i `Unknown` z powodem `null`) z wysłaniem kodu `T0 − 60 000`, **gdy** wywołano `launch`, **wtedy** `BOLUS_INTERVAL` z M = 14.
 - **Zakładając** historię `Unavailable`, **gdy** wywołano `launch(BOLUS …)`, **wtedy** `BOLUS_HISTORY_UNAVAILABLE`; przy odstępie 0 – `Started` bez czytania historii.
 
 ### UI
@@ -418,7 +428,7 @@ Sesja `BOLUS`:
 - z `receivedAt` < chwili wysłania kodu → wiadomość nieoczekiwana (dotyczy innego polecenia), sesja czeka dalej;
 - w `AWAITING_CODE_REQUEST` i `PREPARING_CODE` → `Failed(UNRECOGNIZED_REPLY)`, kod nie jest wysyłany (błąd innego bolusa = stan AAPS inny, niż zakłada sesja).
 
-Nowa wartość `UnknownReason`: `BOLUS_FAILED`. Wpis z tym wynikiem ma wysłany kod, więc liczy się do odstępu aplikacji (BOL-12, bez zmian).
+Nowa wartość `UnknownReason`: `BOLUS_FAILED`. Wpis z tym wynikiem ma wysłany kod, ale od 2026-11-01 **nie liczy się** do odstępu aplikacji (BOL-12) – na podstawie decyzji użytkownika (kontekst: AAPS po błędzie nie zmienia `lastRemoteBolusTime`, B10). Wynik zostaje „nieznany” z ostrzeżeniem bolusowym.
 
 **Kryteria akceptacji:**
 
@@ -429,7 +439,7 @@ Nowa wartość `UnknownReason`: `BOLUS_FAILED`. Wpis z tym wynikiem ma wysłany 
 - **Zakładając** sesję `BOLUS 1,20 j.` z kodem wysłanym w chwili 60 000, **gdy** w chwili 120 000 przychodzi `bolus-blad.txt`, **wtedy** wynik = `Unknown(BOLUS_FAILED)` z treścią pliku; port dostał dokładnie 2 SMS-y: `BOLUS 1.2` i `0504714321`.
 - **Zakładając** sesję `BOLUS 1,20 j.`, w której `bolus-blad.txt` odebrano w `SENDING_CODE` z chwilą odbioru wcześniejszą niż chwila wysłania kodu, **gdy** port zwrócił „wysłano”, **wtedy** wiadomość trafia do nieoczekiwanych, a faza = `AWAITING_CONFIRMATION`.
 - **Zakładając** sesję `BOLUS 0,10 j.` w `AWAITING_CODE_REQUEST`, **gdy** przychodzi `bolus-blad.txt`, **wtedy** `Failed(UNRECOGNIZED_REPLY)` i port nie dostał kodu.
-- **Zakładając** wpis historii `BOLUS` `Unknown(BOLUS_FAILED)` z wysłaniem kodu `T0 − 600 000`, **gdy** wywołano `launch(BOLUS 0,10 j., PIN)` (odstęp 15 min), **wtedy** `BOLUS_INTERVAL` z M = 5 (BOL-12).
+- **Zakładając** wpis historii `BOLUS` `Unknown(BOLUS_FAILED)` z wysłaniem kodu `T0 − 600 000`, **gdy** wywołano `launch(BOLUS 0,10 j., PIN)` (odstęp 15 min), **wtedy** `Started` (BOL-12, zmiana 2026-11-01).
 - **Zakładając** wynik parsera i wynik sesji z `bolus-blad.txt`, **gdy** wywołano `toString()`, **wtedy** tekst nie zawiera `94%` ani żadnej linii treści.
 
 ### BOL-22: Teksty wyniku i historia odmów i błędu bolusa
@@ -442,7 +452,7 @@ Wyniki (CMDUI-19; dodatki „Kod nie został wysłany.” i ostrzeżenie bolusow
 | `Failed(AAPS_BOLUS_QUEUE)` | błąd | „AAPS odmówił bolusa: w kolejce pompy czeka inny bolus.” |
 | `Unknown(BOLUS_FAILED)` | nieznany | „AAPS zgłosił, że bolus się nie powiódł. Sprawdź w AAPS, ile insuliny podano.” |
 
-Treść SMS pokazana (CMDUI-20). Historia (zmiana DATA-09, HISTUI-04): nowe stałe teksty powodów `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` (przy `FAILED`) i `BOLUS_FAILED` (przy `UNKNOWN`), bez zmiany schematu bazy; tekst wyniku wpisu – jak w tabeli. Nieznany tekst powodu w bazie – jak dotychczas (DATA-09).
+Treść SMS pokazana (CMDUI-20). Teksty bez zmian po decyzji 2026-11-01 (BOL-12): komunikat `Unknown(BOLUS_FAILED)` i ostrzeżenie bolusowe „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.” zostają – aplikacja nie blokuje kolejnego `BOLUS`, ale nadal każe najpierw sprawdzić stan w AAPS. Historia (zmiana DATA-09, HISTUI-04): nowe stałe teksty powodów `AAPS_BOLUS_INTERVAL`, `AAPS_BOLUS_QUEUE` (przy `FAILED`) i `BOLUS_FAILED` (przy `UNKNOWN`), bez zmiany schematu bazy; tekst wyniku wpisu – jak w tabeli. Nieznany tekst powodu w bazie – jak dotychczas (DATA-09).
 
 **Kryteria akceptacji:**
 
@@ -457,12 +467,12 @@ Treść SMS pokazana (CMDUI-20). Historia (zmiana DATA-09, HISTUI-04): nowe sta�
 | Tekst ilości pusty / zły / za dużo miejsc / poza krokiem / poza zakresem | błąd pod polem, brak podsumowania | BOL-03, BOL-13 |
 | Ilość > połowy limitu | okno „Na pewno X j.?” przed PIN-em | BOL-04, BOL-14 |
 | Limit zmieniony między „Dalej” a „Wyślij” | `AMOUNT_ABOVE_LIMIT`, PIN wyczyszczony | LIM-09 |
-| Ostatni bolus z aplikacji w odstępie / zegar cofnięty | `BOLUS_INTERVAL`, PIN wyczyszczony, brak SMS-a | BOL-12 |
+| Ostatni bolus z aplikacji (poza `Unknown(BOLUS_FAILED)`) w odstępie / zegar cofnięty | `BOLUS_INTERVAL`, PIN wyczyszczony, brak SMS-a | BOL-12 |
 | Historia niedostępna przy odstępie > 0 | `BOLUS_HISTORY_UNAVAILABLE` | BOL-12 |
 | AAPS obciął ilość (prośba o kod z inną ilością) | `Failed(AMOUNT_MISMATCH)`, kod nie jest wysyłany | BOL-08, BOL-10 |
 | Odmowa AAPS przed kodem: odstęp / bolus w kolejce | `Failed(AAPS_BOLUS_INTERVAL)` / `Failed(AAPS_BOLUS_QUEUE)` z treścią, kod nie jest wysyłany | BOL-20, BOL-22 |
 | Inna odmowa AAPS przed kodem (pętla zawieszona, zdalne wyłączone, `Bledny format`) | `Failed(UNRECOGNIZED_REPLY)` z treścią, kod nie jest wysyłany | BOL-10 |
-| Błąd bolusa po kodzie (`Bolus nie powiodl sie…`) | `Unknown(BOLUS_FAILED)` z treścią i ostrzeżeniem bolusowym | BOL-21, BOL-22 |
+| Błąd bolusa po kodzie (`Bolus nie powiodl sie…`) | `Unknown(BOLUS_FAILED)` z treścią i ostrzeżeniem bolusowym; nie liczy się do odstępu aplikacji (`CommandLauncher.launch` zwraca `Started`, brak `BOLUS_INTERVAL`, przy `minutesLeft == null`) | BOL-12, BOL-21, BOL-22 |
 | Brak prośby o kod w 3 min | `TimedOut`, bez kodu | BOL-10 |
 | Zły kod | `Failed(WRONG_CODE)`; kolejny bolus z aplikacji dopiero po odstępie | BOL-11, BOL-12 |
 | Prośba o kod innego polecenia (np. `CARBS`) w sesji `BOLUS` | `Failed(UNRECOGNIZED_REPLY)`, bez kodu | BOL-19 |
@@ -473,7 +483,8 @@ Treść SMS pokazana (CMDUI-20). Historia (zmiana DATA-09, HISTUI-04): nowe sta�
 ## Bezpieczeństwo
 
 - **Kod tylko na zgodną prośbę.** Jedyną drogą do kodu jest „prośba o kod (bolus)” z ilością równą wysłanej, w fazie `AWAITING_CODE_REQUEST` (BOL-07, BOL-10, SESSION-08). Obcięta ilość, nierozpoznana treść, inny nadawca (filtr `sms`), wiadomość sprzed wysłania (SESSION-05) – stop bez kodu. Rozpoznane odmowy i błąd bolusa (BOL-20, BOL-21) tylko kończą sesję czytelnym wynikiem – nigdy nie dają kodu ani ponowienia.
-- **Błąd bolusa to „nieznany”, nie „błąd”** (BOL-21): AAPS każe sprawdzić prawdziwy stan, bo część dawki mogła zostać podana; wynik ma ostrzeżenie przed ponowieniem, a wpis liczy się do odstępu (BOL-12).
+- **Błąd bolusa to „nieznany”, nie „błąd”** (BOL-21): AAPS każe sprawdzić prawdziwy stan, bo część dawki mogła zostać podana; wynik ma ostrzeżenie przed ponowieniem. Od 2026-11-01 wpis **nie liczy się** do odstępu aplikacji (BOL-12, decyzja użytkownika).
+- **Ryzyko: ponowny bolus po błędzie bolusa (świadomie przyjęte przez użytkownika, 2026-11-01).** Po `Unknown(BOLUS_FAILED)` aplikacja nie blokuje kolejnego `BOLUS`, a AAPS też go nie odmówi (B10). Gdy pompa podała część dawki mimo błędu, ponowne polecenie może podać kolejną dawkę. Mitigacje: AAPS w tej samej wiadomości każe zweryfikować prawdziwy stan przed kolejną komendą (B5); wynik w aplikacji to „nieznany” z treścią SMS i ostrzeżeniem „Nie ponawiaj bolusa, zanim nie sprawdzisz w AAPS, czy został podany.” (BOL-16, BOL-22); okno „Na pewno X j.?” tylko dla ilości powyżej połowy limitu (BOL-14) – ponowienie małego bolusa (do połowy limitu), czyli typowy przypadek retry, wymaga wyłącznie PIN-u, a po `BOLUS_FAILED` w aplikacji nie ma już żadnej blokady (ostrzeżenie widać tylko w wyniku poprzedniego polecenia); limit bolusa w Ustawieniach (Spec 011) i max bolus AAPS; PIN AAPS wpisywany przy każdym poleceniu (BOL-15); aplikacja nigdy nie ponawia bolusa sama (SESSION-20). Pozostałe wyniki „nieznany” po kodzie nadal blokują kolejny bolus do końca odstępu.
 - **Bez ponawiania.** Najwyżej 1 SMS `BOLUS` i 1 kod na sesję; każdy wątpliwy wynik po kodzie to „nieznany – sprawdź w AAPS” z ostrzeżeniem przed powtórzeniem bolusa (BOL-11, BOL-16). Aplikacja nie koryguje ilości.
 - **Bez omijania limitów AAPS.** Limit i odstęp w aplikacji tylko zawężają (Spec 011, BOL-12); AAPS decyduje ostatecznie.
 - **Potwierdzenie bolusa nie dowodzi wykonania polecenia z aplikacji** (jak A5): przyjmowane tylko po wysłaniu kodu, z ilością równą wysłanej, prezentowane jako „AAPS potwierdził podanie X j.”. Ryzyko szczątkowe jak w SESSION-12 (bolus z tą samą ilością z innego numeru w oknie oczekiwania).
@@ -498,8 +509,9 @@ Tylko AAPS z wirtualną pompą. Wyniki opisuje PR zadania, które wprowadza ekra
 | W1 | `BOLUS 0,1` z poprawnym PIN-em: podsumowanie, kroki, prośba o kod, „AAPS potwierdził podanie 0,10 j.”; zanotować treść potwierdzenia | BOL-13, BOL-15, BOL-16 |
 | W2 | Limit aplikacji 10 j., `BOLUS 6` przy max bolus AAPS 5 j. → „AAPS podał inną ilość…”, kod nie wysłany (skrzynka wysłanych: tylko `BOLUS 6`) | BOL-10 |
 | W3 | Aktualizacja z wersji z historią w bazie 1: wpisy zachowane; nowy wpis „BOLUS 0,10 j.” | BOL-17 |
-| W4 | Drugi `BOLUS` przed upływem 15 min → komunikat o odstępie bez SMS-a; odstęp 0 w Ustawieniach → AAPS odpowiada sam (zanotować treść odmowy AAPS – dane do P3) | BOL-12 |
+| W4 | Drugi `BOLUS` przed upływem 15 min po bolusie potwierdzonym albo „nieznanym” innym niż błąd bolusa → komunikat o odstępie bez SMS-a; odstęp 0 w Ustawieniach → AAPS odpowiada sam (zanotować treść odmowy AAPS – dane do P3) | BOL-12 |
 | W5 | Zły PIN → zanotować treść i wynik; `FLAG_SECURE` okna „Na pewno 3 j.?” i podsumowania | BOL-11, BOL-14 |
+| W7 | Po zadaniu zmiany 2026-11-01 (design, „Zmiana 2026-11-01”; wynik w opisie PR, nie warunek scalenia): gdy wystąpi „Bolus nie powiodl sie…” (nie da się wywołać na żądanie), kolejny `BOLUS 0,05` (`launch` zwraca `Started`, brak `BOLUS_INTERVAL`) → brak komunikatu o odstępie, podsumowanie z PIN-em otwarte; wynik poprzedniego w historii nadal „nieznany” | BOL-12, BOL-21 |
 | W6 | Po zadaniu 2 zmiany 2026-10-31 (design 013; wynik w opisie PR, nie warunek scalenia): odstęp aplikacji 0, dwa bolusy 0,05 j. w odstępie < 15 min → drugi kończy się „AAPS odmówił bolusa: … minimalny odstęp w AAPS” z treścią `Bolus zdalny niedostepny. Sprobuj ponownie pozniej.`, kod nie wysłany. Kolejki i błędu bolusa nie da się wywołać na żądanie – zanotować, jeśli wystąpią. Gdy treść różni się od pliku z `dane/` – PR `Spec:` z poprawką | BOL-20 – BOL-22 |
 
 ## Otwarte pytania
@@ -511,7 +523,7 @@ Brak (P3 częściowo zastąpione przez P10, 2026-10-31). Decyzje użytkownika pr
 - [x] **P3. Odmowy przed kodem** (bolus w kolejce, minimalny odstęp, pętla zawieszona) i błąd bolusa po kodzie – treści nieznane. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – „nierozpoznana” → przed kodem `Failed(UNRECOGNIZED_REPLY)`, po kodzie `Unknown`; treść zawsze pokazana. Osobne wzorce po zebraniu SMS-ów (W4).
 - [x] **P4. „Zly kod” dla bolusa.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – jak A2 → `Failed(WRONG_CODE)` (wspólny kod AAPS `AuthRequest`); do potwierdzenia na wirtualnej pompie (W5). Alternatywa ostrożniejsza: `Unknown(UNRECOGNIZED_REPLY)`.
 - [x] **P5. Krok ilości.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – wielokrotności 0,05 j. (BOL-02). Gdy pompa ma większy krok, AAPS zaokrągli i poprosi o kod z inną ilością → stop (bezpiecznie, ale polecenie się nie uda).
-- [x] **P6. Odstęp w aplikacji.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – (BOL-12) aplikacja sama pilnuje odstępu na podstawie własnej historii (bolusy z wysłanym kodem, potwierdzone albo nieznane), mierzonego od wysłania kodu; historia niedostępna → blokada; zegar cofnięty → blokada; 0 = wyłączone. Alternatywa: tylko zapis ustawienia bez sprawdzania (AAPS i tak odmówi). Doprecyzowanie: `Failed(WRONG_CODE)` liczy się do odstępu (decyzja w BOL-12); nieudany zapis historii, „Wyczyść historię” i przestawiony zegar to ryzyko szczątkowe opisane w BOL-12.
+- [x] **P6. Odstęp w aplikacji.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – (BOL-12) aplikacja sama pilnuje odstępu na podstawie własnej historii (bolusy z wysłanym kodem, potwierdzone albo nieznane; od 2026-11-01 bez `Unknown(BOLUS_FAILED)`, zob. zmiana 2026-11-01), mierzonego od wysłania kodu; historia niedostępna → blokada; zegar cofnięty → blokada; 0 = wyłączone. Alternatywa: tylko zapis ustawienia bez sprawdzania (AAPS i tak odmówi). Doprecyzowanie: `Failed(WRONG_CODE)` liczy się do odstępu (decyzja w BOL-12); nieudany zapis historii, „Wyczyść historię” i przestawiony zegar to ryzyko szczątkowe opisane w BOL-12.
 - [x] **P7. Potwierdzenie do wszystkich numerów.** Nie wiemy, czy AAPS wysyła potwierdzenie bolusa także na inne dozwolone numery. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – przyjmować je jak `CARBS` (tylko po kodzie, prezentacja „AAPS potwierdził”).
 - [x] **P8. Ostrzeżenie dla `Unknown` bolusa.** Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – osobny tekst „Nie ponawiaj bolusa…” (BOL-16).
 - [x] **P9. Wersja AAPS** dla nowych SMS-ów. Rozstrzygnięte (użytkownik, 2026-10-28): przyjęto propozycję – 3.4.2.6 jak w Spec 002.
@@ -522,9 +534,12 @@ Propozycje specyfikatora w zmianie 2026-10-31 (scalenie PR `Spec: …` = akcepta
 
 ## Przyszłe zmiany (nie blokują)
 
+- Opcjonalne ostrzeżenie w podsumowaniu `BOLUS` (bez blokady), gdy ostatni bolus z aplikacji to `Unknown(BOLUS_FAILED)` – propozycja recenzenta po zmianie 2026-11-01; nie wprowadzone.
 - Rozpoznawanie pozostałych odmów z kodu AAPS 3.4.2.6 (B4): `Pompa wstrzymana`, `Zdalne komendy nie sa dozwolone`, `Bledny format` przed kodem; `Przekroczono limit czasu oczekiwania na zakonczenie poprzedniej komunikacji z pompa` po kodzie (B6) – dziś „nierozpoznana”.
 
 ## Historia zmian
+
+- **2026-11-01 – błąd bolusa nie liczy się do odstępu (decyzja użytkownika po teście na telefonie).** BOL-12: wpis `Unknown(BOLUS_FAILED)` nie liczy się do odstępu aplikacji (warunek, decyzja, kryteria); BOL-21: zdanie o odstępie i kryterium `launch` → `Started`; BOL-22: teksty bez zmian (zdanie wyjaśniające); skutek B10, „Przypadki błędów”, „Bezpieczeństwo” (ryzyko ponownego bolusa po błędzie i mitigacje), W4, nowe W7. Design: „Zmiana 2026-11-01” z jednym zadaniem. Identyfikatory wymagań bez zmian; Spec 009 bez zmian (komunikat `BOLUS_INTERVAL` odwołuje się do BOL-12).
 
 - **2026-10-31 – scalenie planowanych zmian po BOL-20 – BOL-22 (po wdrożeniu).** Wykonano zadanie 4 zmiany 2026-10-31 (design 013): treść PARSER-01 (Spec 002), SESSION-11 – SESSION-13 (Spec 004), DATA-09 (Spec 007), CMDUI-19 (Spec 009) i HISTUI-04 (Spec 010) przepisana zgodnie z BOL-20 – BOL-22 i stanem kodu na `main`; wpisy „Planowane zmiany” w tych specyfikacjach zamienione na zwykłe wpisy historii. Wymagania Spec 012 bez zmian.
 
