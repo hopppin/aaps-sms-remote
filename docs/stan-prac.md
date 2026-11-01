@@ -2,7 +2,7 @@
 
 Krótki obraz tego, gdzie jest projekt. Czytaj na początku sesji; aktualizuj na końcu (skill `/aktualizuj-stan`). Szczegóły: [plan](plan.md), [specyfikacje](specs/README.md), [zasady](../AGENTS.md).
 
-_Ostatnia aktualizacja: 2026-10-31 (po #270)_
+_Ostatnia aktualizacja: 2026-11-01 (po #276)_
 
 ## Zrobione
 
@@ -38,11 +38,15 @@ _Ostatnia aktualizacja: 2026-10-31 (po #270)_
 | Spec 002–010 po 011–013 | wpisy „Planowane zmiany” zamienione na zwykłe; wymagania przepisane zgodnie z kodem (dwa przebiegi: 2026-10-29 i 2026-10-31) | PR #253, #270 (issues #237, #259) |
 | Dane z kodu AAPS 3.4.2.6 | odczyt kodu SMS Communicatora (lokalny klon, tylko do odczytu): `PROFILE 1 100` ≡ `PROFILE 1`, teksty odmów i błędu bolusa, korekta A6 (prośbę o kod nadpisują tylko polecenia tworzące nową prośbę), nowe rozpoznawanie odpowiedzi; raport w `docs/specs/013-profil/dane/aaps-kod-zrodlowy.md` | PR #263 (spec), #267–#269 (kod) |
 | Panel poleceń | kolejność sekcji Bolus, Profil, CARBS, BG, PUMP; fokus i klawiatura na polu PIN w podsumowaniu (CMDUI-28) | PR #262 (issue #258) |
+| Test na telefonie (2026-11-01) | użytkownik potwierdził: klawiatura nie zasłania pola PIN w podsumowaniu; po odmowie AAPS przy za krótkim odstępie bolusa pokazuje się komunikat o odstępie | – |
+| Odstęp po błędzie bolusa | `Unknown(BOLUS_FAILED)` („Bolus nie powiodl sie”) nie wlicza się do odstępu, kolejny `BOLUS` można wysłać od razu (decyzja użytkownika); `BolusConfirmed` i pozostałe `Unknown` po kodzie nadal blokują; ryzyko podwójnej dawki przy częściowo podanym bolusie zapisane jako zaakceptowane | PR #274 (spec), #276 (kod, issue #275) |
+| Sprzątanie profilu | nieaktualne komentarze KDoc i nazwa `CommandParameter.Percent` | PR #273 (issue #271) |
+| Porównanie z AAPS 4.0.0 | SMS Communicator istnieje w 4.0.0, ale zmienił się m.in. format `BG`, liczenie odstępu bolusa (od przyjęcia przez pompę, także po błędzie), zakres procentu profilu (30–250) i odmowy po kodzie; nowy Client Control (Nightscout, drugi telefon z AAPSClient) bez TOTP/PIN. Raport: [aaps-4.0.0-porownanie.md](specs/013-profil/dane/aaps-4.0.0-porownanie.md) | – |
 | Test na telefonie | pierwsza instalacja APK (debug) na telefonie z AAPS: Historia, `BG`, `CARBS 1` z kodem działają; `PUMP` bez pompy przy telefonie nie dostaje stanu pompy (AAPS odpowiada spóźnionym „Odczyt statusu nie powiodl sie”, aplikacja traktuje to jako wiadomość nieoczekiwaną) | zamknięte issue #205 |
 
 ## W toku
 
-Otwarte: #271 (sprzątanie komentarzy KDoc i nazwy `CommandParameter.ProfileAndPercent`, bez zmiany zachowania). Bolus i zmiana profilu czekają na ręczny test na wirtualnej pompie (nigdy na prawdziwej).
+Brak otwartych issues i PR-ów. Projekt jest zamknięty dla AAPS 3.4.x (3.4.2.6): użytkownik przechodzi na AAPS 4.0 z Client Control, więc zgodność z 4.0 nie jest planowana. Bolus i zmiana profilu mogą jeszcze czekać na ręczny test na wirtualnej pompie (nigdy na prawdziwej).
 
 Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 
@@ -68,6 +72,8 @@ Stan PR-ów: `gh pr list`, stan issues: `gh issue list`.
 - **Profil (2026-10-30):** użytkownik zmienia tylko profil 1, więc aplikacja nie pobiera listy profili: przycisk „Zmień profil” z samym procentem, SMS `PROFILE 1 <p>`. Konsekwencja zaakceptowana przez użytkownika: aplikacja nie zna nazwy profilu i porównuje w prośbie o kod tylko procent (wyjątek od zasady zgodności odpowiedzi, zapisany w AGENTS.md i spec 013); ryzyko szczątkowe: ręczna zmiana profilu z tego samego numeru AAPS po wysłaniu naszego kodu zostałaby uznana za nasze potwierdzenie.
 - **Panel (2026-10-30):** kolejność Bolus, Profil, CARBS, BG, PUMP; pole PIN w podsumowaniu od razu z fokusem i klawiaturą.
 - **Dane AAPS z kodu, nie z telefonu (2026-10-31):** użytkownikowi trudno sprawdzać odpowiedzi AAPS na telefonie, więc teksty odmów, błędu bolusa i potwierdzenia profilu wzięto z kodu AAPS 3.4.2.6; testy W5/W6 na wirtualnej pompie nie są warunkiem scalenia, tylko późniejszym sprawdzeniem.
+- **Koniec rozwoju dla AAPS 3.4 (2026-11-01):** AAPS 4.0.0 wyszło jako stabilne 2026-10-31; użytkownik przechodzi na Client Control, a ta aplikacja zostaje w obecnym stanie jako obsługa AAPS 3.4.x. Zgodność z 4.0 (format `BG`, odstęp bolusa od przyjęcia przez pompę, zakres procentu 30–250, odmowy po kodzie) nie jest planowana.
+- **Odstęp po błędzie bolusa (2026-11-01):** po SMS-ie „Bolus nie powiodl sie” użytkownik chce móc od razu ponowić `BOLUS`; aplikacja nie liczy takiego bolusa do odstępu (na AAPS 3.4 AAPS też liczy odstęp tylko od udanego bolusa; w 4.0 liczy od przyjęcia przez pompę).
 - **Proces:** po pierwszej recenzji CodeRabbita poprawki zasadnych uwag scala się po zielonym buildzie, bez czekania na ponowną recenzję (każda trwa 10–15 min); `recenzent` obowiązkowy dla PR z `bezpieczenstwo`; `codex-latwe.sh` bierze zależności ze stanem `MERGED` tak samo jak `CLOSED`.
 
 ## Otwarte (do ustalenia)
