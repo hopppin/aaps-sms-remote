@@ -138,6 +138,15 @@ sealed interface SessionOutcome {
 //   (przed kodem – istniejąca gałąź else → Failed(UNRECOGNIZED_REPLY))
 ```
 
+### Zmiana 2026-11-01: drugi tekst powiadomienia (PROF-20)
+
+```kotlin
+// AapsPl3426Patterns – jedyna zmiana kodu produkcyjnego; oba teksty to zasób AAPS profile_set_ok (R11):
+val PROFILE_BASE_UPDATED = Regex("""(?:Profil bazowy w pompie uaktualniony|Profil pomyslnie ustawiony)""")
+// AapsReply.ProfileBaseUpdated, parseProfileSwitch, CommandSession – bez zmian
+// (po kodzie addUnexpected, przed kodem gałąź else → Failed(UNRECOGNIZED_REPLY)).
+```
+
 `data`: `HistoryOutcome.ProfileSwitchConfirmed` (bez pól, jak `BolusConfirmed`), literał `PROFILE_SWITCH_CONFIRMED` w `HistoryCodec`. `ui`: `ResultMapper` (sukces, argument = `percent`), `HistoryEntryMapper` (argument = `profilePercent` wpisu, brak → „Brak szczegółów wyniku …”), klucz `result_profile_switch_confirmed` w `strings.xml`; historia używa wspólnych kluczy `result_*` (jak bolus i `CARBS`, HISTUI-04), bez osobnego klucza `history_outcome_*` dla tego wyniku.
 
 ## Model danych i stany
@@ -170,6 +179,7 @@ Historia bez zmian schematu: `HistoryCommand` z `PROFILE_STATUS`, `PROFILE_LIST`
 | Bez wyniku „potwierdzono zmianę profilu” (do 2026-10-30) | zgadnięty wzorzec | Treść nieznana – `Unknown` z treścią (P4). Zastąpione 2026-10-31 przez PROF-19 (treść z kodu AAPS, R8). |
 | `ProfileSwitchConfirmed` z procentem z polecenia sesji (2026-10-31) | wynik bez procentu | AAPS nie podaje procentu w potwierdzeniu; procent wysłany był sprawdzony w prośbie o kod (PROF-08, PROF-12), a komunikat („AAPS potwierdził zmianę profilu (polecenie: profil 1, P%).”) mówi o potwierdzeniu AAPS i podaje procent jako dane polecenia. Treść prośby o kod (nazwa profilu) jest dołączona do `text`, bo samo potwierdzenie jej nie zawiera. |
 | `Profil bazowy w pompie uaktualniony`: po kodzie nieoczekiwana, przed kodem stop (2026-10-31) | zawsze nieoczekiwana; zawsze nierozpoznana | Po kodzie powiadomienie może towarzyszyć naszej zmianie (R11) i nie powinno kończyć sesji „nieznanym”; przed kodem oznacza zmianę profilu z innego źródła – w razie wątpliwości stop (AGENTS.md). |
+| `Profil pomyslnie ustawiony` jako ten sam wynik `ProfileBaseUpdated` (2026-11-01, P14) | nowy rodzaj wyniku; potwierdzenie sukcesu; zostawić „nierozpoznana” | Ten sam zasób AAPS (`profile_set_ok`) w innym buildzie, te same warunki wysyłki (R11) – osobny typ nic nie wnosi. Nie jest potwierdzeniem: idzie do wszystkich numerów i tylko przy części zmian; sukces potwierdza tylko `Zmiana profilu wykonana`. Jedna alternatywa w istniejącym wzorcu = zmiana tylko w `parser`, sesja bez zmian. Bez wariantów angielskich: parser rozpoznaje tylko polski AAPS 3.4.2.6 (P6). |
 | Wzorce PROF-19, PROF-20 tylko w kontekście zmiany profilu | we wszystkich kontekstach | Najmniejsza zmiana PARSER-01; inne konteksty – „Przyszłe zmiany”. |
 | Powód `AMOUNT_MISMATCH` dla profilu | nowy `PROFILE_MISMATCH` | Bez zmiany `FailureReason`, DATA-09 i testów parytetu historii; tekst rozróżnia `ui` po poleceniu. |
 | Osobna migracja 2 → 3 | wspólna z bolusem | Każda spec ma własne zadanie danych; kolejność 012 → 013. |
@@ -191,6 +201,10 @@ Historia bez zmian schematu: `HistoryCommand` z `PROFILE_STATUS`, `PROFILE_LIST`
 | PROF-21 | `ResultMapperProfileTest`, `HistoryCodecProfileTest`, `HistoryEntryMapperProfileTest` |
 
 ## Podział na zadania
+
+### Zadanie zmiany 2026-11-01
+
+1. **Parser: drugi tekst powiadomienia o ustawieniu profilu** – `parser/AapsPl3426Patterns.kt` (`PROFILE_BASE_UPDATED` z dwoma alternatywami, komentarz z R11); kopia `dane/profile-pomyslnie-ustawiony.txt` bez zmian do `app/src/test/resources/parser/aaps-3.4.2.6-pl/`, `AapsSamples.profileSettingOk`; testy `ProfileReplyParserTest` (oba teksty → `ProfileBaseUpdated` z treścią; wersja z `ś`, angielskie, z kropką, z dopisaną linią → `Unrecognized`; inne konteksty → `Unrecognized`), `ParserRedactionTest` (`toString()`), `CommandSessionProfileFlowTest` (po kodzie: powiadomienie → sukces = `ProfileSwitchConfirmed(100)` i 1 kod; sukces → powiadomienie = ten sam wynik i 1 kod; samo powiadomienie → `Unknown(CONFIRMATION_TIMEOUT)`; przed kodem → `Failed(UNRECOGNIZED_REPLY)` bez kodu). Bez zmian w `session`, `data`, `ui`. Wymaganie: PROF-20. Etykiety `bezpieczenstwo`, `trudnosc:latwe`. Zależy od scalenia tej zmiany spec.
 
 ### Zadania zmiany 2026-10-31
 
